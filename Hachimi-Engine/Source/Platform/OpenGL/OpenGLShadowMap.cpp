@@ -21,6 +21,11 @@ namespace HachimiEngine
 
     void OpenGLShadowMap::BindForWriting()
     {
+        // Shadow passes run nested inside the viewport's scene framebuffer, so the
+        // previous binding and viewport must be restored afterwards.
+        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &m_PreviousFramebuffer);
+        glGetIntegerv(GL_VIEWPORT, m_PreviousViewport.data());
+
         glBindFramebuffer(GL_FRAMEBUFFER, m_Framebuffer);
         glViewport(0, 0, static_cast<GLsizei>(m_Width), static_cast<GLsizei>(m_Height));
         glClearDepth(1.0);
@@ -29,7 +34,12 @@ namespace HachimiEngine
 
     void OpenGLShadowMap::Unbind()
     {
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(m_PreviousFramebuffer));
+        glViewport(
+            m_PreviousViewport[0],
+            m_PreviousViewport[1],
+            m_PreviousViewport[2],
+            m_PreviousViewport[3]);
     }
 
     void OpenGLShadowMap::Resize(uint32_t width, uint32_t height)
