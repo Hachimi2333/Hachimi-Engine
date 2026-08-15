@@ -43,13 +43,21 @@ namespace HachimiEngine
 
             m_Window->OnUpdate();
 
+            AppUpdateEvent updateEvent;
+            OnEvent(updateEvent);
+            m_LayerStack.Update(timestep);
+
             if (!m_Minimized)
             {
+                AppRenderEvent renderEvent;
+                OnEvent(renderEvent);
+
                 // Temporary clear color until the renderer abstraction owns scene presentation.
                 glClearColor(0.08f, 0.08f, 0.10f, 1.0f);
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
                 glEnable(GL_DEPTH_TEST);
 
+                m_LayerStack.RenderImGui();
                 m_Window->SwapBuffers();
             }
         }
@@ -65,6 +73,8 @@ namespace HachimiEngine
         EventDispatcher dispatcher(event);
         dispatcher.Dispatch<WindowCloseEvent>([this](WindowCloseEvent& closeEvent) { return OnWindowClose(closeEvent); });
         dispatcher.Dispatch<WindowResizeEvent>([this](WindowResizeEvent& resizeEvent) { return OnWindowResize(resizeEvent); });
+
+        m_LayerStack.DispatchEvent(event);
     }
 
     bool Application::OnWindowClose(WindowCloseEvent& event)

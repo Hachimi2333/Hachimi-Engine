@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Base.h"
+#include "Core/LayerStack.h"
 #include "Core/Memory.h"
 #include "Core/Window.h"
 #include "Events/ApplicationEvent.h"
@@ -20,6 +21,11 @@ namespace HachimiEngine
         void Run();
         void Close();
 
+        void PushLayer(const Ref<Layer>& layer) { m_LayerStack.PushLayer(layer); }
+        void PushOverlay(const Ref<Layer>& overlay) { m_LayerStack.PushOverlay(overlay); }
+        void PopLayer(const Ref<Layer>& layer) { m_LayerStack.PopLayer(layer); }
+        void PopOverlay(const Ref<Layer>& overlay) { m_LayerStack.PopOverlay(overlay); }
+
         Window& GetWindow() { return *m_Window; }
         static Application& Get() { return *s_Instance; }
 
@@ -30,6 +36,7 @@ namespace HachimiEngine
 
     protected:
         Scope<Window> m_Window;
+        LayerStack m_LayerStack;
         bool m_Running = true;
         bool m_Minimized = false;
 
