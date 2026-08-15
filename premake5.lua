@@ -18,7 +18,8 @@ workspace "Hachimi-Engine"
     filter "system:windows"
         system "windows"
         characterset "Unicode"
-        defines { "HE_PLATFORM_WINDOWS", "GLFW_INCLUDE_NONE" }
+        buildoptions { "/utf-8" }
+        defines { "HE_PLATFORM_WINDOWS" }
 
     filter {}
         cppdialect "C++20"
@@ -38,6 +39,14 @@ workspace "Hachimi-Engine"
         runtime "Release"
 
     filter {}
+
+includeIfPresent("Hachimi-Engine/Vendor/GLFW/premake5.lua")
+includeIfPresent("Hachimi-Engine/Vendor/GLAD/premake5.lua")
+includeIfPresent("Hachimi-Engine/Vendor/imgui/premake5.lua")
+includeIfPresent("Hachimi-Engine/Vendor/spdlog/premake5.lua")
+includeIfPresent("Hachimi-Engine/Vendor/yaml-cpp/premake5.lua")
+includeIfPresent("Hachimi-Editor/Vendor/ImGuiFileDialog/premake5.lua")
+includeIfPresent("Hachimi-Editor/Vendor/ImGuizmo/premake5.lua")
 
 includeIfPresent("Hachimi-Engine/premake5.lua")
 includeIfPresent("Hachimi-Editor/premake5.lua")
