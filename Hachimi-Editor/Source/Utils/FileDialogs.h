@@ -19,5 +19,8 @@ namespace HachimiEngine
 
         static void OpenTextureImportDialog(const std::filesystem::path& startPath);
         static bool DrawTextureImportDialog(std::string& selectedPath);
+
+        static void OpenSceneFileDialog(const std::filesystem::path& startPath);
+        static bool DrawSceneFileDialog(std::string& selectedPath);
     };
 }

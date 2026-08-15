@@ -4,10 +4,9 @@
 #include "Core/Application.h"
 #include "Core/Log.h"
 #include "Project/ProjectManager.h"
-#include "Renderer/RenderCommand.h"
-#include "Renderer/SceneRenderer.h"
 #include "Scene/Scene.h"
 
+#include <ImGuizmo.h>
 #include <imgui.h>
 
 namespace HachimiEngine
@@ -27,48 +26,45 @@ namespace HachimiEngine
         }
 
         AssetManager::Init(project->GetAssetsDirectory());
-        m_Scene = project->GetActiveScene();
-        m_EditorCamera.SetViewportSize(Application::Get().GetWindow().GetWidth(), Application::Get().GetWindow().GetHeight());
+        m_Context.Scene = project->GetActiveScene();
+        m_Context.Camera.SetViewportSize(Application::Get().GetWindow().GetWidth(), Application::Get().GetWindow().GetHeight());
+        m_ConsolePanel.RegisterCallbacks();
 
         HE_CLIENT_INFO("Editing project: {}", project->GetName());
     }
 
     void EditorLayer::OnDetach()
     {
+        m_ConsolePanel.UnregisterCallbacks();
         AssetManager::Shutdown();
     }
 
     void EditorLayer::OnUpdate(Timestep timestep)
     {
-        m_EditorCamera.OnUpdate(timestep);
-        if (m_Scene != nullptr)
+        m_Context.Camera.OnUpdate(timestep);
+        if (m_Context.Scene != nullptr)
         {
-            m_Scene->OnUpdate(timestep);
+            m_Context.Scene->OnUpdate(timestep);
         }
     }
 
     void EditorLayer::OnImGuiRender()
     {
+        ImGuizmo::BeginFrame();
+        m_ViewportPanel.RenderScene(m_Context);
+
         DrawDockSpace();
-        DrawMenuBar();
-        RenderScene();
+        m_MenuBar.Draw(this, m_Context);
+        m_SceneHierarchyPanel.Draw(m_Context);
+        m_InspectorPanel.Draw(m_Context);
+        m_ContentBrowserPanel.Draw(m_Context);
+        m_ConsolePanel.Draw();
+        m_ViewportPanel.Draw(m_Context);
     }
 
     void EditorLayer::OnEvent(Event& event)
     {
-    }
-
-    void EditorLayer::RenderScene()
-    {
-        if (m_Scene == nullptr)
-        {
-            return;
-        }
-
-        RenderCommand::SetViewport(0, 0, Application::Get().GetWindow().GetWidth(), Application::Get().GetWindow().GetHeight());
-        RenderCommand::SetClearColor({ 0.08f, 0.08f, 0.10f, 1.0f });
-        RenderCommand::Clear();
-        m_Scene->OnRender(m_EditorCamera);
+        // Panels mostly poll ImGui state; additional event handling can be added here.
     }
 
     void EditorLayer::DrawDockSpace()
@@ -89,32 +85,5 @@ namespace HachimiEngine
         ImGui::Begin("EditorDockSpace", nullptr, windowFlags);
         ImGui::DockSpace(ImGui::GetID("EditorDockSpace"), ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
         ImGui::End();
-    }
-
-    void EditorLayer::DrawMenuBar()
-    {
-        if (ImGui::BeginMainMenuBar())
-        {
-            if (ImGui::BeginMenu("File"))
-            {
-                if (ImGui::MenuItem("Save Scene"))
-                {
-                    const Ref<Project> project = ProjectManager::GetActiveProject();
-                    if (project != nullptr)
-                    {
-                        project->SaveActiveScene();
-                    }
-                }
-
-                ImGui::Separator();
-                if (ImGui::MenuItem("Exit Editor"))
-                {
-                    Application::Get().Close();
-                }
-
-                ImGui::EndMenu();
-            }
-            ImGui::EndMainMenuBar();
-        }
     }
 }

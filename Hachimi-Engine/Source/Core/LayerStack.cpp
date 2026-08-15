@@ -48,6 +48,34 @@ namespace HachimiEngine
         }
     }
 
+    void LayerStack::PopLayer(Layer* layer)
+    {
+        const auto it = std::find_if(m_Layers.begin(), m_Layers.end(), [layer](const Ref<Layer>& candidate)
+        {
+            return candidate.get() == layer;
+        });
+
+        if (it != m_Layers.end())
+        {
+            (*it)->OnDetach();
+            m_Layers.erase(it);
+        }
+    }
+
+    void LayerStack::PopOverlay(Layer* overlay)
+    {
+        const auto it = std::find_if(m_Overlays.begin(), m_Overlays.end(), [overlay](const Ref<Layer>& candidate)
+        {
+            return candidate.get() == overlay;
+        });
+
+        if (it != m_Overlays.end())
+        {
+            (*it)->OnDetach();
+            m_Overlays.erase(it);
+        }
+    }
+
     void LayerStack::Update(Timestep timestep) const
     {
         for (const auto& layer : m_Layers)

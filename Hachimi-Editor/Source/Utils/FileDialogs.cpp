@@ -9,6 +9,7 @@ namespace HachimiEngine
         constexpr const char* ProjectDialogKey = "ProjectFileDialog";
         constexpr const char* DirectoryDialogKey = "DirectoryDialog";
         constexpr const char* TextureDialogKey = "TextureImportDialog";
+        constexpr const char* SceneDialogKey = "SceneFileDialog";
 
         bool FinishDialog(const char* key, std::string& selectedPath)
         {
@@ -64,5 +65,18 @@ namespace HachimiEngine
     bool FileDialogs::DrawTextureImportDialog(std::string& selectedPath)
     {
         return FinishDialog(TextureDialogKey, selectedPath);
+    }
+
+    void FileDialogs::OpenSceneFileDialog(const std::filesystem::path& startPath)
+    {
+        IGFD::FileDialogConfig config;
+        config.path = startPath.string();
+        config.flags = ImGuiFileDialogFlags_Default;
+        ImGuiFileDialog::Instance()->OpenDialog(SceneDialogKey, "Open Scene", ".hscene", config);
+    }
+
+    bool FileDialogs::DrawSceneFileDialog(std::string& selectedPath)
+    {
+        return FinishDialog(SceneDialogKey, selectedPath);
     }
 }

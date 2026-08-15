@@ -18,6 +18,8 @@ namespace HachimiEngine
         void PushOverlay(const Ref<Layer>& overlay);
         void PopLayer(const Ref<Layer>& layer);
         void PopOverlay(const Ref<Layer>& overlay);
+        void PopLayer(Layer* layer);
+        void PopOverlay(Layer* overlay);
 
         const std::vector<Ref<Layer>>& GetLayers() const { return m_Layers; }
         const std::vector<Ref<Layer>>& GetOverlays() const { return m_Overlays; }

@@ -2,13 +2,20 @@
 
 #include "Core/Layer.h"
 #include "Core/Memory.h"
+#include "Panels/ConsolePanel.h"
+#include "Panels/ContentBrowserPanel.h"
+#include "Panels/EditorContext.h"
+#include "Panels/EditorMenuBar.h"
+#include "Panels/InspectorPanel.h"
+#include "Panels/SceneHierarchyPanel.h"
+#include "Panels/ViewportPanel.h"
 #include "Renderer/EditorCamera.h"
 
 namespace HachimiEngine
 {
     class Scene;
 
-    // Main editor layer. Full panel layout is built on top of this layer.
+    // Main editor layer; owns the shared context and all docking panels.
     class EditorLayer final : public Layer
     {
     public:
@@ -22,12 +29,15 @@ namespace HachimiEngine
         void OnEvent(Event& event) override;
 
     private:
-        void RenderScene();
         void DrawDockSpace();
-        void DrawMenuBar();
 
     private:
-        Ref<Scene> m_Scene;
-        EditorCamera m_EditorCamera;
+        EditorContext m_Context;
+        ViewportPanel m_ViewportPanel;
+        SceneHierarchyPanel m_SceneHierarchyPanel;
+        InspectorPanel m_InspectorPanel;
+        ContentBrowserPanel m_ContentBrowserPanel;
+        ConsolePanel m_ConsolePanel;
+        EditorMenuBar m_MenuBar;
     };
 }
