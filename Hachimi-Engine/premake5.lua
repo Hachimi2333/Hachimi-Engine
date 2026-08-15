@@ -28,7 +28,8 @@ project "Hachimi-Engine"
     {
         "SPDLOG_COMPILED_LIB",
         "YAML_CPP_STATIC_DEFINE",
-        "GLFW_INCLUDE_NONE"
+        "GLFW_INCLUDE_NONE",
+        "GLM_ENABLE_EXPERIMENTAL"
     }
 
     links

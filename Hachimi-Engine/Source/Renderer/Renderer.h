@@ -21,7 +21,7 @@ namespace HachimiEngine
         static void SetClearColor(const glm::vec4& color);
         static void Clear();
         static void SetDepthTest(bool enabled);
-        static void DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount = 0);
+        static void DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount = 0, DrawMode drawMode = DrawMode::Triangles);
 
         static RendererAPIType GetAPI();
 

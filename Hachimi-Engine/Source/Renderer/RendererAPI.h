@@ -16,6 +16,13 @@ namespace HachimiEngine
         OpenGL = 1
     };
 
+    // Draw primitive topology used by the simple backend abstraction.
+    enum class DrawMode
+    {
+        Triangles = 0,
+        Lines = 1
+    };
+
     // Small OpenGL-style backend abstraction; intentionally simple rather than Vulkan-like.
     class RendererAPI
     {
@@ -32,7 +39,7 @@ namespace HachimiEngine
         virtual void SetBlend(bool enabled) = 0;
         virtual void SetLineWidth(float width) = 0;
 
-        virtual void DrawIndexed(const Ref<class VertexArray>& vertexArray, uint32_t indexCount = 0) = 0;
+        virtual void DrawIndexed(const Ref<class VertexArray>& vertexArray, uint32_t indexCount = 0, DrawMode drawMode = DrawMode::Triangles) = 0;
 
         static RendererAPIType GetAPI();
         static Scope<RendererAPI> Create();

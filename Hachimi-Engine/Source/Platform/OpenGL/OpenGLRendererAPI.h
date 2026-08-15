@@ -18,6 +18,6 @@ namespace HachimiEngine
         void SetBlend(bool enabled) override;
         void SetLineWidth(float width) override;
 
-        void DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount = 0) override;
+        void DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount = 0, DrawMode drawMode = DrawMode::Triangles) override;
     };
 }

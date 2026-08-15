@@ -57,11 +57,12 @@ namespace HachimiEngine
         glLineWidth(width);
     }
 
-    void OpenGLRendererAPI::DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount)
+    void OpenGLRendererAPI::DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount, DrawMode drawMode)
     {
         vertexArray->Bind();
 
         const uint32_t count = indexCount > 0 ? indexCount : vertexArray->GetIndexBuffer()->GetCount();
-        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(count), GL_UNSIGNED_INT, nullptr);
+        const GLenum primitiveType = drawMode == DrawMode::Lines ? GL_LINES : GL_TRIANGLES;
+        glDrawElements(primitiveType, static_cast<GLsizei>(count), GL_UNSIGNED_INT, nullptr);
     }
 }

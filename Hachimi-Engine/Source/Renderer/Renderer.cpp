@@ -38,9 +38,9 @@ namespace HachimiEngine
         s_RendererAPI->SetDepthTest(enabled);
     }
 
-    void Renderer::DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount)
+    void Renderer::DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount, DrawMode drawMode)
     {
-        s_RendererAPI->DrawIndexed(vertexArray, indexCount);
+        s_RendererAPI->DrawIndexed(vertexArray, indexCount, drawMode);
     }
 
     RendererAPIType Renderer::GetAPI()
