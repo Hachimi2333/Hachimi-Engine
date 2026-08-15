@@ -38,6 +38,11 @@ namespace HachimiEngine
         s_RendererAPI->SetDepthTest(enabled);
     }
 
+    void Renderer::SetPolygonOffset(bool enabled, float factor, float units)
+    {
+        s_RendererAPI->SetPolygonOffset(enabled, factor, units);
+    }
+
     void Renderer::DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount, DrawMode drawMode)
     {
         s_RendererAPI->DrawIndexed(vertexArray, indexCount, drawMode);

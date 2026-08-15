@@ -4,6 +4,7 @@
 #include "Core/KeyCodes.h"
 #include "Core/MouseButtonCodes.h"
 #include "Panels/EditorContext.h"
+#include "Renderer/PostProcessPass.h"
 #include "Renderer/RenderCommand.h"
 #include "Scene/Components.h"
 #include "Scene/Scene.h"
@@ -137,14 +138,34 @@ namespace HachimiEngine
 
             return closestEntity;
         }
+
+        void ResizeFramebufferIfNeeded(const Ref<Framebuffer>& framebuffer, uint32_t width, uint32_t height)
+        {
+            if (framebuffer == nullptr)
+            {
+                return;
+            }
+
+            const auto& specification = framebuffer->GetSpecification();
+            if (width > 0 && height > 0 && (width != specification.Width || height != specification.Height))
+            {
+                framebuffer->Resize(width, height);
+            }
+        }
     }
 
     ViewportPanel::ViewportPanel()
     {
-        FramebufferSpecification specification;
-        specification.Width = 1280;
-        specification.Height = 720;
-        m_Framebuffer = Framebuffer::Create(specification);
+        FramebufferSpecification sceneSpecification;
+        sceneSpecification.Width = 1280;
+        sceneSpecification.Height = 720;
+        sceneSpecification.ColorFormat = FramebufferColorFormat::RGBA16F;
+        m_SceneFramebuffer = Framebuffer::Create(sceneSpecification);
+
+        FramebufferSpecification displaySpecification;
+        displaySpecification.Width = 1280;
+        displaySpecification.Height = 720;
+        m_DisplayFramebuffer = Framebuffer::Create(displaySpecification);
     }
 
     void ViewportPanel::RenderScene(EditorContext& context)
@@ -160,21 +181,24 @@ namespace HachimiEngine
             return;
         }
 
-        const auto& specification = m_Framebuffer->GetSpecification();
         const uint32_t width = static_cast<uint32_t>(context.ViewportSize.x);
         const uint32_t height = static_cast<uint32_t>(context.ViewportSize.y);
 
-        if (width > 0 && height > 0 && (width != specification.Width || height != specification.Height))
-        {
-            m_Framebuffer->Resize(width, height);
-            context.Camera.SetViewportSize(width, height);
-        }
+        ResizeFramebufferIfNeeded(m_SceneFramebuffer, width, height);
+        ResizeFramebufferIfNeeded(m_DisplayFramebuffer, width, height);
+        context.Camera.SetViewportSize(width, height);
 
-        m_Framebuffer->Bind();
-        RenderCommand::SetClearColor({ 0.08f, 0.08f, 0.10f, 1.0f });
+        m_SceneFramebuffer->Bind();
+        // Linear-space clear color matching the previous sRGB editor background.
+        RenderCommand::SetClearColor({ 0.00719f, 0.00719f, 0.01002f, 1.0f });
         RenderCommand::Clear();
         context.ActiveScene->OnRender(context.Camera);
-        m_Framebuffer->Unbind();
+        m_SceneFramebuffer->Unbind();
+
+        m_DisplayFramebuffer->Bind();
+        RenderCommand::Clear();
+        PostProcessPass::Render(m_SceneFramebuffer->GetColorAttachmentRendererID());
+        m_DisplayFramebuffer->Unbind();
     }
 
     void ViewportPanel::Draw(EditorContext& context)
@@ -196,11 +220,11 @@ namespace HachimiEngine
         ImVec2 imageMax(0.0f, 0.0f);
         bool hasViewportImage = false;
 
-        if (m_Framebuffer->GetColorAttachmentRendererID() != 0 && viewportSize.x > 0.0f && viewportSize.y > 0.0f)
+        if (m_DisplayFramebuffer->GetColorAttachmentRendererID() != 0 && viewportSize.x > 0.0f && viewportSize.y > 0.0f)
         {
             // UVs are flipped vertically for the OpenGL framebuffer texture.
             ImGui::Image(
-                static_cast<ImTextureID>(m_Framebuffer->GetColorAttachmentRendererID()),
+                static_cast<ImTextureID>(m_DisplayFramebuffer->GetColorAttachmentRendererID()),
                 viewportSize,
                 ImVec2(0.0f, 1.0f),
                 ImVec2(1.0f, 0.0f));

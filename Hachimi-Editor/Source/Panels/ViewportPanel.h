@@ -24,6 +24,7 @@ namespace HachimiEngine
         void ManipulateSelectedEntity(EditorContext& context, const ImVec2& imageMin, const ImVec2& imageMax);
 
     private:
-        Ref<Framebuffer> m_Framebuffer;
+        Ref<Framebuffer> m_SceneFramebuffer;
+        Ref<Framebuffer> m_DisplayFramebuffer;
     };
 }

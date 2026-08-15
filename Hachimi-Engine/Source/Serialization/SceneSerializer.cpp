@@ -54,6 +54,14 @@ namespace HachimiEngine
         YAML::Emitter out;
         out << YAML::BeginMap;
         out << YAML::Key << "Scene" << YAML::Value << m_Scene->GetName();
+
+        const EnvironmentSettings& environment = m_Scene->GetEnvironmentSettings();
+        out << YAML::Key << "Environment" << YAML::Value << YAML::BeginMap;
+        out << YAML::Key << "ShowSkybox" << YAML::Value << environment.ShowSkybox;
+        out << YAML::Key << "Exposure" << YAML::Value << environment.Exposure;
+        out << YAML::Key << "EnvironmentIntensity" << YAML::Value << environment.EnvironmentIntensity;
+        out << YAML::EndMap;
+
         out << YAML::Key << "Entities" << YAML::Value << YAML::BeginSeq;
 
         for (const Entity entity : m_Scene->GetAllEntities())
@@ -80,6 +88,14 @@ namespace HachimiEngine
         m_Scene->m_EntityMap.clear();
         m_Scene->m_Registry.clear();
         m_Scene->SetName(data["Scene"].as<std::string>());
+
+        if (const YAML::Node environmentNode = data["Environment"])
+        {
+            EnvironmentSettings& environment = m_Scene->GetEnvironmentSettings();
+            environment.ShowSkybox = environmentNode["ShowSkybox"].as<bool>(true);
+            environment.Exposure = environmentNode["Exposure"].as<float>(1.0f);
+            environment.EnvironmentIntensity = environmentNode["EnvironmentIntensity"].as<float>(1.0f);
+        }
 
         const YAML::Node entities = data["Entities"];
         if (entities && entities.IsSequence())
@@ -165,6 +181,9 @@ namespace HachimiEngine
             out << YAML::Key << "Color" << YAML::Value;
             EmitVec3(out, light.Color);
             out << YAML::Key << "Intensity" << YAML::Value << light.Intensity;
+            out << YAML::Key << "Range" << YAML::Value << light.Range;
+            out << YAML::Key << "CastsShadows" << YAML::Value << light.CastsShadows;
+            out << YAML::Key << "ShadowBias" << YAML::Value << light.ShadowBias;
             out << YAML::EndMap;
         }
 
@@ -242,6 +261,9 @@ namespace HachimiEngine
             light.Type = static_cast<LightComponent::LightType>(lightNode["Type"].as<int>(1));
             light.Color = ReadVec3(lightNode["Color"], glm::vec3(1.0f));
             light.Intensity = lightNode["Intensity"].as<float>(10.0f);
+            light.Range = lightNode["Range"].as<float>(12.0f);
+            light.CastsShadows = lightNode["CastsShadows"].as<bool>(true);
+            light.ShadowBias = lightNode["ShadowBias"].as<float>(0.0005f);
         }
 
         scene.m_EntityMap[UUID(uuidValue)] = entity.GetHandle();

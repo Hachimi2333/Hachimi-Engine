@@ -44,6 +44,15 @@ namespace HachimiEngine
             ImGui::EndMenu();
         }
 
+        if (context.ActiveScene != nullptr && ImGui::BeginMenu("Renderer"))
+        {
+            EnvironmentSettings& environment = context.ActiveScene->GetEnvironmentSettings();
+            ImGui::Checkbox("Show Skybox", &environment.ShowSkybox);
+            ImGui::SliderFloat("Exposure", &environment.Exposure, 0.1f, 4.0f);
+            ImGui::SliderFloat("Environment Intensity", &environment.EnvironmentIntensity, 0.0f, 4.0f);
+            ImGui::EndMenu();
+        }
+
         ImGui::EndMainMenuBar();
 
         std::string selectedScenePath;

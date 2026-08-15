@@ -11,6 +11,7 @@ namespace HachimiEngine
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
     }
 
     void OpenGLRendererAPI::SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
@@ -55,6 +56,19 @@ namespace HachimiEngine
     void OpenGLRendererAPI::SetLineWidth(float width)
     {
         glLineWidth(width);
+    }
+
+    void OpenGLRendererAPI::SetPolygonOffset(bool enabled, float factor, float units)
+    {
+        if (enabled)
+        {
+            glEnable(GL_POLYGON_OFFSET_FILL);
+            glPolygonOffset(factor, units);
+        }
+        else
+        {
+            glDisable(GL_POLYGON_OFFSET_FILL);
+        }
     }
 
     void OpenGLRendererAPI::DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount, DrawMode drawMode)

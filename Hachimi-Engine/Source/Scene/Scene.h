@@ -4,6 +4,7 @@
 #include "Core/Memory.h"
 #include "Core/UUID.h"
 #include "Renderer/EditorCamera.h"
+#include "Renderer/EnvironmentSettings.h"
 #include "Scene/Components.h"
 #include "Scene/Entity.h"
 
@@ -49,6 +50,9 @@ namespace HachimiEngine
         uint32_t GetViewportWidth() const { return m_ViewportWidth; }
         uint32_t GetViewportHeight() const { return m_ViewportHeight; }
 
+        EnvironmentSettings& GetEnvironmentSettings() { return m_Environment; }
+        const EnvironmentSettings& GetEnvironmentSettings() const { return m_Environment; }
+
         entt::registry& GetRegistry() { return m_Registry; }
         const std::unordered_map<UUID, entt::entity>& GetEntityMap() const { return m_EntityMap; }
 
@@ -64,6 +68,7 @@ namespace HachimiEngine
         std::string m_Name = "Untitled Scene";
         uint32_t m_ViewportWidth = 1280;
         uint32_t m_ViewportHeight = 720;
+        EnvironmentSettings m_Environment;
 
         friend class Entity;
         friend class SceneSerializer;

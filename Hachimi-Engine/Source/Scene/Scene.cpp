@@ -101,6 +101,7 @@ namespace HachimiEngine
         clone->m_Name = m_Name;
         clone->m_ViewportWidth = m_ViewportWidth;
         clone->m_ViewportHeight = m_ViewportHeight;
+        clone->m_Environment = m_Environment;
 
         const auto entities = m_Registry.view<IDComponent>();
         for (const entt::entity sourceHandle : entities)
@@ -231,8 +232,35 @@ namespace HachimiEngine
     void Scene::RenderScene(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& cameraPosition, bool drawGrid)
     {
         ApplyLightsToRenderer();
-
+        SceneRenderer::GetEnvironmentSettings() = m_Environment;
         SceneRenderer::BeginScene(view, projection, cameraPosition);
+
+        const LightingEnvironment& lighting = SceneRenderer::GetLightingEnvironment();
+        const bool castsDirectionalShadows = lighting.Directional.CastsShadows
+            && lighting.Directional.Intensity > 0.0f
+            && glm::length(lighting.Directional.Direction) > 0.001f;
+
+        if (castsDirectionalShadows)
+        {
+            const glm::mat4 lightViewProjection = SceneRenderer::CalculateDirectionalLightViewProjection(cameraPosition);
+            SceneRenderer::BeginDirectionalShadowPass(lightViewProjection);
+
+            auto shadowMeshView = m_Registry.view<MeshComponent, TransformComponent>();
+            for (const entt::entity entity : shadowMeshView)
+            {
+                const auto& [meshComponent, transformComponent] = shadowMeshView.get<MeshComponent, TransformComponent>(entity);
+                if (!meshComponent.Visible || meshComponent.Mesh == nullptr || meshComponent.Mesh->GetDrawMode() != MeshDrawMode::Triangles)
+                {
+                    continue;
+                }
+
+                SceneRenderer::SubmitShadowMesh(meshComponent.Mesh, GetWorldTransform(entity));
+            }
+
+            SceneRenderer::EndDirectionalShadowPass();
+        }
+
+        SceneRenderer::DrawSkybox();
 
         if (drawGrid)
         {
@@ -249,7 +277,20 @@ namespace HachimiEngine
             }
 
             const glm::mat4 worldTransform = GetWorldTransform(entity);
-            SceneRenderer::SubmitMesh(meshComponent.Mesh, worldTransform, meshComponent.MaterialOverride);
+
+            // Keep the per-entity material parameters authoritative even when no
+            // explicit material override was created yet.
+            if (meshComponent.MaterialOverride == nullptr)
+            {
+                meshComponent.MaterialOverride = Material::Create(SceneRenderer::GetDefaultMaterial()->GetShader());
+            }
+
+            Ref<Material> material = meshComponent.MaterialOverride;
+            material->SetAlbedoColor(meshComponent.MaterialColor);
+            material->SetRoughness(meshComponent.Roughness);
+            material->SetMetallic(meshComponent.Metallic);
+
+            SceneRenderer::SubmitMesh(meshComponent.Mesh, worldTransform, material);
         }
 
         SceneRenderer::EndScene();
@@ -276,17 +317,35 @@ namespace HachimiEngine
     void Scene::ApplyLightsToRenderer()
     {
         LightingEnvironment lighting;
+        lighting.Directional.Direction = glm::vec3(0.0f);
+        lighting.Directional.Color = glm::vec3(0.0f);
+        lighting.Directional.Intensity = 0.0f;
         lighting.PointLightCount = 0;
+
+        for (PointLight& pointLight : lighting.PointLights)
+        {
+            pointLight.Position = glm::vec3(0.0f);
+            pointLight.Color = glm::vec3(0.0f);
+            pointLight.Intensity = 0.0f;
+            pointLight.Range = 0.0f;
+        }
+
+        bool hasAnyLight = false;
+        bool hasDirectionalLight = false;
 
         auto view = m_Registry.view<LightComponent, TransformComponent>();
         for (const entt::entity entity : view)
         {
             const auto& [lightComponent, transformComponent] = view.get<LightComponent, TransformComponent>(entity);
+            hasAnyLight = true;
 
             if (lightComponent.Type == LightComponent::LightType::Directional)
             {
+                hasDirectionalLight = true;
                 lighting.Directional.Color = lightComponent.Color;
                 lighting.Directional.Intensity = lightComponent.Intensity;
+                lighting.Directional.CastsShadows = lightComponent.CastsShadows;
+                lighting.Directional.ShadowBias = lightComponent.ShadowBias;
 
                 const glm::quat rotation = glm::quat(glm::radians(transformComponent.Rotation));
                 lighting.Directional.Direction = glm::normalize(glm::rotate(rotation, glm::vec3(0.0f, 0.0f, -1.0f)));
@@ -297,12 +356,20 @@ namespace HachimiEngine
                 pointLight.Position = GetWorldTransform(entity) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
                 pointLight.Color = lightComponent.Color;
                 pointLight.Intensity = lightComponent.Intensity;
+                pointLight.Range = lightComponent.Range;
             }
         }
 
-        if (lighting.PointLightCount == 0)
+        if (!hasAnyLight)
         {
-            lighting.PointLightCount = 1;
+            // A completely dark scene is not useful for editing; restore the default
+            // environment only when the user did not add any lights.
+            lighting = LightingEnvironment();
+        }
+        else if (!hasDirectionalLight)
+        {
+            // Do not apply a phantom directional light when the scene only has point lights.
+            lighting.Directional.Intensity = 0.0f;
         }
 
         SceneRenderer::GetLightingEnvironment() = lighting;

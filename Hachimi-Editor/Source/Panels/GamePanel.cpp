@@ -1,6 +1,7 @@
 #include "Panels/GamePanel.h"
 
 #include "Panels/EditorContext.h"
+#include "Renderer/PostProcessPass.h"
 #include "Renderer/RenderCommand.h"
 #include "Scene/Components.h"
 #include "Scene/Scene.h"
@@ -15,12 +16,35 @@
 
 namespace HachimiEngine
 {
+    namespace
+    {
+        void ResizeFramebufferIfNeeded(const Ref<Framebuffer>& framebuffer, uint32_t width, uint32_t height)
+        {
+            if (framebuffer == nullptr)
+            {
+                return;
+            }
+
+            const auto& specification = framebuffer->GetSpecification();
+            if (width > 0 && height > 0 && (width != specification.Width || height != specification.Height))
+            {
+                framebuffer->Resize(width, height);
+            }
+        }
+    }
+
     GamePanel::GamePanel()
     {
-        FramebufferSpecification specification;
-        specification.Width = 1280;
-        specification.Height = 720;
-        m_Framebuffer = Framebuffer::Create(specification);
+        FramebufferSpecification sceneSpecification;
+        sceneSpecification.Width = 1280;
+        sceneSpecification.Height = 720;
+        sceneSpecification.ColorFormat = FramebufferColorFormat::RGBA16F;
+        m_SceneFramebuffer = Framebuffer::Create(sceneSpecification);
+
+        FramebufferSpecification displaySpecification;
+        displaySpecification.Width = 1280;
+        displaySpecification.Height = 720;
+        m_DisplayFramebuffer = Framebuffer::Create(displaySpecification);
     }
 
     void GamePanel::RenderScene(EditorContext& context)
@@ -35,14 +59,11 @@ namespace HachimiEngine
             return;
         }
 
-        const auto& specification = m_Framebuffer->GetSpecification();
         const uint32_t width = static_cast<uint32_t>(context.GameViewportSize.x);
         const uint32_t height = static_cast<uint32_t>(context.GameViewportSize.y);
 
-        if (width > 0 && height > 0 && (width != specification.Width || height != specification.Height))
-        {
-            m_Framebuffer->Resize(width, height);
-        }
+        ResizeFramebufferIfNeeded(m_SceneFramebuffer, width, height);
+        ResizeFramebufferIfNeeded(m_DisplayFramebuffer, width, height);
 
         const float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
 
@@ -73,11 +94,17 @@ namespace HachimiEngine
             projectionMatrix = glm::perspective(glm::radians(context.Camera.GetFieldOfView()), aspectRatio, 0.1f, 1000.0f);
         }
 
-        m_Framebuffer->Bind();
-        RenderCommand::SetClearColor({ 0.08f, 0.08f, 0.10f, 1.0f });
+        m_SceneFramebuffer->Bind();
+        // Linear-space clear color matching the previous sRGB editor background.
+        RenderCommand::SetClearColor({ 0.00719f, 0.00719f, 0.01002f, 1.0f });
         RenderCommand::Clear();
         context.ActiveScene->OnRender(viewMatrix, projectionMatrix, cameraPosition);
-        m_Framebuffer->Unbind();
+        m_SceneFramebuffer->Unbind();
+
+        m_DisplayFramebuffer->Bind();
+        RenderCommand::Clear();
+        PostProcessPass::Render(m_SceneFramebuffer->GetColorAttachmentRendererID());
+        m_DisplayFramebuffer->Unbind();
     }
 
     void GamePanel::Draw(EditorContext& context)
@@ -92,11 +119,11 @@ namespace HachimiEngine
             std::max(availableSize.y, 0.0f));
         context.GameViewportSize = { viewportSize.x, viewportSize.y };
 
-        if (m_Framebuffer->GetColorAttachmentRendererID() != 0 && viewportSize.x > 0.0f && viewportSize.y > 0.0f)
+        if (m_DisplayFramebuffer->GetColorAttachmentRendererID() != 0 && viewportSize.x > 0.0f && viewportSize.y > 0.0f)
         {
             // UVs are flipped vertically for the OpenGL framebuffer texture.
             ImGui::Image(
-                static_cast<ImTextureID>(m_Framebuffer->GetColorAttachmentRendererID()),
+                static_cast<ImTextureID>(m_DisplayFramebuffer->GetColorAttachmentRendererID()),
                 viewportSize,
                 ImVec2(0.0f, 1.0f),
                 ImVec2(1.0f, 0.0f));

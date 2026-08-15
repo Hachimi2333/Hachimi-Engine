@@ -17,6 +17,7 @@ namespace HachimiEngine
         void SetDepthTest(bool enabled) override;
         void SetBlend(bool enabled) override;
         void SetLineWidth(float width) override;
+        void SetPolygonOffset(bool enabled, float factor = 0.0f, float units = 0.0f) override;
 
         void DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount = 0, DrawMode drawMode = DrawMode::Triangles) override;
     };

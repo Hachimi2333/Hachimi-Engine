@@ -12,6 +12,8 @@ namespace HachimiEngine
         uint32_t Width = 1;
         uint32_t Height = 1;
         uint32_t Channels = 4;
+        bool SRGB = true;
+        bool GenerateMips = true;
     };
 
     // Base class for GPU texture resources.

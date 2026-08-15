@@ -218,5 +218,14 @@ namespace HachimiEngine
 
         ImGui::ColorEdit3("Color", glm::value_ptr(light.Color));
         ImGui::DragFloat("Intensity", &light.Intensity, 0.1f, 0.0f, 1000.0f);
+        if (light.Type == LightComponent::LightType::Point)
+        {
+            ImGui::DragFloat("Range", &light.Range, 0.1f, 0.1f, 1000.0f);
+        }
+        else
+        {
+            ImGui::Checkbox("Casts Shadows", &light.CastsShadows);
+            ImGui::DragFloat("Shadow Bias", &light.ShadowBias, 0.0001f, 0.0f, 0.05f, "%.5f");
+        }
     }
 }

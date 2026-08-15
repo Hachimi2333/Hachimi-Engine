@@ -6,6 +6,7 @@
 #include "Events/ApplicationEvent.h"
 #include "Events/EventDispatcher.h"
 #include "ImGui/ImGuiLayer.h"
+#include "Renderer/PostProcessPass.h"
 #include "Renderer/RenderCommand.h"
 #include "Renderer/SceneRenderer.h"
 
@@ -26,6 +27,7 @@ namespace HachimiEngine
         RenderCommand::Init();
         RenderCommand::SetClearColor({ 0.08f, 0.08f, 0.10f, 1.0f });
         SceneRenderer::Init();
+        PostProcessPass::Init();
 
         m_ImGuiLayer = CreateRef<ImGuiLayer>();
         PushOverlay(m_ImGuiLayer);
@@ -33,6 +35,7 @@ namespace HachimiEngine
 
     Application::~Application()
     {
+        PostProcessPass::Shutdown();
         SceneRenderer::Shutdown();
         RenderCommand::SetDepthTest(false);
         Renderer::Shutdown();

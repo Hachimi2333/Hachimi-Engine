@@ -20,6 +20,7 @@ namespace HachimiEngine
         void Draw(EditorContext& context);
 
     private:
-        Ref<Framebuffer> m_Framebuffer;
+        Ref<Framebuffer> m_SceneFramebuffer;
+        Ref<Framebuffer> m_DisplayFramebuffer;
     };
 }

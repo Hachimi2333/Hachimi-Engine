@@ -5,11 +5,18 @@
 
 namespace HachimiEngine
 {
+    enum class FramebufferColorFormat
+    {
+        RGBA8 = 0,
+        RGBA16F = 1
+    };
+
     struct FramebufferSpecification
     {
         uint32_t Width = 1280;
         uint32_t Height = 720;
         uint32_t Samples = 1;
+        FramebufferColorFormat ColorFormat = FramebufferColorFormat::RGBA8;
     };
 
     // Off-screen render target abstraction.

@@ -63,17 +63,21 @@ namespace HachimiEngine
         glCreateFramebuffers(1, &m_RendererID);
         glBindFramebuffer(GL_FRAMEBUFFER, m_RendererID);
 
+        const bool isHdr = m_Specification.ColorFormat == FramebufferColorFormat::RGBA16F;
+        const GLenum colorInternalFormat = isHdr ? GL_RGBA16F : GL_RGBA8;
+        const GLenum colorDataType = isHdr ? GL_FLOAT : GL_UNSIGNED_BYTE;
+
         glCreateTextures(GL_TEXTURE_2D, 1, &m_ColorAttachment);
         glBindTexture(GL_TEXTURE_2D, m_ColorAttachment);
         glTexImage2D(
             GL_TEXTURE_2D,
             0,
-            GL_RGBA8,
+            colorInternalFormat,
             static_cast<GLsizei>(m_Specification.Width),
             static_cast<GLsizei>(m_Specification.Height),
             0,
             GL_RGBA,
-            GL_UNSIGNED_BYTE,
+            colorDataType,
             nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);

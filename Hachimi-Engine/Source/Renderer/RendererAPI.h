@@ -38,6 +38,7 @@ namespace HachimiEngine
         virtual void SetDepthTest(bool enabled) = 0;
         virtual void SetBlend(bool enabled) = 0;
         virtual void SetLineWidth(float width) = 0;
+        virtual void SetPolygonOffset(bool enabled, float factor = 0.0f, float units = 0.0f) = 0;
 
         virtual void DrawIndexed(const Ref<class VertexArray>& vertexArray, uint32_t indexCount = 0, DrawMode drawMode = DrawMode::Triangles) = 0;
 
