@@ -21,6 +21,9 @@ namespace HachimiEngine
         void PopLayer(Layer* layer);
         void PopOverlay(Layer* overlay);
 
+        bool ContainsLayer(Layer* layer) const;
+        bool ContainsOverlay(Layer* overlay) const;
+
         const std::vector<Ref<Layer>>& GetLayers() const { return m_Layers; }
         const std::vector<Ref<Layer>>& GetOverlays() const { return m_Overlays; }
 

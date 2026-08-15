@@ -76,6 +76,22 @@ namespace HachimiEngine
         }
     }
 
+    bool LayerStack::ContainsLayer(Layer* layer) const
+    {
+        return std::any_of(m_Layers.begin(), m_Layers.end(), [layer](const Ref<Layer>& candidate)
+        {
+            return candidate.get() == layer;
+        });
+    }
+
+    bool LayerStack::ContainsOverlay(Layer* overlay) const
+    {
+        return std::any_of(m_Overlays.begin(), m_Overlays.end(), [overlay](const Ref<Layer>& candidate)
+        {
+            return candidate.get() == overlay;
+        });
+    }
+
     void LayerStack::Update(Timestep timestep) const
     {
         for (const auto& layer : m_Layers)

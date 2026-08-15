@@ -23,5 +23,6 @@ namespace HachimiEngine
         char m_ProjectName[128] = "NewProject";
         char m_ProjectLocation[1024] = {};
         bool m_EditorPushed = false;
+        Layer* m_EditorLayer = nullptr;
     };
 }

@@ -29,6 +29,8 @@ namespace HachimiEngine
         void PopOverlay(const Ref<Layer>& overlay) { m_LayerStack.PopOverlay(overlay); }
         void PopLayer(Layer* layer) { m_LayerStack.PopLayer(layer); }
         void PopOverlay(Layer* overlay) { m_LayerStack.PopOverlay(overlay); }
+        bool HasLayer(Layer* layer) const { return m_LayerStack.ContainsLayer(layer); }
+        bool HasOverlay(Layer* overlay) const { return m_LayerStack.ContainsOverlay(overlay); }
 
         Window& GetWindow() { return *m_Window; }
         static Application& Get() { return *s_Instance; }

@@ -26,6 +26,13 @@ namespace HachimiEngine
 
     void ProjectHubLayer::OnImGuiRender()
     {
+        // The editor may have returned to the hub by popping itself.
+        if (m_EditorPushed && (m_EditorLayer == nullptr || !Application::Get().HasLayer(m_EditorLayer)))
+        {
+            m_EditorPushed = false;
+            m_EditorLayer = nullptr;
+        }
+
         const ImGuiViewport* viewport = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(viewport->WorkPos);
         ImGui::SetNextWindowSize(viewport->WorkSize);
@@ -68,8 +75,10 @@ namespace HachimiEngine
             const Ref<Project> project = ProjectManager::CreateProject(m_ProjectName, m_ProjectLocation);
             if (project != nullptr && !m_EditorPushed)
             {
+                const Ref<EditorLayer> editorLayer = CreateRef<EditorLayer>();
+                Application::Get().PushLayer(editorLayer);
                 m_EditorPushed = true;
-                Application::Get().PushLayer(CreateRef<EditorLayer>());
+                m_EditorLayer = editorLayer.get();
             }
         }
 
@@ -125,7 +134,9 @@ namespace HachimiEngine
             return;
         }
 
+        const Ref<EditorLayer> editorLayer = CreateRef<EditorLayer>();
+        Application::Get().PushLayer(editorLayer);
         m_EditorPushed = true;
-        Application::Get().PushLayer(CreateRef<EditorLayer>());
+        m_EditorLayer = editorLayer.get();
     }
 }

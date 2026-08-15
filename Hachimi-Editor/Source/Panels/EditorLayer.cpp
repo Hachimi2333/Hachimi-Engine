@@ -41,7 +41,12 @@ namespace HachimiEngine
 
     void EditorLayer::OnUpdate(Timestep timestep)
     {
-        m_Context.Camera.OnUpdate(timestep);
+        // Do not move the camera while the user is typing into an ImGui input field.
+        if (!ImGui::GetIO().WantCaptureKeyboard)
+        {
+            m_Context.Camera.OnUpdate(timestep);
+        }
+
         if (m_Context.Scene != nullptr)
         {
             m_Context.Scene->OnUpdate(timestep);
