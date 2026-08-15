@@ -66,7 +66,7 @@ namespace HachimiEngine
     {
         if (mouseButton == Mouse::ButtonRight)
         {
-            m_Yaw -= mouseDelta.x * m_MouseSensitivity;
+            m_Yaw += mouseDelta.x * m_MouseSensitivity;
             m_Pitch -= mouseDelta.y * m_MouseSensitivity;
         }
         else if (mouseButton == Mouse::ButtonMiddle)
@@ -80,7 +80,7 @@ namespace HachimiEngine
         }
         else if (mouseButton == Mouse::ButtonLeft && Input::IsKeyPressed(Key::LeftAlt))
         {
-            m_Yaw -= mouseDelta.x * m_MouseSensitivity;
+            m_Yaw += mouseDelta.x * m_MouseSensitivity;
             m_Pitch -= mouseDelta.y * m_MouseSensitivity;
         }
 

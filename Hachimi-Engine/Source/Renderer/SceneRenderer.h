@@ -41,6 +41,7 @@ namespace HachimiEngine
         static void Shutdown();
 
         static void BeginScene(const EditorCamera& camera);
+        static void BeginScene(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& cameraPosition);
         static void SubmitMesh(const Ref<Mesh>& mesh, const glm::mat4& transform, const Ref<Material>& material);
         static void DrawGrid(float size = 20.0f, uint32_t divisions = 20);
         static void EndScene();
@@ -49,7 +50,7 @@ namespace HachimiEngine
         static Ref<Material> GetDefaultMaterial() { return s_DefaultMaterial; }
 
     private:
-        static void UploadLighting(const Ref<Shader>& shader, const EditorCamera& camera);
+        static void UploadLighting(const Ref<Shader>& shader, const glm::vec3& cameraPosition);
 
     private:
         static Ref<Shader> s_DefaultShader;
@@ -57,6 +58,7 @@ namespace HachimiEngine
         static Ref<Material> s_DefaultMaterial;
         static Ref<Mesh> s_GridMesh;
         static LightingEnvironment s_Lighting;
-        static const EditorCamera* s_ActiveCamera;
+        static glm::mat4 s_ViewProjection;
+        static glm::vec3 s_CameraPosition;
     };
 }

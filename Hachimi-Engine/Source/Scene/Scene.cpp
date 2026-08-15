@@ -62,7 +62,15 @@ namespace HachimiEngine
 
         const std::string name = entity.GetName();
         Entity duplicate = CreateEntity(name + " Copy");
-        duplicate.GetComponent<TransformComponent>() = entity.GetComponent<TransformComponent>();
+
+        if (entity.HasComponent<TransformComponent>())
+        {
+            duplicate.GetComponent<TransformComponent>() = entity.GetComponent<TransformComponent>();
+        }
+        else
+        {
+            duplicate.RemoveComponent<TransformComponent>();
+        }
 
         if (entity.HasComponent<MeshComponent>())
         {
@@ -80,6 +88,70 @@ namespace HachimiEngine
         }
 
         return duplicate;
+    }
+
+    Ref<Scene> Scene::Clone() const
+    {
+        Ref<Scene> clone = CreateRef<Scene>();
+
+        // The Scene constructor creates a default environment; discard it before copying.
+        clone->m_Registry.clear();
+        clone->m_EntityMap.clear();
+
+        clone->m_Name = m_Name;
+        clone->m_ViewportWidth = m_ViewportWidth;
+        clone->m_ViewportHeight = m_ViewportHeight;
+
+        const auto entities = m_Registry.view<IDComponent>();
+        for (const entt::entity sourceHandle : entities)
+        {
+            Entity targetEntity(clone->m_Registry.create(), clone.get());
+            targetEntity.AddComponent<IDComponent>() = m_Registry.get<IDComponent>(sourceHandle);
+
+            if (const auto* sourceTag = m_Registry.try_get<TagComponent>(sourceHandle))
+            {
+                targetEntity.AddComponent<TagComponent>() = *sourceTag;
+            }
+            if (const auto* sourceTransform = m_Registry.try_get<TransformComponent>(sourceHandle))
+            {
+                targetEntity.AddComponent<TransformComponent>() = *sourceTransform;
+            }
+            if (const auto* sourceRelationship = m_Registry.try_get<RelationshipComponent>(sourceHandle))
+            {
+                targetEntity.AddComponent<RelationshipComponent>() = *sourceRelationship;
+            }
+
+            if (const auto* sourceMesh = m_Registry.try_get<MeshComponent>(sourceHandle))
+            {
+                auto& targetMesh = targetEntity.AddComponent<MeshComponent>();
+                targetMesh = *sourceMesh;
+
+                // Clone the material override so runtime edits do not affect the editor scene.
+                if (sourceMesh->MaterialOverride != nullptr)
+                {
+                    const Ref<Material>& sourceMaterial = sourceMesh->MaterialOverride;
+                    targetMesh.MaterialOverride = Material::Create(sourceMaterial->GetShader());
+                    targetMesh.MaterialOverride->SetAlbedoTexture(sourceMaterial->GetAlbedoTexture());
+                    targetMesh.MaterialOverride->SetAlbedoColor(sourceMaterial->GetAlbedoColor());
+                    targetMesh.MaterialOverride->SetRoughness(sourceMaterial->GetRoughness());
+                    targetMesh.MaterialOverride->SetMetallic(sourceMaterial->GetMetallic());
+                }
+            }
+
+            if (const auto* sourceCamera = m_Registry.try_get<CameraComponent>(sourceHandle))
+            {
+                targetEntity.AddComponent<CameraComponent>() = *sourceCamera;
+            }
+
+            if (const auto* sourceLight = m_Registry.try_get<LightComponent>(sourceHandle))
+            {
+                targetEntity.AddComponent<LightComponent>() = *sourceLight;
+            }
+
+            clone->m_EntityMap[targetEntity.GetUUID()] = targetEntity.GetHandle();
+        }
+
+        return clone;
     }
 
     Entity Scene::GetEntityByUUID(UUID uuid)
@@ -148,15 +220,29 @@ namespace HachimiEngine
 
     void Scene::OnRender(const EditorCamera& camera)
     {
+        RenderScene(camera.GetViewMatrix(), camera.GetProjection(), camera.GetPosition(), true);
+    }
+
+    void Scene::OnRender(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& cameraPosition)
+    {
+        RenderScene(view, projection, cameraPosition, false);
+    }
+
+    void Scene::RenderScene(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& cameraPosition, bool drawGrid)
+    {
         ApplyLightsToRenderer();
 
-        SceneRenderer::BeginScene(camera);
-        SceneRenderer::DrawGrid();
+        SceneRenderer::BeginScene(view, projection, cameraPosition);
 
-        auto view = m_Registry.view<MeshComponent, TransformComponent>();
-        for (const entt::entity entity : view)
+        if (drawGrid)
         {
-            const auto& [meshComponent, transformComponent] = view.get<MeshComponent, TransformComponent>(entity);
+            SceneRenderer::DrawGrid();
+        }
+
+        auto meshView = m_Registry.view<MeshComponent, TransformComponent>();
+        for (const entt::entity entity : meshView)
+        {
+            const auto& [meshComponent, transformComponent] = meshView.get<MeshComponent, TransformComponent>(entity);
             if (!meshComponent.Visible || meshComponent.Mesh == nullptr)
             {
                 continue;

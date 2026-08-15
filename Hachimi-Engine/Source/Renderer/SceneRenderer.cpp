@@ -139,7 +139,8 @@ void main()
     Ref<Material> SceneRenderer::s_DefaultMaterial;
     Ref<Mesh> SceneRenderer::s_GridMesh;
     LightingEnvironment SceneRenderer::s_Lighting;
-    const EditorCamera* SceneRenderer::s_ActiveCamera = nullptr;
+    glm::mat4 SceneRenderer::s_ViewProjection { 1.0f };
+    glm::vec3 SceneRenderer::s_CameraPosition { 0.0f };
 
     void SceneRenderer::Init()
     {
@@ -155,27 +156,32 @@ void main()
         s_DefaultMaterial.reset();
         s_DefaultShader.reset();
         s_GridShader.reset();
-        s_ActiveCamera = nullptr;
+        s_ViewProjection = glm::mat4(1.0f);
+        s_CameraPosition = glm::vec3(0.0f);
     }
 
     void SceneRenderer::BeginScene(const EditorCamera& camera)
     {
-        s_ActiveCamera = &camera;
+        BeginScene(camera.GetViewMatrix(), camera.GetProjection(), camera.GetPosition());
+    }
+
+    void SceneRenderer::BeginScene(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& cameraPosition)
+    {
+        s_ViewProjection = projection * view;
+        s_CameraPosition = cameraPosition;
     }
 
     void SceneRenderer::SubmitMesh(const Ref<Mesh>& mesh, const glm::mat4& transform, const Ref<Material>& material)
     {
-        HE_CORE_ASSERT(s_ActiveCamera != nullptr);
-
         const Ref<Material>& drawMaterial = material != nullptr ? material : s_DefaultMaterial;
         drawMaterial->Bind();
 
         const Ref<Shader>& shader = drawMaterial->GetShader();
         HE_CORE_ASSERT(shader != nullptr);
 
-        shader->SetMat4("u_ViewProjection", s_ActiveCamera->GetViewProjection());
+        shader->SetMat4("u_ViewProjection", s_ViewProjection);
         shader->SetMat4("u_Model", transform);
-        UploadLighting(shader, *s_ActiveCamera);
+        UploadLighting(shader, s_CameraPosition);
 
         const DrawMode drawMode = mesh->GetDrawMode() == MeshDrawMode::Lines ? DrawMode::Lines : DrawMode::Triangles;
         Renderer::DrawIndexed(mesh->GetVertexArray(), 0, drawMode);
@@ -183,7 +189,6 @@ void main()
 
     void SceneRenderer::DrawGrid(float size, uint32_t divisions)
     {
-        HE_CORE_ASSERT(s_ActiveCamera != nullptr);
         HE_CORE_ASSERT(s_GridMesh != nullptr);
 
         if (size != 20.0f || divisions != 20)
@@ -192,18 +197,17 @@ void main()
         }
 
         s_GridShader->Bind();
-        s_GridShader->SetMat4("u_ViewProjection", s_ActiveCamera->GetViewProjection());
+        s_GridShader->SetMat4("u_ViewProjection", s_ViewProjection);
         Renderer::DrawIndexed(s_GridMesh->GetVertexArray(), 0, DrawMode::Lines);
     }
 
     void SceneRenderer::EndScene()
     {
-        s_ActiveCamera = nullptr;
     }
 
-    void SceneRenderer::UploadLighting(const Ref<Shader>& shader, const EditorCamera& camera)
+    void SceneRenderer::UploadLighting(const Ref<Shader>& shader, const glm::vec3& cameraPosition)
     {
-        shader->SetFloat3("u_CameraPosition", camera.GetPosition());
+        shader->SetFloat3("u_CameraPosition", cameraPosition);
         shader->SetFloat3("u_DirectionalLightDirection", s_Lighting.Directional.Direction);
         shader->SetFloat3("u_DirectionalLightColor", s_Lighting.Directional.Color);
         shader->SetFloat("u_DirectionalLightIntensity", s_Lighting.Directional.Intensity);

@@ -8,15 +8,46 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 
+#include <algorithm>
 #include <cstdio>
 
 namespace HachimiEngine
 {
+    namespace
+    {
+        // Draws a collapsible component header with a right-aligned remove button.
+        template<typename T>
+        bool DrawComponentHeader(Entity entity, const char* label, bool defaultOpen, bool& removed)
+        {
+            const ImGuiTreeNodeFlags flags = defaultOpen ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None;
+            const bool open = ImGui::CollapsingHeader(label, flags);
+
+            const float buttonWidth = ImGui::GetFrameHeight();
+            ImGui::SameLine(std::max(ImGui::GetContentRegionAvail().x - buttonWidth, 0.0f));
+
+            ImGui::PushID(label);
+            const bool removeClicked = ImGui::SmallButton("x");
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("Remove component");
+            }
+            ImGui::PopID();
+
+            if (removeClicked)
+            {
+                entity.RemoveComponent<T>();
+                removed = true;
+            }
+
+            return open;
+        }
+    }
+
     void InspectorPanel::Draw(EditorContext& context)
     {
         ImGui::Begin("Inspector");
 
-        if (!context.SelectedEntity || context.Scene == nullptr)
+        if (!context.SelectedEntity || context.ActiveScene == nullptr)
         {
             ImGui::TextDisabled("No entity selected");
             ImGui::End();
@@ -55,7 +86,7 @@ namespace HachimiEngine
 
         if (ImGui::Button("Delete Entity"))
         {
-            context.Scene->DestroyEntity(entity);
+            context.ActiveScene->DestroyEntity(entity);
             context.SelectedEntity = {};
         }
 
@@ -71,6 +102,10 @@ namespace HachimiEngine
 
         if (ImGui::BeginPopup("AddComponentPopup"))
         {
+            if (!entity.HasComponent<TransformComponent>() && ImGui::MenuItem("Transform Component"))
+            {
+                entity.AddComponent<TransformComponent>();
+            }
             if (!entity.HasComponent<MeshComponent>() && ImGui::MenuItem("Mesh Component"))
             {
                 auto& mesh = entity.AddComponent<MeshComponent>();
@@ -96,22 +131,29 @@ namespace HachimiEngine
             return;
         }
 
-        auto& transform = entity.Transform();
-        if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
+        bool removed = false;
+        const bool open = DrawComponentHeader<TransformComponent>(entity, "Transform", true, removed);
+        if (removed || !open)
         {
-            ImGui::DragFloat3("Position", glm::value_ptr(transform.Position), 0.05f);
-            ImGui::DragFloat3("Rotation", glm::value_ptr(transform.Rotation), 0.25f);
-            ImGui::DragFloat3("Scale", glm::value_ptr(transform.Scale), 0.05f, 0.01f, 100.0f);
+            return;
         }
+
+        auto& transform = entity.Transform();
+        ImGui::DragFloat3("Position", glm::value_ptr(transform.Position), 0.05f);
+        ImGui::DragFloat3("Rotation", glm::value_ptr(transform.Rotation), 0.25f);
+        ImGui::DragFloat3("Scale", glm::value_ptr(transform.Scale), 0.05f, 0.01f, 100.0f);
     }
 
     void InspectorPanel::DrawMesh(Entity entity)
     {
-        auto& mesh = entity.GetComponent<MeshComponent>();
-        if (!ImGui::CollapsingHeader("Mesh", ImGuiTreeNodeFlags_DefaultOpen))
+        bool removed = false;
+        const bool open = DrawComponentHeader<MeshComponent>(entity, "Mesh", true, removed);
+        if (removed || !open)
         {
             return;
         }
+
+        auto& mesh = entity.GetComponent<MeshComponent>();
 
         const char* primitiveNames[] = { "Cube", "Sphere", "Plane", "Grid" };
         int primitiveType = static_cast<int>(mesh.PrimitiveType) - static_cast<int>(PrimitiveMeshType::Cube);
@@ -141,11 +183,14 @@ namespace HachimiEngine
 
     void InspectorPanel::DrawCamera(Entity entity)
     {
-        auto& camera = entity.GetComponent<CameraComponent>();
-        if (!ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
+        bool removed = false;
+        const bool open = DrawComponentHeader<CameraComponent>(entity, "Camera", true, removed);
+        if (removed || !open)
         {
             return;
         }
+
+        auto& camera = entity.GetComponent<CameraComponent>();
 
         ImGui::Checkbox("Primary", &camera.Primary);
         ImGui::SliderFloat("Field Of View", &camera.FieldOfView, 20.0f, 120.0f);
@@ -155,11 +200,14 @@ namespace HachimiEngine
 
     void InspectorPanel::DrawLight(Entity entity)
     {
-        auto& light = entity.GetComponent<LightComponent>();
-        if (!ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen))
+        bool removed = false;
+        const bool open = DrawComponentHeader<LightComponent>(entity, "Light", true, removed);
+        if (removed || !open)
         {
             return;
         }
+
+        auto& light = entity.GetComponent<LightComponent>();
 
         const char* lightTypeNames[] = { "Directional", "Point" };
         int lightType = static_cast<int>(light.Type);

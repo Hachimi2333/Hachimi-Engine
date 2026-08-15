@@ -16,6 +16,47 @@ All contributors and automated agents must follow these rules.
 - Intermediate directory: `Bin/Obj/<configuration>-<system>-<architecture>/<ProjectName>`.
 - Vendor projects must follow the same output/intermediate directory convention.
 
+## Build Environment and Commands
+
+- Visual Studio 2026 Community install directory:
+  `C:\Program Files\Microsoft Visual Studio\18\Community`
+- MSBuild x64 executable:
+  `C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe`
+- MSVC compiler executable:
+  `C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x64\cl.exe`
+
+Generate the solution from the repository root:
+
+```
+cmd /c GenerateSolution.bat
+```
+
+or run Premake directly:
+
+```
+Vendor\Premake\Bin\premake5.exe vs2026 --file=premake5.lua
+```
+
+Build Debug:
+
+```
+"C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe" Hachimi-Engine.slnx -p:Configuration=Debug -p:Platform=x64 -v:minimal -nologo
+```
+
+Build Release:
+
+```
+"C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe" Hachimi-Engine.slnx -p:Configuration=Release -p:Platform=x64 -v:minimal -nologo
+```
+
+When using the VS 2026 Developer Command Prompt, `msbuild Hachimi-Engine.slnx -p:Configuration=Debug -p:Platform=x64` is equivalent.
+
+## Testing and Verification
+
+- Automated agents must verify changes by generating the solution and building Debug and Release.
+- Automated agents must not perform complex GUI tests such as image recognition, screenshot analysis, or pixel-based clicking.
+- Leave interactive editor behavior verification to the user; user testing is faster and more reliable.
+
 ## Code Style
 
 - Namespace: `HachimiEngine`, alias `HE`. Use `HE::` in implementation code.

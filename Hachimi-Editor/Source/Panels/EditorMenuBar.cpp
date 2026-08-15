@@ -52,10 +52,17 @@ namespace HachimiEngine
             if (!selectedScenePath.empty())
             {
                 const Ref<Project> project = ProjectManager::GetActiveProject();
+                if (context.PlayState != EditorPlayState::Stopped)
+                {
+                    owner->OnStop();
+                }
+
                 if (project != nullptr && project->OpenScene(selectedScenePath))
                 {
-                    context.Scene = project->GetActiveScene();
+                    context.ActiveScene = project->GetActiveScene();
+                    context.EditorScene = nullptr;
                     context.SelectedEntity = {};
+                    context.PlayState = EditorPlayState::Stopped;
                     HE_CLIENT_INFO("Opened scene {}", selectedScenePath);
                 }
             }

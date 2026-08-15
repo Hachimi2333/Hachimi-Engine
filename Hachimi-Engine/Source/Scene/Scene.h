@@ -28,6 +28,9 @@ namespace HachimiEngine
         void DestroyEntity(Entity entity);
         Entity DuplicateEntity(Entity entity);
 
+        // Creates a runtime copy with matching UUIDs; mesh assets are shared while material overrides are cloned.
+        Ref<Scene> Clone() const;
+
         Entity GetEntityByUUID(UUID uuid);
         Entity GetPrimaryCameraEntity();
 
@@ -38,6 +41,7 @@ namespace HachimiEngine
         void SetViewportSize(uint32_t width, uint32_t height);
         void OnUpdate(Timestep timestep);
         void OnRender(const EditorCamera& camera);
+        void OnRender(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& cameraPosition);
 
         const std::string& GetName() const { return m_Name; }
         void SetName(const std::string& name) { m_Name = name; }
@@ -51,6 +55,7 @@ namespace HachimiEngine
     private:
         void DestroyChildren(entt::entity entity);
         void ApplyLightsToRenderer();
+        void RenderScene(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& cameraPosition, bool drawGrid);
 
     private:
         entt::registry m_Registry;

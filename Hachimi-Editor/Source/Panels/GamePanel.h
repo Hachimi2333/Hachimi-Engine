@@ -5,23 +5,19 @@
 #include "Renderer/FrameBuffer.h"
 
 #include <glm/glm.hpp>
-#include <imgui.h>
 
 namespace HachimiEngine
 {
     struct EditorContext;
 
-    // Framebuffer viewport with EditorCamera controls and ImGuizmo manipulation.
-    class ViewportPanel
+    // Runtime game view rendered from the scene's primary camera.
+    class GamePanel
     {
     public:
-        ViewportPanel();
+        GamePanel();
 
         void RenderScene(EditorContext& context);
         void Draw(EditorContext& context);
-
-    private:
-        void ManipulateSelectedEntity(EditorContext& context, const ImVec2& imageMin, const ImVec2& imageMax);
 
     private:
         Ref<Framebuffer> m_Framebuffer;

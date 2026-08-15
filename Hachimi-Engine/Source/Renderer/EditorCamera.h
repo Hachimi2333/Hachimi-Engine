@@ -64,6 +64,6 @@ namespace HachimiEngine
 
         float m_MoveSpeed = 8.0f;
         float m_MouseSensitivity = 0.008f;
-        float m_ZoomSpeed = 0.1f;
+        float m_ZoomSpeed = 0.25f;
     };
 }

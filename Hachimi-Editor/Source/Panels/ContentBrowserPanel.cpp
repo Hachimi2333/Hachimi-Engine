@@ -3,6 +3,7 @@
 #include "Asset/AssetManager.h"
 #include "Core/Log.h"
 #include "Panels/EditorContext.h"
+#include "Panels/EditorLayer.h"
 #include "Project/ProjectManager.h"
 #include "Utils/FileDialogs.h"
 #include "Utils/FileSystem.h"
@@ -11,7 +12,7 @@
 
 namespace HachimiEngine
 {
-    void ContentBrowserPanel::Draw(EditorContext& context)
+    void ContentBrowserPanel::Draw(EditorLayer* owner, EditorContext& context)
     {
         ImGui::Begin("Content Browser");
 
@@ -80,11 +81,18 @@ namespace HachimiEngine
             {
                 if (FileSystem::GetExtension(file) == ".hscene")
                 {
+                    if (context.PlayState != EditorPlayState::Stopped)
+                    {
+                        owner->OnStop();
+                    }
+
                     const Ref<Project> project = ProjectManager::GetActiveProject();
                     if (project != nullptr && project->OpenScene(file))
                     {
-                        context.Scene = project->GetActiveScene();
+                        context.ActiveScene = project->GetActiveScene();
+                        context.EditorScene = nullptr;
                         context.SelectedEntity = {};
+                        context.PlayState = EditorPlayState::Stopped;
                         HE_CLIENT_INFO("Opened scene {}", file.string());
                     }
                 }

@@ -2,20 +2,15 @@
 
 #include "Core/Base.h"
 
-#include <filesystem>
-
 namespace HachimiEngine
 {
     struct EditorContext;
     class EditorLayer;
 
-    // File browser rooted at the project Assets directory.
-    class ContentBrowserPanel
+    // Top toolbar hosting gizmo mode buttons and playback controls.
+    class ToolbarPanel
     {
     public:
         void Draw(EditorLayer* owner, EditorContext& context);
-
-    private:
-        std::filesystem::path m_CurrentDirectory;
     };
 }

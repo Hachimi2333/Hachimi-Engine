@@ -13,7 +13,7 @@ namespace HachimiEngine
     {
         ImGui::Begin("Scene Hierarchy");
 
-        if (context.Scene == nullptr)
+        if (context.ActiveScene == nullptr)
         {
             ImGui::TextDisabled("No active scene");
             ImGui::End();
@@ -26,7 +26,7 @@ namespace HachimiEngine
             ImGui::EndPopup();
         }
 
-        for (const Entity entity : context.Scene->GetAllEntities())
+        for (const Entity entity : context.ActiveScene->GetAllEntities())
         {
             if (!entity.HasComponent<RelationshipComponent>())
             {
@@ -56,7 +56,8 @@ namespace HachimiEngine
             flags |= ImGuiTreeNodeFlags_Selected;
         }
 
-        const std::string label = entity.GetName() + "##" + entity.GetUUID().ToString();
+        // The entity handle pointer keeps duplicate names unique without showing the UUID.
+        const std::string label = entity.GetName();
         const bool expanded = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uintptr_t>(static_cast<uint32_t>(entity))), flags, "%s", label.c_str());
 
         if (ImGui::IsItemClicked())
@@ -71,7 +72,7 @@ namespace HachimiEngine
             const auto& relationship = entity.GetComponent<RelationshipComponent>();
             for (const UUID childUUID : relationship.Children)
             {
-                DrawEntityNode(context, context.Scene->GetEntityByUUID(childUUID));
+                DrawEntityNode(context, context.ActiveScene->GetEntityByUUID(childUUID));
             }
             ImGui::TreePop();
         }
@@ -86,7 +87,7 @@ namespace HachimiEngine
 
             if (ImGui::MenuItem("Delete Entity"))
             {
-                context.Scene->DestroyEntity(entity);
+                context.ActiveScene->DestroyEntity(entity);
                 if (context.SelectedEntity == entity)
                 {
                     context.SelectedEntity = {};
@@ -96,7 +97,7 @@ namespace HachimiEngine
 
             if (ImGui::MenuItem("Duplicate Entity"))
             {
-                context.Scene->DuplicateEntity(entity);
+                context.ActiveScene->DuplicateEntity(entity);
                 ImGui::CloseCurrentPopup();
             }
 
@@ -108,11 +109,11 @@ namespace HachimiEngine
     {
         if (ImGui::MenuItem("Create Empty Entity"))
         {
-            context.Scene->CreateEntity("Empty Entity");
+            context.ActiveScene->CreateEntity("Empty Entity");
         }
         if (ImGui::MenuItem("Create Cube"))
         {
-            Entity entity = context.Scene->CreateEntity("Cube");
+            Entity entity = context.ActiveScene->CreateEntity("Cube");
             auto& mesh = entity.AddComponent<MeshComponent>();
             mesh.PrimitiveType = PrimitiveMeshType::Cube;
             mesh.Mesh = MeshFactory::CreateCube();
@@ -120,7 +121,7 @@ namespace HachimiEngine
         }
         if (ImGui::MenuItem("Create Sphere"))
         {
-            Entity entity = context.Scene->CreateEntity("Sphere");
+            Entity entity = context.ActiveScene->CreateEntity("Sphere");
             auto& mesh = entity.AddComponent<MeshComponent>();
             mesh.PrimitiveType = PrimitiveMeshType::Sphere;
             mesh.Mesh = MeshFactory::CreateSphere();
@@ -128,7 +129,7 @@ namespace HachimiEngine
         }
         if (ImGui::MenuItem("Create Plane"))
         {
-            Entity entity = context.Scene->CreateEntity("Plane");
+            Entity entity = context.ActiveScene->CreateEntity("Plane");
             auto& mesh = entity.AddComponent<MeshComponent>();
             mesh.PrimitiveType = PrimitiveMeshType::Plane;
             mesh.Mesh = MeshFactory::CreatePlane();
@@ -136,14 +137,14 @@ namespace HachimiEngine
         }
         if (ImGui::MenuItem("Create Point Light"))
         {
-            Entity entity = context.Scene->CreateEntity("Point Light");
+            Entity entity = context.ActiveScene->CreateEntity("Point Light");
             auto& light = entity.AddComponent<LightComponent>();
             light.Type = LightComponent::LightType::Point;
             context.SelectedEntity = entity;
         }
         if (ImGui::MenuItem("Create Directional Light"))
         {
-            Entity entity = context.Scene->CreateEntity("Directional Light");
+            Entity entity = context.ActiveScene->CreateEntity("Directional Light");
             auto& light = entity.AddComponent<LightComponent>();
             light.Type = LightComponent::LightType::Directional;
             light.Intensity = 1.4f;
@@ -151,7 +152,7 @@ namespace HachimiEngine
         }
         if (ImGui::MenuItem("Create Camera"))
         {
-            Entity entity = context.Scene->CreateEntity("Camera");
+            Entity entity = context.ActiveScene->CreateEntity("Camera");
             entity.AddComponent<CameraComponent>();
             context.SelectedEntity = entity;
         }

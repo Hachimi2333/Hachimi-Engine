@@ -33,7 +33,13 @@ namespace HachimiEngine
             ImGuiID dockConsole = 0;
             ImGui::DockBuilderSplitNode(dockBottom, ImGuiDir_Right, 0.5f, &dockConsole, &dockBottom);
 
+            // Split the central area vertically so the toolbar stays above the viewport tabs.
+            ImGuiID dockToolbar = 0;
+            ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Up, 0.08f, &dockToolbar, &dockMain);
+
+            ImGui::DockBuilderDockWindow("Toolbar", dockToolbar);
             ImGui::DockBuilderDockWindow("Viewport", dockMain);
+            ImGui::DockBuilderDockWindow("Game", dockMain);
             ImGui::DockBuilderDockWindow("Scene Hierarchy", dockLeft);
             ImGui::DockBuilderDockWindow("Inspector", dockRight);
             ImGui::DockBuilderDockWindow("Content Browser", dockBottom);
@@ -57,7 +63,9 @@ namespace HachimiEngine
         }
 
         AssetManager::Init(project->GetAssetsDirectory());
-        m_Context.Scene = project->GetActiveScene();
+        m_Context.ActiveScene = project->GetActiveScene();
+        m_Context.EditorScene = nullptr;
+        m_Context.PlayState = EditorPlayState::Stopped;
         m_Context.Camera.SetViewportSize(Application::Get().GetWindow().GetWidth(), Application::Get().GetWindow().GetHeight());
         m_ConsolePanel.RegisterCallbacks();
 
@@ -78,23 +86,112 @@ namespace HachimiEngine
             m_Context.Camera.OnUpdate(timestep);
         }
 
-        if (m_Context.Scene != nullptr)
+        // Scene simulation only advances while the playback toolbar is in Play mode.
+        if (m_Context.ActiveScene != nullptr && m_Context.PlayState == EditorPlayState::Playing)
         {
-            m_Context.Scene->OnUpdate(timestep);
+            m_Context.ActiveScene->OnUpdate(timestep);
         }
+    }
+
+    void EditorLayer::OnPlay()
+    {
+        if (m_Context.ActiveScene == nullptr)
+        {
+            return;
+        }
+
+        if (m_Context.PlayState == EditorPlayState::Paused)
+        {
+            m_Context.PlayState = EditorPlayState::Playing;
+            m_Context.FocusGamePanel = true;
+            return;
+        }
+
+        if (m_Context.PlayState == EditorPlayState::Playing)
+        {
+            return;
+        }
+
+        // Clone the editor scene so Play mode edits are discarded when stopping.
+        m_Context.EditorScene = m_Context.ActiveScene;
+        m_Context.ActiveScene = m_Context.EditorScene->Clone();
+
+        if (m_Context.SelectedEntity)
+        {
+            const UUID selectedUUID = m_Context.SelectedEntity.GetUUID();
+            m_Context.SelectedEntity = m_Context.ActiveScene->GetEntityByUUID(selectedUUID);
+        }
+
+        m_Context.PlayState = EditorPlayState::Playing;
+        m_Context.FocusGamePanel = true;
+        m_Context.FocusViewportPanel = false;
+    }
+
+    void EditorLayer::OnPause()
+    {
+        if (m_Context.PlayState == EditorPlayState::Playing)
+        {
+            m_Context.PlayState = EditorPlayState::Paused;
+        }
+        else if (m_Context.PlayState == EditorPlayState::Paused)
+        {
+            m_Context.PlayState = EditorPlayState::Playing;
+            m_Context.FocusGamePanel = true;
+        }
+    }
+
+    void EditorLayer::OnStop()
+    {
+        if (m_Context.PlayState == EditorPlayState::Stopped)
+        {
+            return;
+        }
+
+        m_Context.PlayState = EditorPlayState::Stopped;
+
+        if (m_Context.EditorScene != nullptr)
+        {
+            UUID selectedUUID = UUID::Invalid();
+            if (m_Context.SelectedEntity)
+            {
+                selectedUUID = m_Context.SelectedEntity.GetUUID();
+            }
+
+            m_Context.ActiveScene = m_Context.EditorScene;
+            m_Context.EditorScene = nullptr;
+            m_Context.SelectedEntity = m_Context.ActiveScene->GetEntityByUUID(selectedUUID);
+        }
+
+        m_Context.FocusViewportPanel = true;
+        m_Context.FocusGamePanel = false;
     }
 
     void EditorLayer::OnImGuiRender()
     {
         ImGuizmo::BeginFrame();
         m_ViewportPanel.RenderScene(m_Context);
+        m_GamePanel.RenderScene(m_Context);
 
         DrawDockSpace();
         m_MenuBar.Draw(this, m_Context);
+        m_ToolbarPanel.Draw(this, m_Context);
         m_SceneHierarchyPanel.Draw(m_Context);
         m_InspectorPanel.Draw(m_Context);
-        m_ContentBrowserPanel.Draw(m_Context);
+        m_ContentBrowserPanel.Draw(this, m_Context);
         m_ConsolePanel.Draw();
+
+        if (m_Context.FocusGamePanel)
+        {
+            ImGui::SetNextWindowFocus();
+            m_Context.FocusGamePanel = false;
+        }
+        m_GamePanel.Draw(m_Context);
+
+        if (m_Context.FocusViewportPanel)
+        {
+            ImGui::SetNextWindowFocus();
+            m_Context.FocusViewportPanel = false;
+        }
         m_ViewportPanel.Draw(m_Context);
     }
 
@@ -106,7 +203,8 @@ namespace HachimiEngine
     void EditorLayer::DrawDockSpace()
     {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
-        const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpace");
+        // Versioned dock space ID gives the new Toolbar/Game panels a clean default layout.
+        const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpaceV2");
 
         // Build the layout once, before the dock space is submitted for this frame.
         if (ImGui::DockBuilderGetNode(dockspaceId) == nullptr)

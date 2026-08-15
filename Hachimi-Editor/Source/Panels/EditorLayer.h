@@ -6,8 +6,10 @@
 #include "Panels/ContentBrowserPanel.h"
 #include "Panels/EditorContext.h"
 #include "Panels/EditorMenuBar.h"
+#include "Panels/GamePanel.h"
 #include "Panels/InspectorPanel.h"
 #include "Panels/SceneHierarchyPanel.h"
+#include "Panels/ToolbarPanel.h"
 #include "Panels/ViewportPanel.h"
 #include "Renderer/EditorCamera.h"
 
@@ -28,16 +30,23 @@ namespace HachimiEngine
         void OnImGuiRender() override;
         void OnEvent(Event& event) override;
 
+        // Playback controls used by the toolbar panel.
+        void OnPlay();
+        void OnPause();
+        void OnStop();
+
     private:
         void DrawDockSpace();
 
     private:
         EditorContext m_Context;
         ViewportPanel m_ViewportPanel;
+        GamePanel m_GamePanel;
         SceneHierarchyPanel m_SceneHierarchyPanel;
         InspectorPanel m_InspectorPanel;
         ContentBrowserPanel m_ContentBrowserPanel;
         ConsolePanel m_ConsolePanel;
         EditorMenuBar m_MenuBar;
+        ToolbarPanel m_ToolbarPanel;
     };
 }
