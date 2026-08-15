@@ -1,0 +1,20 @@
+# Build output
+Bin/
+
+# Premake generated Visual Studio files
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+.vs/
+
+# Temporary library download area
+TMP/
+
+# OS / editor junk
+Thumbs.db
+Desktop.ini
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
