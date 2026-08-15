@@ -88,7 +88,12 @@ namespace HachimiEngine
             static_cast<GLsizei>(m_Specification.Height));
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, m_DepthAttachment);
 
-        HE_CORE_ASSERT(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+        const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        if (status != GL_FRAMEBUFFER_COMPLETE)
+        {
+            HE_CORE_CRITICAL("Framebuffer is incomplete: status=0x{:X}, size={}x{}", status, m_Specification.Width, m_Specification.Height);
+        }
+        HE_CORE_ASSERT(status == GL_FRAMEBUFFER_COMPLETE);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }

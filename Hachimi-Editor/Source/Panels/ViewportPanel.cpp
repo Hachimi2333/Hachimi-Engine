@@ -13,6 +13,9 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 
+#include <algorithm>
+#include <cfloat>
+
 namespace HachimiEngine
 {
     ViewportPanel::ViewportPanel()
@@ -26,6 +29,12 @@ namespace HachimiEngine
     void ViewportPanel::RenderScene(EditorContext& context)
     {
         if (context.Scene == nullptr)
+        {
+            return;
+        }
+
+        // Ignore collapsed or otherwise invalid viewport sizes before converting them.
+        if (context.ViewportSize.x <= 0.0f || context.ViewportSize.y <= 0.0f)
         {
             return;
         }
@@ -49,15 +58,21 @@ namespace HachimiEngine
 
     void ViewportPanel::Draw(EditorContext& context)
     {
+        // Keep the viewport usable even when a stale layout saved a collapsed size.
+        ImGui::SetNextWindowSizeConstraints(ImVec2(320.0f, 240.0f), ImVec2(FLT_MAX, FLT_MAX));
+        ImGui::SetNextWindowSize(ImVec2(1280.0f, 720.0f), ImGuiCond_FirstUseEver);
         ImGui::Begin("Viewport");
         DrawGizmoToolbar(context);
 
-        const ImVec2 viewportSize = ImGui::GetContentRegionAvail();
+        const ImVec2 availableSize = ImGui::GetContentRegionAvail();
+        const ImVec2 viewportSize(
+            std::max(availableSize.x, 0.0f),
+            std::max(availableSize.y, 0.0f));
         context.ViewportSize = { viewportSize.x, viewportSize.y };
         context.ViewportHovered = ImGui::IsWindowHovered();
         context.ViewportFocused = ImGui::IsWindowFocused();
 
-        if (m_Framebuffer->GetColorAttachmentRendererID() != 0)
+        if (m_Framebuffer->GetColorAttachmentRendererID() != 0 && viewportSize.x > 0.0f && viewportSize.y > 0.0f)
         {
             // UVs are flipped vertically for the OpenGL framebuffer texture.
             ImGui::Image(
