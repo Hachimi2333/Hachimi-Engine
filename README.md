@@ -8,8 +8,11 @@ Hachimi-Engine 是一个借鉴 Hazel 架构思路、使用 C++20 编写的 3D �
 - Premake5 生成 Visual Studio 2026 解决方案
 - OpenGL 4.6 Core 渲染后端
 - Application / Entry Point / Layer / LayerStack / Event 系统
-- OpenGL 风格渲染抽象：VertexArray、VertexBuffer、IndexBuffer、Shader、Texture2D、Framebuffer
+- OpenGL 风格渲染抽象：VertexArray、VertexBuffer、IndexBuffer、Shader、Texture2D、TextureCube、Framebuffer
 - 内置网格：Cube、Sphere、Plane、Grid
+- HDR 渲染管线：ACES Tone Mapping + Gamma 后处理
+- Cook-Torrance PBR 直接光照、方向光阴影映射（3×3 PCF）
+- 程序化天空盒与基于环境贴图的 IBL（irradiance + prefiltered specular）
 - 编辑器相机：右键旋转、中键平移、滚轮缩放、WASD 移动
 - 基于 EnTT 的 Scene / ECS
 - yaml-cpp 场景（`.hscene`）与项目（`.hproj`）序列化
@@ -73,6 +76,9 @@ Bin/Release-windows-x86_64/Hachimi-Editor.exe
     └── Scenes/
         └── Default.hscene
 ```
+
+默认 `Default.hscene` 是一个渲染特性展示场景：PBR 金属/粗糙材质球与立方体、地面、
+方向光阴影、两盏点光源、父级层级物体、天空盒与 IBL；Game 面板使用主相机视角。
 
 ### 视口操作
 
