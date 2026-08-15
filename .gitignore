@@ -1,5 +1,5 @@
-# Build output
-Bin/
+# Build output (repository root only; keeps Vendor/Premake/Bin tracked)
+/Bin/
 
 # Premake generated Visual Studio files
 *.sln
