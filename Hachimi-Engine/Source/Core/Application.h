@@ -8,6 +8,8 @@
 
 namespace HachimiEngine
 {
+    class ImGuiLayer;
+
     // Engine entry point object: owns the window and drives the main loop.
     class Application
     {
@@ -37,6 +39,7 @@ namespace HachimiEngine
     protected:
         Scope<Window> m_Window;
         LayerStack m_LayerStack;
+        Ref<ImGuiLayer> m_ImGuiLayer;
         bool m_Running = true;
         bool m_Minimized = false;
 

@@ -5,6 +5,7 @@
 #include "Core/Timestep.h"
 #include "Events/ApplicationEvent.h"
 #include "Events/EventDispatcher.h"
+#include "ImGui/ImGuiLayer.h"
 #include "Renderer/RenderCommand.h"
 #include "Renderer/SceneRenderer.h"
 
@@ -25,6 +26,9 @@ namespace HachimiEngine
         RenderCommand::Init();
         RenderCommand::SetClearColor({ 0.08f, 0.08f, 0.10f, 1.0f });
         SceneRenderer::Init();
+
+        m_ImGuiLayer = CreateRef<ImGuiLayer>();
+        PushOverlay(m_ImGuiLayer);
     }
 
     Application::~Application()
@@ -60,7 +64,11 @@ namespace HachimiEngine
                 OnEvent(renderEvent);
 
                 RenderCommand::Clear();
+
+                m_ImGuiLayer->Begin();
                 m_LayerStack.RenderImGui();
+                m_ImGuiLayer->End();
+
                 m_Window->SwapBuffers();
             }
         }
