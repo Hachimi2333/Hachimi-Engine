@@ -94,11 +94,15 @@ namespace HachimiEngine
 
     void LayerStack::Update(Timestep timestep) const
     {
-        for (const auto& layer : m_Layers)
+        // Iterate over a snapshot so layers can safely push/pop mid-frame.
+        const std::vector<Ref<Layer>> layers = m_Layers;
+        for (const auto& layer : layers)
         {
             layer->OnUpdate(timestep);
         }
-        for (const auto& overlay : m_Overlays)
+
+        const std::vector<Ref<Layer>> overlays = m_Overlays;
+        for (const auto& overlay : overlays)
         {
             overlay->OnUpdate(timestep);
         }
@@ -106,11 +110,15 @@ namespace HachimiEngine
 
     void LayerStack::RenderImGui() const
     {
-        for (const auto& layer : m_Layers)
+        // Iterate over a snapshot so layers can safely push/pop mid-frame.
+        const std::vector<Ref<Layer>> layers = m_Layers;
+        for (const auto& layer : layers)
         {
             layer->OnImGuiRender();
         }
-        for (const auto& overlay : m_Overlays)
+
+        const std::vector<Ref<Layer>> overlays = m_Overlays;
+        for (const auto& overlay : overlays)
         {
             overlay->OnImGuiRender();
         }
@@ -119,7 +127,9 @@ namespace HachimiEngine
     void LayerStack::DispatchEvent(Event& event) const
     {
         // Events travel from the topmost overlay/layer down until handled.
-        for (auto it = m_Overlays.rbegin(); it != m_Overlays.rend(); ++it)
+        // Use snapshots so layers can safely push/pop while dispatching.
+        const std::vector<Ref<Layer>> overlays = m_Overlays;
+        for (auto it = overlays.rbegin(); it != overlays.rend(); ++it)
         {
             if (event.Handled)
             {
@@ -128,7 +138,8 @@ namespace HachimiEngine
             (*it)->OnEvent(event);
         }
 
-        for (auto it = m_Layers.rbegin(); it != m_Layers.rend(); ++it)
+        const std::vector<Ref<Layer>> layers = m_Layers;
+        for (auto it = layers.rbegin(); it != layers.rend(); ++it)
         {
             if (event.Handled)
             {
