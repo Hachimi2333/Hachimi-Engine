@@ -2,6 +2,7 @@
 
 #include "Core/EntryPoint.h"
 #include "Core/Log.h"
+#include "Panels/ProjectHubLayer.h"
 
 namespace HachimiEngine
 {
@@ -9,6 +10,7 @@ namespace HachimiEngine
         : Application(WindowProps("Hachimi-Editor", 1600, 900))
     {
         HE_CLIENT_INFO("Hachimi-Editor started");
+        PushLayer(CreateRef<ProjectHubLayer>());
     }
 }
 
