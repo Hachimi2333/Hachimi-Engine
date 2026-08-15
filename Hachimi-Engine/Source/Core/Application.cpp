@@ -5,8 +5,7 @@
 #include "Core/Timestep.h"
 #include "Events/ApplicationEvent.h"
 #include "Events/EventDispatcher.h"
-
-#include <glad/gl.h>
+#include "Renderer/RenderCommand.h"
 
 #include <chrono>
 
@@ -21,10 +20,15 @@ namespace HachimiEngine
 
         m_Window = Window::Create(props);
         m_Window->SetEventCallback([this](Event& event) { OnEvent(event); });
+
+        RenderCommand::Init();
+        RenderCommand::SetClearColor({ 0.08f, 0.08f, 0.10f, 1.0f });
     }
 
     Application::~Application()
     {
+        RenderCommand::SetDepthTest(false);
+        Renderer::Shutdown();
         s_Instance = nullptr;
     }
 
@@ -52,11 +56,7 @@ namespace HachimiEngine
                 AppRenderEvent renderEvent;
                 OnEvent(renderEvent);
 
-                // Temporary clear color until the renderer abstraction owns scene presentation.
-                glClearColor(0.08f, 0.08f, 0.10f, 1.0f);
-                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-                glEnable(GL_DEPTH_TEST);
-
+                RenderCommand::Clear();
                 m_LayerStack.RenderImGui();
                 m_Window->SwapBuffers();
             }
@@ -92,7 +92,7 @@ namespace HachimiEngine
         }
 
         m_Minimized = false;
-        glViewport(0, 0, static_cast<GLsizei>(event.GetWidth()), static_cast<GLsizei>(event.GetHeight()));
+        RenderCommand::SetViewport(0, 0, event.GetWidth(), event.GetHeight());
         return false;
     }
 }
