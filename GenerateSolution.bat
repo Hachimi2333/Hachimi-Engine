@@ -18,5 +18,5 @@ if errorlevel 1 (
 )
 
 echo.
-echo [OK] Hachimi-Engine.sln generated at the repository root.
+echo [OK] Hachimi-Engine.slnx generated at the repository root.
 exit /b 0

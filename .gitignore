@@ -11,6 +11,9 @@
 # Temporary library download area
 TMP/
 
+# Local MSBuild temporary directory
+.msbuild-tmp/
+
 # OS / editor junk
 Thumbs.db
 Desktop.ini
