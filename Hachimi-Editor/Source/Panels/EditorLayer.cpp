@@ -8,9 +8,40 @@
 
 #include <ImGuizmo.h>
 #include <imgui.h>
+#include <imgui_internal.h>
 
 namespace HachimiEngine
 {
+    namespace
+    {
+        // Builds the initial editor docking layout the first time the dock space appears.
+        void SetupDefaultEditorDockLayout(ImGuiID dockspaceId, const ImVec2& dockspaceSize)
+        {
+            ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
+            ImGui::DockBuilderSetNodeSize(dockspaceId, dockspaceSize);
+
+            ImGuiID dockMain = dockspaceId;
+            ImGuiID dockBottom = 0;
+            ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Down, 0.25f, &dockBottom, &dockMain);
+
+            ImGuiID dockRight = 0;
+            ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Right, 0.22f, &dockRight, &dockMain);
+
+            ImGuiID dockLeft = 0;
+            ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Left, 0.20f, &dockLeft, &dockMain);
+
+            ImGuiID dockConsole = 0;
+            ImGui::DockBuilderSplitNode(dockBottom, ImGuiDir_Right, 0.5f, &dockConsole, &dockBottom);
+
+            ImGui::DockBuilderDockWindow("Viewport", dockMain);
+            ImGui::DockBuilderDockWindow("Scene Hierarchy", dockLeft);
+            ImGui::DockBuilderDockWindow("Inspector", dockRight);
+            ImGui::DockBuilderDockWindow("Content Browser", dockBottom);
+            ImGui::DockBuilderDockWindow("Console", dockConsole);
+            ImGui::DockBuilderFinish(dockspaceId);
+        }
+    }
+
     EditorLayer::EditorLayer()
         : Layer("EditorLayer")
     {
@@ -75,6 +106,14 @@ namespace HachimiEngine
     void EditorLayer::DrawDockSpace()
     {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
+        const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpace");
+
+        // Build the layout once, before the dock space is submitted for this frame.
+        if (ImGui::DockBuilderGetNode(dockspaceId) == nullptr)
+        {
+            SetupDefaultEditorDockLayout(dockspaceId, viewport->WorkSize);
+        }
+
         ImGui::SetNextWindowPos(viewport->WorkPos);
         ImGui::SetNextWindowSize(viewport->WorkSize);
         ImGui::SetNextWindowViewport(viewport->ID);
@@ -88,7 +127,7 @@ namespace HachimiEngine
             | ImGuiWindowFlags_NoNavFocus;
 
         ImGui::Begin("EditorDockSpace", nullptr, windowFlags);
-        ImGui::DockSpace(ImGui::GetID("EditorDockSpace"), ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
+        ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
         ImGui::End();
     }
 }

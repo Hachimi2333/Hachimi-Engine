@@ -33,6 +33,12 @@ namespace HachimiEngine
             m_EditorLayer = nullptr;
         }
 
+        // While the editor is active, keep the hub in the layer stack but do not render it.
+        if (m_EditorPushed)
+        {
+            return;
+        }
+
         const ImGuiViewport* viewport = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(viewport->WorkPos);
         ImGui::SetNextWindowSize(viewport->WorkSize);
