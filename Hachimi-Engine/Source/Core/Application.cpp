@@ -6,6 +6,7 @@
 #include "Events/ApplicationEvent.h"
 #include "Events/EventDispatcher.h"
 #include "Renderer/RenderCommand.h"
+#include "Renderer/SceneRenderer.h"
 
 #include <chrono>
 
@@ -23,10 +24,12 @@ namespace HachimiEngine
 
         RenderCommand::Init();
         RenderCommand::SetClearColor({ 0.08f, 0.08f, 0.10f, 1.0f });
+        SceneRenderer::Init();
     }
 
     Application::~Application()
     {
+        SceneRenderer::Shutdown();
         RenderCommand::SetDepthTest(false);
         Renderer::Shutdown();
         s_Instance = nullptr;
