@@ -8,6 +8,7 @@
 #include "Renderer/RenderCommand.h"
 #include "Scene/Components.h"
 #include "Scene/Scene.h"
+#include "Viewport/SelectionIndicators.h"
 #include "Math/Math.h"
 
 #include <ImGuizmo.h>
@@ -107,7 +108,18 @@ namespace HachimiEngine
 
                 const Math::Mat4 inverseWorldTransform = Math::Inverse(context.ActiveScene->GetWorldTransform(entity.GetHandle()));
                 const Math::Vec3 localRayOrigin = Math::Vec3(inverseWorldTransform * Math::Vec4(rayOrigin, 1.0f));
-                const Math::Vec3 localRayDirection = Math::Normalize(Math::Vec3(inverseWorldTransform * Math::Vec4(rayDirection, 0.0f)));
+
+                // Keep the ray direction normalized for numerical stability, but remember its
+                // original length. Non-uniform entity scale changes that length, so local-space
+                // intersection distances are not directly comparable between entities.
+                const Math::Vec3 unnormalizedLocalRayDirection = Math::Vec3(inverseWorldTransform * Math::Vec4(rayDirection, 0.0f));
+                const float localRayDirectionLength = Math::Length(unnormalizedLocalRayDirection);
+                if (localRayDirectionLength < 1e-6f)
+                {
+                    continue;
+                }
+
+                const Math::Vec3 localRayDirection = unnormalizedLocalRayDirection / localRayDirectionLength;
 
                 const auto& vertices = mesh.Mesh->GetVertices();
                 const auto& indices = mesh.Mesh->GetIndices();
@@ -126,9 +138,12 @@ namespace HachimiEngine
                         continue;
                     }
 
-                    if (distance < closestDistance)
+                    // Convert the local-space hit back to world-space distance so closest-hit
+                    // comparisons stay correct across entities with different world scales.
+                    const float worldDistance = distance / localRayDirectionLength;
+                    if (worldDistance < closestDistance)
                     {
-                        closestDistance = distance;
+                        closestDistance = worldDistance;
                         closestEntity = entity;
                     }
                 }
@@ -191,6 +206,7 @@ namespace HachimiEngine
         RenderCommand::SetClearColor({ 0.00719f, 0.00719f, 0.01002f, 1.0f });
         RenderCommand::Clear();
         context.ActiveScene->OnRender(context.Camera);
+        DrawSelectionIndicators(context);
         m_SceneFramebuffer->Unbind();
 
         m_DisplayFramebuffer->Bind();
@@ -242,23 +258,26 @@ namespace HachimiEngine
         }
 
         const ImGuiIO& io = ImGui::GetIO();
-        if (context.ViewportHovered && !ImGuizmo::IsUsingViewManipulate())
+        if (context.ViewportHovered && !ImGuizmo::IsUsingAny())
         {
             if (io.MouseWheel != 0.0f)
             {
                 context.Camera.OnMouseScroll(io.MouseWheel);
             }
 
+            // Poll mouse-down state instead of ImGui::IsMouseDragging so camera
+            // input has no drag threshold delay.
             const Math::Vec2 mouseDelta(io.MouseDelta.x, io.MouseDelta.y);
-            if (ImGui::IsMouseDragging(ImGuiMouseButton_Right))
-            {
-                context.Camera.OnMouseDrag(mouseDelta, Mouse::ButtonRight);
-            }
-            else if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle))
+            if (ImGui::IsMouseDown(ImGuiMouseButton_Middle))
             {
                 context.Camera.OnMouseDrag(mouseDelta, Mouse::ButtonMiddle);
             }
-            else if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) && Input::IsKeyPressed(Key::LeftAlt))
+            else if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
+            {
+                // OnMouseDrag distinguishes plain right-drag orbit from Alt+right zoom.
+                context.Camera.OnMouseDrag(mouseDelta, Mouse::ButtonRight);
+            }
+            else if (ImGui::IsMouseDown(ImGuiMouseButton_Left) && Input::IsKeyPressed(Key::LeftAlt))
             {
                 context.Camera.OnMouseDrag(mouseDelta, Mouse::ButtonLeft);
             }

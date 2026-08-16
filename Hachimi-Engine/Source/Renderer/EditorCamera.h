@@ -13,7 +13,7 @@ namespace HachimiEngine
     public:
         EditorCamera();
 
-        void OnUpdate(Timestep timestep);
+        void OnUpdate(Timestep timestep, bool viewportHovered);
         void OnMouseScroll(float yOffset);
         void OnMouseDrag(const Math::Vec2& mouseDelta, int mouseButton);
         void SetViewportSize(uint32_t width, uint32_t height);
@@ -52,17 +52,11 @@ namespace HachimiEngine
         Math::Vec3 m_FocalPoint { 0.0f, 1.0f, 0.0f };
         Math::Vec3 m_WorldUp { 0.0f, 1.0f, 0.0f };
 
-        float m_FieldOfView = 45.0f;
+        float m_FieldOfView = 60.0f;
         float m_AspectRatio = 1.778f;
-        float m_NearClip = 0.1f;
-        float m_FarClip = 1000.0f;
 
         float m_Distance = 8.0f;
         float m_Pitch = -0.35f;
         float m_Yaw = -1.5708f;
-
-        float m_MoveSpeed = 8.0f;
-        float m_MouseSensitivity = 0.008f;
-        float m_ZoomSpeed = 0.25f;
     };
 }

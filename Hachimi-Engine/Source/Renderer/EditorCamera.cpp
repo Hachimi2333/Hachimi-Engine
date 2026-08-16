@@ -6,18 +6,45 @@
 #include "Math/Math.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace HachimiEngine
 {
+    namespace
+    {
+        // Control constants for the editor camera's orbit/pan/zoom feel.
+        constexpr float OrbitSensitivity = 0.006f;
+        constexpr float PanScalePerUnit = 0.0015f;
+        constexpr float MinimumPanScale = 0.002f;
+        constexpr float WheelZoomRate = 0.14f;
+        constexpr float AltDragZoomRate = 0.01f;
+        constexpr float MinimumDistance = 0.15f;
+        constexpr float MaximumDistance = 5000.0f;
+        constexpr float NormalMoveSpeed = 4.0f;
+        constexpr float FastMoveSpeed = 12.0f;
+        constexpr float MoveSpeedDistanceFactor = 0.15f;
+        constexpr float HalfPi = 1.57079632679f;
+        constexpr float MaximumPitch = HalfPi - 0.02f;
+    }
+
     EditorCamera::EditorCamera()
     {
         RecalculateProjection();
         RecalculateView();
     }
 
-    void EditorCamera::OnUpdate(Timestep timestep)
+    void EditorCamera::OnUpdate(Timestep timestep, bool viewportHovered)
     {
-        const float speed = m_MoveSpeed * (Input::IsKeyPressed(Key::LeftShift) ? 2.0f : 1.0f);
+        // WASD/QE flight only happens while the right mouse button is held and
+        // the cursor is over the viewport.
+        if (!viewportHovered || !Input::IsMouseButtonPressed(Mouse::ButtonRight))
+        {
+            return;
+        }
+
+        const float speed = (Input::IsKeyPressed(Key::LeftShift) ? FastMoveSpeed : NormalMoveSpeed)
+            * std::max(1.0f, m_Distance * MoveSpeedDistanceFactor);
+
         Math::Vec3 movement(0.0f);
 
         if (Input::IsKeyPressed(Key::W))
@@ -38,17 +65,16 @@ namespace HachimiEngine
         }
         if (Input::IsKeyPressed(Key::E))
         {
-            movement += GetUpDirection();
+            movement += m_WorldUp;
         }
         if (Input::IsKeyPressed(Key::Q))
         {
-            movement -= GetUpDirection();
+            movement -= m_WorldUp;
         }
 
         if (Math::Length(movement) > 0.0f)
         {
             const float delta = speed * timestep.GetSeconds();
-            m_Position += Math::Normalize(movement) * delta;
             m_FocalPoint += Math::Normalize(movement) * delta;
             RecalculateView();
         }
@@ -56,30 +82,34 @@ namespace HachimiEngine
 
     void EditorCamera::OnMouseScroll(float yOffset)
     {
-        const float delta = -yOffset * m_ZoomSpeed * std::max(m_Distance * 0.1f, 0.1f);
-        SetDistance(m_Distance + delta);
+        m_Distance = std::clamp(m_Distance * std::exp(-yOffset * WheelZoomRate), MinimumDistance, MaximumDistance);
+        RecalculateView();
     }
 
     void EditorCamera::OnMouseDrag(const Math::Vec2& mouseDelta, int mouseButton)
     {
-        if (mouseButton == Mouse::ButtonRight)
+        const bool altPressed = Input::IsKeyPressed(Key::LeftAlt);
+
+        if (mouseButton == Mouse::ButtonRight && altPressed)
         {
-            m_Yaw += mouseDelta.x * m_MouseSensitivity;
-            m_Pitch -= mouseDelta.y * m_MouseSensitivity;
+            m_Distance = std::clamp(
+                m_Distance * std::exp(mouseDelta.y * AltDragZoomRate),
+                MinimumDistance,
+                MaximumDistance);
+        }
+        else if (mouseButton == Mouse::ButtonRight || (mouseButton == Mouse::ButtonLeft && altPressed))
+        {
+            m_Yaw -= mouseDelta.x * OrbitSensitivity;
+            m_Pitch = std::clamp(m_Pitch + mouseDelta.y * OrbitSensitivity, -MaximumPitch, MaximumPitch);
         }
         else if (mouseButton == Mouse::ButtonMiddle)
         {
             const Math::Vec3 right = GetRightDirection();
             const Math::Vec3 up = GetUpDirection();
-            const float panScale = m_Distance * 0.0025f;
+            const float panScale = std::max(MinimumPanScale, m_Distance * PanScalePerUnit);
 
             m_FocalPoint += -right * mouseDelta.x * panScale;
             m_FocalPoint += up * mouseDelta.y * panScale;
-        }
-        else if (mouseButton == Mouse::ButtonLeft && Input::IsKeyPressed(Key::LeftAlt))
-        {
-            m_Yaw += mouseDelta.x * m_MouseSensitivity;
-            m_Pitch -= mouseDelta.y * m_MouseSensitivity;
         }
 
         RecalculateView();
@@ -120,8 +150,7 @@ namespace HachimiEngine
 
     void EditorCamera::SetDistance(float distance)
     {
-        m_Distance = std::clamp(distance, 0.1f, 200.0f);
-        m_Position = m_FocalPoint - GetForwardDirection() * m_Distance;
+        m_Distance = std::clamp(distance, MinimumDistance, MaximumDistance);
         RecalculateView();
     }
 
@@ -142,29 +171,40 @@ namespace HachimiEngine
 
     Math::Vec3 EditorCamera::GetUpDirection() const
     {
-        return Math::Rotate(Math::Quat(Math::Vec3(-m_Pitch, -m_Yaw, 0.0f)), m_WorldUp);
+        const Math::Vec3 right = GetRightDirection();
+        return Math::Normalize(Math::Cross(right, GetForwardDirection()));
     }
 
     Math::Vec3 EditorCamera::GetRightDirection() const
     {
-        return Math::Rotate(Math::Quat(Math::Vec3(-m_Pitch, -m_Yaw, 0.0f)), Math::Vec3(1.0f, 0.0f, 0.0f));
+        return Math::Normalize(Math::Cross(GetForwardDirection(), m_WorldUp));
     }
 
     Math::Vec3 EditorCamera::GetForwardDirection() const
     {
-        return Math::Rotate(Math::Quat(Math::Vec3(-m_Pitch, -m_Yaw, 0.0f)), Math::Vec3(0.0f, 0.0f, -1.0f));
+        const float cosPitch = std::cos(m_Pitch);
+        return Math::Normalize(Math::Vec3(
+            std::sin(m_Yaw) * cosPitch,
+            std::sin(m_Pitch),
+            std::cos(m_Yaw) * cosPitch));
     }
 
     void EditorCamera::RecalculateView()
     {
         m_Position = m_FocalPoint - GetForwardDirection() * m_Distance;
         m_ViewMatrix = Math::LookAt(m_Position, m_FocalPoint, m_WorldUp);
+        RecalculateProjection();
         m_ViewProjectionDirty = true;
     }
 
     void EditorCamera::RecalculateProjection()
     {
-        m_Projection = Math::Perspective(Math::Radians(m_FieldOfView), m_AspectRatio, m_NearClip, m_FarClip);
+        // Dynamic clip planes scale with distance so both small scenes and very
+        // large imported scenes stay visible, matching the previous editor camera.
+        const float nearClip = std::clamp(m_Distance * 0.001f, 0.01f, 1.0f);
+        const float farClip = std::max(2000.0f, m_Distance * 50.0f);
+
+        m_Projection = Math::Perspective(Math::Radians(m_FieldOfView), m_AspectRatio, nearClip, farClip);
         m_ViewProjectionDirty = true;
     }
 }

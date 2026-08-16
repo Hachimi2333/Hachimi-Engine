@@ -19,6 +19,7 @@ Hachimi-Engine 是一个借鉴 Hazel 架构思路、使用 C++20 编写的 3D �
 - Box3D 物理系统：Static / Kinematic / Dynamic 刚体、Box / Sphere / Capsule / Plane 碰撞体、固定步长模拟与 Play 模式 Transform 同步
 - yaml-cpp 场景（`.hscene`）与项目（`.hproj`）序列化
 - ImGui Docking 编辑器：Project Hub、Viewport、Scene Hierarchy、Inspector、Content Browser、Console；Inter 字体与显示器 DPI 自适应 UI 缩放
+- 选中相机 / 灯光实体时，在视口中绘制视锥、光照范围与方向等调试指示线
 - ImGuizmo 变换工具：Translate / Rotate / Scale
 - ImGuiFileDialog 文件对话框
 - 控制台日志（引擎与客户端双 logger，暂不输出日志文件）
@@ -88,10 +89,10 @@ Game 面板使用主相机视角。
 
 | 操作 | 按键 |
 | --- | --- |
-| 旋转视角 | 鼠标右键拖动 |
+| 旋转视角 | 鼠标右键拖动（或 Alt + 左键拖动） |
 | 平移视角 | 鼠标中键拖动 |
-| 缩放 | 鼠标滚轮 |
-| 移动 | W / A / S / D / Q / E |
+| 缩放 | 鼠标滚轮（或 Alt + 右键上下拖动） |
+| 移动 | 按住鼠标右键 + W / A / S / D / Q / E |
 | 加速移动 | 按住 Left Shift |
 | 平移 Gizmo | Translate 按钮 |
 | 旋转 Gizmo | Rotate 按钮 |

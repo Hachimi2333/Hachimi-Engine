@@ -86,9 +86,10 @@ namespace HachimiEngine
     void EditorLayer::OnUpdate(Timestep timestep)
     {
         // Do not move the camera while the user is typing into an ImGui input field.
+        // ViewportHovered is updated by the previous frame's viewport panel layout.
         if (!ImGui::GetIO().WantCaptureKeyboard)
         {
-            m_Context.Camera.OnUpdate(timestep);
+            m_Context.Camera.OnUpdate(timestep, m_Context.ViewportHovered && !ImGuizmo::IsUsingAny());
         }
 
         // Scene simulation only advances while the playback toolbar is in Play mode.
