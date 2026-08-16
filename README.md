@@ -18,7 +18,7 @@ Hachimi-Engine 是一个借鉴 Hazel 架构思路、使用 C++20 编写的 3D �
 - 基于 EnTT 的 Scene / ECS
 - Box3D 物理系统：Static / Kinematic / Dynamic 刚体、Box / Sphere / Capsule / Plane 碰撞体、固定步长模拟与 Play 模式 Transform 同步
 - yaml-cpp 场景（`.hscene`）与项目（`.hproj`）序列化
-- ImGui Docking 编辑器：Project Hub、Viewport、Scene Hierarchy、Inspector、Content Browser、Console
+- ImGui Docking 编辑器：Project Hub、Viewport、Scene Hierarchy、Inspector、Content Browser、Console；Inter 字体与显示器 DPI 自适应 UI 缩放
 - ImGuizmo 变换工具：Translate / Rotate / Scale
 - ImGuiFileDialog 文件对话框
 - 控制台日志（引擎与客户端双 logger，暂不输出日志文件）

@@ -24,7 +24,9 @@ project "Hachimi-Editor"
     files
     {
         "%{prj.location}/Source/**.h",
-        "%{prj.location}/Source/**.cpp"
+        "%{prj.location}/Source/**.cpp",
+        "%{prj.location}/Assets/Fonts/Inter-Regular.ttf",
+        "%{prj.location}/Assets/Fonts/OFL.txt"
     }
 
     defines
@@ -47,4 +49,11 @@ project "Hachimi-Editor"
         "GLAD",
         "GLFW",
         "opengl32"
+    }
+
+    postbuildcommands
+    {
+        "{MKDIR} \"%{cfg.targetdir}/Assets/Fonts\"",
+        "copy /Y \"%{prj.location}Assets\\Fonts\\Inter-Regular.ttf\" \"%{cfg.targetdir}/Assets/Fonts/Inter-Regular.ttf\"",
+        "copy /Y \"%{prj.location}Assets\\Fonts\\OFL.txt\" \"%{cfg.targetdir}/Assets/Fonts/OFL.txt\""
     }

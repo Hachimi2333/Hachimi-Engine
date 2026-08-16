@@ -57,6 +57,25 @@ namespace HachimiEngine
         return GetUserDocumentsDirectory() / "HachimiProjects";
     }
 
+    std::filesystem::path PlatformUtils::GetExecutableDirectory()
+    {
+#ifdef HE_PLATFORM_WINDOWS
+        std::wstring buffer(MAX_PATH, L'\0');
+        DWORD length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+        while (length > 0 && length == buffer.size() && GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+        {
+            buffer.resize(buffer.size() * 2);
+            length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+        }
+
+        if (length > 0)
+        {
+            return std::filesystem::path(buffer.substr(0, length)).parent_path();
+        }
+#endif
+        return std::filesystem::current_path();
+    }
+
     void PlatformUtils::OpenPathInExplorer(const std::filesystem::path& path)
     {
 #ifdef HE_PLATFORM_WINDOWS
