@@ -88,5 +88,6 @@ namespace HachimiEngine
         static glm::vec3 s_CameraForward;
         static glm::mat4 s_DirectionalLightViewProjection;
         static bool s_DirectionalShadowEnabled;
+        static bool s_DirectionalShadowPassActive;
     };
 }

@@ -337,6 +337,7 @@ void main()
     glm::vec3 SceneRenderer::s_CameraForward { 0.0f, 0.0f, -1.0f };
     glm::mat4 SceneRenderer::s_DirectionalLightViewProjection { 1.0f };
     bool SceneRenderer::s_DirectionalShadowEnabled = false;
+    bool SceneRenderer::s_DirectionalShadowPassActive = false;
 
     void SceneRenderer::Init()
     {
@@ -369,6 +370,7 @@ void main()
         s_CameraForward = glm::vec3(0.0f, 0.0f, -1.0f);
         s_DirectionalLightViewProjection = glm::mat4(1.0f);
         s_DirectionalShadowEnabled = false;
+        s_DirectionalShadowPassActive = false;
     }
 
     void SceneRenderer::BeginScene(const EditorCamera& camera)
@@ -385,6 +387,9 @@ void main()
 
         const glm::mat4 transposedView = glm::transpose(view);
         s_CameraForward = glm::normalize(-glm::vec3(transposedView[2]));
+
+        // No shadow data has been rendered for this scene yet.
+        s_DirectionalShadowEnabled = false;
 
         PostProcessPass::SetExposure(s_Environment.Exposure);
     }
@@ -474,6 +479,7 @@ void main()
         s_DirectionalShadowMap->BindForWriting();
         s_DirectionalLightViewProjection = lightViewProjection;
         s_DirectionalShadowEnabled = true;
+        s_DirectionalShadowPassActive = true;
 
         s_DirectionalShadowShader->Bind();
         s_DirectionalShadowShader->SetMat4("u_ViewProjection", lightViewProjection);
@@ -482,7 +488,7 @@ void main()
 
     void SceneRenderer::SubmitShadowMesh(const Ref<Mesh>& mesh, const glm::mat4& transform)
     {
-        HE_CORE_ASSERT(s_DirectionalShadowEnabled);
+        HE_CORE_ASSERT(s_DirectionalShadowPassActive);
 
         if (mesh == nullptr || mesh->GetDrawMode() != MeshDrawMode::Triangles)
         {
@@ -496,8 +502,11 @@ void main()
     void SceneRenderer::EndDirectionalShadowPass()
     {
         Renderer::SetPolygonOffset(false);
-        s_DirectionalShadowEnabled = false;
+        s_DirectionalShadowPassActive = false;
         s_DirectionalShadowMap->Unbind();
+
+        // Keep s_DirectionalShadowEnabled set so SubmitMesh samples the map
+        // rendered above during the current scene pass.
     }
 
     glm::mat4 SceneRenderer::CalculateDirectionalLightViewProjection(const glm::vec3& cameraPosition)
