@@ -4,8 +4,7 @@
 #include "Core/Memory.h"
 #include "Renderer/Buffer.h"
 #include "Renderer/VertexArray.h"
-
-#include <glm/glm.hpp>
+#include "Math/Math.h"
 
 #include <vector>
 
@@ -19,10 +18,10 @@ namespace HachimiEngine
 
     struct MeshVertex
     {
-        glm::vec3 Position { 0.0f };
-        glm::vec3 Normal { 0.0f, 1.0f, 0.0f };
-        glm::vec2 TexCoord { 0.0f };
-        glm::vec4 Color { 1.0f };
+        Math::Vec3 Position { 0.0f };
+        Math::Vec3 Normal { 0.0f, 1.0f, 0.0f };
+        Math::Vec2 TexCoord { 0.0f };
+        Math::Vec4 Color { 1.0f };
 
         static BufferLayout GetLayout();
     };

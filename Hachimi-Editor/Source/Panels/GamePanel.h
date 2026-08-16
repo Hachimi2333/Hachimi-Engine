@@ -4,8 +4,6 @@
 #include "Core/Memory.h"
 #include "Renderer/FrameBuffer.h"
 
-#include <glm/glm.hpp>
-
 namespace HachimiEngine
 {
     struct EditorContext;

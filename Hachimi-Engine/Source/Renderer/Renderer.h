@@ -3,8 +3,7 @@
 #include "Core/Base.h"
 #include "Core/Memory.h"
 #include "Renderer/RendererAPI.h"
-
-#include <glm/glm.hpp>
+#include "Math/Math.h"
 
 namespace HachimiEngine
 {
@@ -18,7 +17,7 @@ namespace HachimiEngine
         static void Shutdown();
 
         static void SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height);
-        static void SetClearColor(const glm::vec4& color);
+        static void SetClearColor(const Math::Vec4& color);
         static void Clear();
         static void SetDepthTest(bool enabled);
         static void SetPolygonOffset(bool enabled, float factor = 0.0f, float units = 0.0f);

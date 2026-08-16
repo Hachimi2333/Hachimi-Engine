@@ -8,12 +8,10 @@
 #include "Renderer/RenderCommand.h"
 #include "Scene/Components.h"
 #include "Scene/Scene.h"
+#include "Math/Math.h"
 
 #include <ImGuizmo.h>
 #include <glad/gl.h>
-#include <glm/gtc/matrix_inverse.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 
 #include <algorithm>
@@ -26,19 +24,19 @@ namespace HachimiEngine
     {
         // Moller-Trumbore ray/triangle intersection. Both triangle windings are accepted.
         bool RayIntersectsTriangle(
-            const glm::vec3& rayOrigin,
-            const glm::vec3& rayDirection,
-            const glm::vec3& vertex0,
-            const glm::vec3& vertex1,
-            const glm::vec3& vertex2,
+            const Math::Vec3& rayOrigin,
+            const Math::Vec3& rayDirection,
+            const Math::Vec3& vertex0,
+            const Math::Vec3& vertex1,
+            const Math::Vec3& vertex2,
             float& outDistance)
         {
             constexpr float epsilon = 1e-6f;
 
-            const glm::vec3 edge1 = vertex1 - vertex0;
-            const glm::vec3 edge2 = vertex2 - vertex0;
-            const glm::vec3 pvec = glm::cross(rayDirection, edge2);
-            const float determinant = glm::dot(edge1, pvec);
+            const Math::Vec3 edge1 = vertex1 - vertex0;
+            const Math::Vec3 edge2 = vertex2 - vertex0;
+            const Math::Vec3 pvec = Math::Cross(rayDirection, edge2);
+            const float determinant = Math::Dot(edge1, pvec);
 
             if (std::fabs(determinant) < epsilon)
             {
@@ -46,21 +44,21 @@ namespace HachimiEngine
             }
 
             const float inverseDeterminant = 1.0f / determinant;
-            const glm::vec3 tvec = rayOrigin - vertex0;
-            const float u = glm::dot(tvec, pvec) * inverseDeterminant;
+            const Math::Vec3 tvec = rayOrigin - vertex0;
+            const float u = Math::Dot(tvec, pvec) * inverseDeterminant;
             if (u < 0.0f || u > 1.0f)
             {
                 return false;
             }
 
-            const glm::vec3 qvec = glm::cross(tvec, edge1);
-            const float v = glm::dot(rayDirection, qvec) * inverseDeterminant;
+            const Math::Vec3 qvec = Math::Cross(tvec, edge1);
+            const float v = Math::Dot(rayDirection, qvec) * inverseDeterminant;
             if (v < 0.0f || u + v > 1.0f)
             {
                 return false;
             }
 
-            outDistance = glm::dot(edge2, qvec) * inverseDeterminant;
+            outDistance = Math::Dot(edge2, qvec) * inverseDeterminant;
             return outDistance > epsilon;
         }
 
@@ -83,13 +81,13 @@ namespace HachimiEngine
             const float ndcX = ((mousePosition.x - imageMin.x) / imageWidth) * 2.0f - 1.0f;
             const float ndcY = 1.0f - ((mousePosition.y - imageMin.y) / imageHeight) * 2.0f;
 
-            const glm::mat4 inverseViewProjection = glm::inverse(context.Camera.GetViewProjection());
+            const Math::Mat4 inverseViewProjection = Math::Inverse(context.Camera.GetViewProjection());
 
-            const glm::vec4 nearClip = inverseViewProjection * glm::vec4(ndcX, ndcY, -1.0f, 1.0f);
-            const glm::vec4 farClip = inverseViewProjection * glm::vec4(ndcX, ndcY, 1.0f, 1.0f);
-            const glm::vec3 rayOrigin = glm::vec3(nearClip.x, nearClip.y, nearClip.z) / nearClip.w;
-            const glm::vec3 farPoint = glm::vec3(farClip.x, farClip.y, farClip.z) / farClip.w;
-            const glm::vec3 rayDirection = glm::normalize(farPoint - rayOrigin);
+            const Math::Vec4 nearClip = inverseViewProjection * Math::Vec4(ndcX, ndcY, -1.0f, 1.0f);
+            const Math::Vec4 farClip = inverseViewProjection * Math::Vec4(ndcX, ndcY, 1.0f, 1.0f);
+            const Math::Vec3 rayOrigin = Math::Vec3(nearClip.x, nearClip.y, nearClip.z) / nearClip.w;
+            const Math::Vec3 farPoint = Math::Vec3(farClip.x, farClip.y, farClip.z) / farClip.w;
+            const Math::Vec3 rayDirection = Math::Normalize(farPoint - rayOrigin);
 
             Entity closestEntity;
             float closestDistance = FLT_MAX;
@@ -107,9 +105,9 @@ namespace HachimiEngine
                     continue;
                 }
 
-                const glm::mat4 inverseWorldTransform = glm::inverse(context.ActiveScene->GetWorldTransform(entity.GetHandle()));
-                const glm::vec3 localRayOrigin = glm::vec3(inverseWorldTransform * glm::vec4(rayOrigin, 1.0f));
-                const glm::vec3 localRayDirection = glm::normalize(glm::vec3(inverseWorldTransform * glm::vec4(rayDirection, 0.0f)));
+                const Math::Mat4 inverseWorldTransform = Math::Inverse(context.ActiveScene->GetWorldTransform(entity.GetHandle()));
+                const Math::Vec3 localRayOrigin = Math::Vec3(inverseWorldTransform * Math::Vec4(rayOrigin, 1.0f));
+                const Math::Vec3 localRayDirection = Math::Normalize(Math::Vec3(inverseWorldTransform * Math::Vec4(rayDirection, 0.0f)));
 
                 const auto& vertices = mesh.Mesh->GetVertices();
                 const auto& indices = mesh.Mesh->GetIndices();
@@ -251,7 +249,7 @@ namespace HachimiEngine
                 context.Camera.OnMouseScroll(io.MouseWheel);
             }
 
-            const glm::vec2 mouseDelta(io.MouseDelta.x, io.MouseDelta.y);
+            const Math::Vec2 mouseDelta(io.MouseDelta.x, io.MouseDelta.y);
             if (ImGui::IsMouseDragging(ImGuiMouseButton_Right))
             {
                 context.Camera.OnMouseDrag(mouseDelta, Mouse::ButtonRight);
@@ -287,8 +285,8 @@ namespace HachimiEngine
             return;
         }
 
-        glm::mat4 worldTransform = context.ActiveScene->GetWorldTransform(selected.GetHandle());
-        glm::mat4 parentWorldTransform(1.0f);
+        Math::Mat4 worldTransform = context.ActiveScene->GetWorldTransform(selected.GetHandle());
+        Math::Mat4 parentWorldTransform(1.0f);
         bool hasParent = false;
 
         if (selected.HasComponent<RelationshipComponent>())
@@ -311,39 +309,39 @@ namespace HachimiEngine
         // Match the gizmo viewport to the framebuffer image, not the whole docking window.
         ImGuizmo::SetRect(imageMin.x, imageMin.y, imageMax.x - imageMin.x, imageMax.y - imageMin.y);
 
-        const glm::mat4& view = context.Camera.GetViewMatrix();
-        const glm::mat4& projection = context.Camera.GetProjection();
+        const Math::Mat4& view = context.Camera.GetViewMatrix();
+        const Math::Mat4& projection = context.Camera.GetProjection();
 
         if (ImGuizmo::Manipulate(
-            glm::value_ptr(view),
-            glm::value_ptr(projection),
+            Math::ValuePtr(view),
+            Math::ValuePtr(projection),
             context.GizmoOperation,
             ImGuizmo::LOCAL,
-            glm::value_ptr(worldTransform)))
+            Math::ValuePtr(worldTransform)))
         {
             // Convert the manipulated world transform back into parent-local space.
-            glm::mat4 localTransform = hasParent
-                ? glm::inverse(parentWorldTransform) * worldTransform
+            Math::Mat4 localTransform = hasParent
+                ? Math::Inverse(parentWorldTransform) * worldTransform
                 : worldTransform;
 
-            glm::vec3 translation(0.0f);
-            glm::vec3 rotationRadians(0.0f);
-            glm::vec3 scale(1.0f);
-            ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(localTransform), glm::value_ptr(translation), glm::value_ptr(rotationRadians), glm::value_ptr(scale));
+            Math::Vec3 translation(0.0f);
+            Math::Vec3 rotationRadians(0.0f);
+            Math::Vec3 scale(1.0f);
+            ImGuizmo::DecomposeMatrixToComponents(Math::ValuePtr(localTransform), Math::ValuePtr(translation), Math::ValuePtr(rotationRadians), Math::ValuePtr(scale));
 
-            // Decompose rotation with GLM so the Euler values round-trip through
+            // Decompose rotation with the Math wrapper so the Euler values round-trip through
             // TransformComponent::GetTransform() without the ImGuizmo Euler convention mismatch.
-            glm::mat3 rotationMatrix(localTransform);
+            Math::Mat3 rotationMatrix(localTransform);
             constexpr float minimumScale = 1e-6f;
-            rotationMatrix[0] = scale.x > minimumScale ? rotationMatrix[0] / scale.x : glm::vec3(1.0f, 0.0f, 0.0f);
-            rotationMatrix[1] = scale.y > minimumScale ? rotationMatrix[1] / scale.y : glm::vec3(0.0f, 1.0f, 0.0f);
-            rotationMatrix[2] = scale.z > minimumScale ? rotationMatrix[2] / scale.z : glm::vec3(0.0f, 0.0f, 1.0f);
-            const glm::quat rotation = glm::quat_cast(rotationMatrix);
-            rotationRadians = glm::eulerAngles(rotation);
+            rotationMatrix[0] = scale.x > minimumScale ? rotationMatrix[0] / scale.x : Math::Vec3(1.0f, 0.0f, 0.0f);
+            rotationMatrix[1] = scale.y > minimumScale ? rotationMatrix[1] / scale.y : Math::Vec3(0.0f, 1.0f, 0.0f);
+            rotationMatrix[2] = scale.z > minimumScale ? rotationMatrix[2] / scale.z : Math::Vec3(0.0f, 0.0f, 1.0f);
+            const Math::Quat rotation = Math::QuatCast(rotationMatrix);
+            rotationRadians = Math::EulerAngles(rotation);
 
             auto& transform = selected.Transform();
             transform.Position = translation;
-            transform.Rotation = glm::degrees(rotationRadians);
+            transform.Rotation = Math::Degrees(rotationRadians);
             transform.Scale = scale;
         }
     }

@@ -3,9 +3,7 @@
 #include "Core/Input.h"
 #include "Core/KeyCodes.h"
 #include "Core/MouseButtonCodes.h"
-
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/quaternion.hpp>
+#include "Math/Math.h"
 
 #include <algorithm>
 
@@ -20,7 +18,7 @@ namespace HachimiEngine
     void EditorCamera::OnUpdate(Timestep timestep)
     {
         const float speed = m_MoveSpeed * (Input::IsKeyPressed(Key::LeftShift) ? 2.0f : 1.0f);
-        glm::vec3 movement(0.0f);
+        Math::Vec3 movement(0.0f);
 
         if (Input::IsKeyPressed(Key::W))
         {
@@ -47,11 +45,11 @@ namespace HachimiEngine
             movement -= GetUpDirection();
         }
 
-        if (glm::length(movement) > 0.0f)
+        if (Math::Length(movement) > 0.0f)
         {
             const float delta = speed * timestep.GetSeconds();
-            m_Position += glm::normalize(movement) * delta;
-            m_FocalPoint += glm::normalize(movement) * delta;
+            m_Position += Math::Normalize(movement) * delta;
+            m_FocalPoint += Math::Normalize(movement) * delta;
             RecalculateView();
         }
     }
@@ -62,7 +60,7 @@ namespace HachimiEngine
         SetDistance(m_Distance + delta);
     }
 
-    void EditorCamera::OnMouseDrag(const glm::vec2& mouseDelta, int mouseButton)
+    void EditorCamera::OnMouseDrag(const Math::Vec2& mouseDelta, int mouseButton)
     {
         if (mouseButton == Mouse::ButtonRight)
         {
@@ -71,8 +69,8 @@ namespace HachimiEngine
         }
         else if (mouseButton == Mouse::ButtonMiddle)
         {
-            const glm::vec3 right = GetRightDirection();
-            const glm::vec3 up = GetUpDirection();
+            const Math::Vec3 right = GetRightDirection();
+            const Math::Vec3 up = GetUpDirection();
             const float panScale = m_Distance * 0.0025f;
 
             m_FocalPoint += -right * mouseDelta.x * panScale;
@@ -113,7 +111,7 @@ namespace HachimiEngine
         RecalculateProjection();
     }
 
-    void EditorCamera::Move(const glm::vec3& delta)
+    void EditorCamera::Move(const Math::Vec3& delta)
     {
         m_Position += delta;
         m_FocalPoint += delta;
@@ -127,12 +125,12 @@ namespace HachimiEngine
         RecalculateView();
     }
 
-    const glm::mat4& EditorCamera::GetViewMatrix() const
+    const Math::Mat4& EditorCamera::GetViewMatrix() const
     {
         return m_ViewMatrix;
     }
 
-    const glm::mat4& EditorCamera::GetViewProjection() const
+    const Math::Mat4& EditorCamera::GetViewProjection() const
     {
         if (m_ViewProjectionDirty)
         {
@@ -142,31 +140,31 @@ namespace HachimiEngine
         return m_ViewProjectionCache;
     }
 
-    glm::vec3 EditorCamera::GetUpDirection() const
+    Math::Vec3 EditorCamera::GetUpDirection() const
     {
-        return glm::rotate(glm::quat(glm::vec3(-m_Pitch, -m_Yaw, 0.0f)), m_WorldUp);
+        return Math::Rotate(Math::Quat(Math::Vec3(-m_Pitch, -m_Yaw, 0.0f)), m_WorldUp);
     }
 
-    glm::vec3 EditorCamera::GetRightDirection() const
+    Math::Vec3 EditorCamera::GetRightDirection() const
     {
-        return glm::rotate(glm::quat(glm::vec3(-m_Pitch, -m_Yaw, 0.0f)), glm::vec3(1.0f, 0.0f, 0.0f));
+        return Math::Rotate(Math::Quat(Math::Vec3(-m_Pitch, -m_Yaw, 0.0f)), Math::Vec3(1.0f, 0.0f, 0.0f));
     }
 
-    glm::vec3 EditorCamera::GetForwardDirection() const
+    Math::Vec3 EditorCamera::GetForwardDirection() const
     {
-        return glm::rotate(glm::quat(glm::vec3(-m_Pitch, -m_Yaw, 0.0f)), glm::vec3(0.0f, 0.0f, -1.0f));
+        return Math::Rotate(Math::Quat(Math::Vec3(-m_Pitch, -m_Yaw, 0.0f)), Math::Vec3(0.0f, 0.0f, -1.0f));
     }
 
     void EditorCamera::RecalculateView()
     {
         m_Position = m_FocalPoint - GetForwardDirection() * m_Distance;
-        m_ViewMatrix = glm::lookAt(m_Position, m_FocalPoint, m_WorldUp);
+        m_ViewMatrix = Math::LookAt(m_Position, m_FocalPoint, m_WorldUp);
         m_ViewProjectionDirty = true;
     }
 
     void EditorCamera::RecalculateProjection()
     {
-        m_Projection = glm::perspective(glm::radians(m_FieldOfView), m_AspectRatio, m_NearClip, m_FarClip);
+        m_Projection = Math::Perspective(Math::Radians(m_FieldOfView), m_AspectRatio, m_NearClip, m_FarClip);
         m_ViewProjectionDirty = true;
     }
 }

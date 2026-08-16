@@ -1,6 +1,7 @@
 #include "Platform/OpenGL/OpenGLRendererAPI.h"
 
 #include "Renderer/VertexArray.h"
+#include "Math/Math.h"
 
 #include <glad/gl.h>
 
@@ -19,7 +20,7 @@ namespace HachimiEngine
         glViewport(static_cast<GLint>(x), static_cast<GLint>(y), static_cast<GLsizei>(width), static_cast<GLsizei>(height));
     }
 
-    void OpenGLRendererAPI::SetClearColor(const glm::vec4& color)
+    void OpenGLRendererAPI::SetClearColor(const Math::Vec4& color)
     {
         glClearColor(color.r, color.g, color.b, color.a);
     }

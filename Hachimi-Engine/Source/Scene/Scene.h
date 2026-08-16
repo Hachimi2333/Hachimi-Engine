@@ -7,10 +7,9 @@
 #include "Renderer/EnvironmentSettings.h"
 #include "Scene/Components.h"
 #include "Scene/Entity.h"
+#include "Math/Math.h"
 
 #include <entt/entt.hpp>
-
-#include <glm/glm.hpp>
 
 #include <string>
 #include <unordered_map>
@@ -37,12 +36,12 @@ namespace HachimiEngine
 
         std::vector<Entity> GetAllEntities();
 
-        glm::mat4 GetWorldTransform(entt::entity entity) const;
+        Math::Mat4 GetWorldTransform(entt::entity entity) const;
 
         void SetViewportSize(uint32_t width, uint32_t height);
         void OnUpdate(Timestep timestep);
         void OnRender(const EditorCamera& camera);
-        void OnRender(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& cameraPosition);
+        void OnRender(const Math::Mat4& view, const Math::Mat4& projection, const Math::Vec3& cameraPosition);
 
         const std::string& GetName() const { return m_Name; }
         void SetName(const std::string& name) { m_Name = name; }
@@ -59,7 +58,7 @@ namespace HachimiEngine
     private:
         void DestroyChildren(entt::entity entity);
         void ApplyLightsToRenderer();
-        void RenderScene(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& cameraPosition, bool drawGrid);
+        void RenderScene(const Math::Mat4& view, const Math::Mat4& projection, const Math::Vec3& cameraPosition, bool drawGrid);
 
     private:
         entt::registry m_Registry;

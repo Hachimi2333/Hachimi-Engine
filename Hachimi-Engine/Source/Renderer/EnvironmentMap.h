@@ -2,8 +2,7 @@
 
 #include "Core/Base.h"
 #include "Core/Memory.h"
-
-#include <glm/glm.hpp>
+#include "Math/Math.h"
 
 namespace HachimiEngine
 {
@@ -31,8 +30,8 @@ namespace HachimiEngine
         void GenerateIrradianceMap();
         void GeneratePrefilteredMap();
 
-        static glm::vec3 EvaluateSky(glm::vec3 direction);
-        static glm::vec3 CubeMapFaceDirection(uint32_t faceIndex, float u, float v);
+        static Math::Vec3 EvaluateSky(Math::Vec3 direction);
+        static Math::Vec3 CubeMapFaceDirection(uint32_t faceIndex, float u, float v);
 
     private:
         uint32_t m_Resolution = 128;

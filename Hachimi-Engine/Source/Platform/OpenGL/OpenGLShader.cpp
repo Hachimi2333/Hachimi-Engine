@@ -2,9 +2,9 @@
 
 #include "Core/Assert.h"
 #include "Core/Log.h"
+#include "Math/Math.h"
 
 #include <glad/gl.h>
-#include <glm/gtc/type_ptr.hpp>
 
 #include <array>
 #include <cstring>
@@ -87,24 +87,24 @@ namespace HachimiEngine
         glUniform1f(GetUniformLocation(name), value);
     }
 
-    void OpenGLShader::SetFloat2(const std::string& name, const glm::vec2& value)
+    void OpenGLShader::SetFloat2(const std::string& name, const Math::Vec2& value)
     {
         glUniform2f(GetUniformLocation(name), value.x, value.y);
     }
 
-    void OpenGLShader::SetFloat3(const std::string& name, const glm::vec3& value)
+    void OpenGLShader::SetFloat3(const std::string& name, const Math::Vec3& value)
     {
         glUniform3f(GetUniformLocation(name), value.x, value.y, value.z);
     }
 
-    void OpenGLShader::SetFloat4(const std::string& name, const glm::vec4& value)
+    void OpenGLShader::SetFloat4(const std::string& name, const Math::Vec4& value)
     {
         glUniform4f(GetUniformLocation(name), value.x, value.y, value.z, value.w);
     }
 
-    void OpenGLShader::SetMat4(const std::string& name, const glm::mat4& value)
+    void OpenGLShader::SetMat4(const std::string& name, const Math::Mat4& value)
     {
-        glUniformMatrix4fv(GetUniformLocation(name), 1, GL_FALSE, glm::value_ptr(value));
+        glUniformMatrix4fv(GetUniformLocation(name), 1, GL_FALSE, Math::ValuePtr(value));
     }
 
     std::string OpenGLShader::ReadFile(const std::string& filepath)

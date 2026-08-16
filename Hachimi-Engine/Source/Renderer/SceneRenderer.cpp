@@ -6,10 +6,9 @@
 #include "Renderer/PostProcessPass.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/ShadowMap.h"
+#include "Math/Math.h"
 
 #include <glad/gl.h>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 
 #include <algorithm>
 #include <array>
@@ -330,12 +329,12 @@ void main()
     Ref<EnvironmentMap> SceneRenderer::s_EnvironmentMap;
     LightingEnvironment SceneRenderer::s_Lighting;
     EnvironmentSettings SceneRenderer::s_Environment;
-    glm::mat4 SceneRenderer::s_ViewProjection { 1.0f };
-    glm::mat4 SceneRenderer::s_View { 1.0f };
-    glm::mat4 SceneRenderer::s_Projection { 1.0f };
-    glm::vec3 SceneRenderer::s_CameraPosition { 0.0f };
-    glm::vec3 SceneRenderer::s_CameraForward { 0.0f, 0.0f, -1.0f };
-    glm::mat4 SceneRenderer::s_DirectionalLightViewProjection { 1.0f };
+    Math::Mat4 SceneRenderer::s_ViewProjection { 1.0f };
+    Math::Mat4 SceneRenderer::s_View { 1.0f };
+    Math::Mat4 SceneRenderer::s_Projection { 1.0f };
+    Math::Vec3 SceneRenderer::s_CameraPosition { 0.0f };
+    Math::Vec3 SceneRenderer::s_CameraForward { 0.0f, 0.0f, -1.0f };
+    Math::Mat4 SceneRenderer::s_DirectionalLightViewProjection { 1.0f };
     bool SceneRenderer::s_DirectionalShadowEnabled = false;
     bool SceneRenderer::s_DirectionalShadowPassActive = false;
 
@@ -363,12 +362,12 @@ void main()
         s_GridShader.reset();
         s_DirectionalShadowShader.reset();
         s_SkyboxShader.reset();
-        s_ViewProjection = glm::mat4(1.0f);
-        s_View = glm::mat4(1.0f);
-        s_Projection = glm::mat4(1.0f);
-        s_CameraPosition = glm::vec3(0.0f);
-        s_CameraForward = glm::vec3(0.0f, 0.0f, -1.0f);
-        s_DirectionalLightViewProjection = glm::mat4(1.0f);
+        s_ViewProjection = Math::Mat4(1.0f);
+        s_View = Math::Mat4(1.0f);
+        s_Projection = Math::Mat4(1.0f);
+        s_CameraPosition = Math::Vec3(0.0f);
+        s_CameraForward = Math::Vec3(0.0f, 0.0f, -1.0f);
+        s_DirectionalLightViewProjection = Math::Mat4(1.0f);
         s_DirectionalShadowEnabled = false;
         s_DirectionalShadowPassActive = false;
     }
@@ -378,15 +377,15 @@ void main()
         BeginScene(camera.GetViewMatrix(), camera.GetProjection(), camera.GetPosition());
     }
 
-    void SceneRenderer::BeginScene(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& cameraPosition)
+    void SceneRenderer::BeginScene(const Math::Mat4& view, const Math::Mat4& projection, const Math::Vec3& cameraPosition)
     {
         s_ViewProjection = projection * view;
         s_View = view;
         s_Projection = projection;
         s_CameraPosition = cameraPosition;
 
-        const glm::mat4 transposedView = glm::transpose(view);
-        s_CameraForward = glm::normalize(-glm::vec3(transposedView[2]));
+        const Math::Mat4 transposedView = Math::Transpose(view);
+        s_CameraForward = Math::Normalize(-Math::Vec3(transposedView[2]));
 
         // No shadow data has been rendered for this scene yet.
         s_DirectionalShadowEnabled = false;
@@ -394,7 +393,7 @@ void main()
         PostProcessPass::SetExposure(s_Environment.Exposure);
     }
 
-    void SceneRenderer::SubmitMesh(const Ref<Mesh>& mesh, const glm::mat4& transform, const Ref<Material>& material)
+    void SceneRenderer::SubmitMesh(const Ref<Mesh>& mesh, const Math::Mat4& transform, const Ref<Material>& material)
     {
         const Ref<Material>& drawMaterial = material != nullptr ? material : s_DefaultMaterial;
         drawMaterial->Bind();
@@ -457,7 +456,7 @@ void main()
         Renderer::SetDepthTest(false);
         s_SkyboxShader->Bind();
 
-        const glm::mat4 skyViewProjection = s_Projection * glm::mat4(glm::mat3(s_View));
+        const Math::Mat4 skyViewProjection = s_Projection * Math::Mat4(Math::Mat3(s_View));
         s_SkyboxShader->SetMat4("u_ViewProjection", skyViewProjection);
         s_SkyboxShader->SetInt("u_SkyboxTexture", 0);
         s_SkyboxShader->SetFloat("u_SkyboxIntensity", s_Environment.EnvironmentIntensity);
@@ -471,7 +470,7 @@ void main()
     {
     }
 
-    void SceneRenderer::BeginDirectionalShadowPass(const glm::mat4& lightViewProjection)
+    void SceneRenderer::BeginDirectionalShadowPass(const Math::Mat4& lightViewProjection)
     {
         HE_CORE_ASSERT(s_DirectionalShadowMap != nullptr);
         HE_CORE_ASSERT(s_DirectionalShadowShader != nullptr);
@@ -486,7 +485,7 @@ void main()
         Renderer::SetPolygonOffset(true, 1.0f, 1.0f);
     }
 
-    void SceneRenderer::SubmitShadowMesh(const Ref<Mesh>& mesh, const glm::mat4& transform)
+    void SceneRenderer::SubmitShadowMesh(const Ref<Mesh>& mesh, const Math::Mat4& transform)
     {
         HE_CORE_ASSERT(s_DirectionalShadowPassActive);
 
@@ -509,43 +508,43 @@ void main()
         // rendered above during the current scene pass.
     }
 
-    glm::mat4 SceneRenderer::CalculateDirectionalLightViewProjection(const glm::vec3& cameraPosition)
+    Math::Mat4 SceneRenderer::CalculateDirectionalLightViewProjection(const Math::Vec3& cameraPosition)
     {
-        const glm::vec3 lightDirection = glm::normalize(s_Lighting.Directional.Direction);
+        const Math::Vec3 lightDirection = Math::Normalize(s_Lighting.Directional.Direction);
         constexpr float shadowDistance = 30.0f;
 
         // Center the shadow volume between the camera and the area it is looking at.
-        const glm::vec3 center = cameraPosition + s_CameraForward * (shadowDistance * 0.5f);
-        const glm::vec3 lightPosition = center - lightDirection * shadowDistance;
-        const glm::vec3 upDirection = std::abs(lightDirection.y) > 0.99f
-            ? glm::vec3(1.0f, 0.0f, 0.0f)
-            : glm::vec3(0.0f, 1.0f, 0.0f);
+        const Math::Vec3 center = cameraPosition + s_CameraForward * (shadowDistance * 0.5f);
+        const Math::Vec3 lightPosition = center - lightDirection * shadowDistance;
+        const Math::Vec3 upDirection = std::abs(lightDirection.y) > 0.99f
+            ? Math::Vec3(1.0f, 0.0f, 0.0f)
+            : Math::Vec3(0.0f, 1.0f, 0.0f);
 
-        const glm::mat4 lightView = glm::lookAt(lightPosition, center, upDirection);
+        const Math::Mat4 lightView = Math::LookAt(lightPosition, center, upDirection);
 
-        std::array<glm::vec3, 8> corners =
+        std::array<Math::Vec3, 8> corners =
         {
-            center + glm::vec3(-shadowDistance, -shadowDistance, -shadowDistance),
-            center + glm::vec3( shadowDistance, -shadowDistance, -shadowDistance),
-            center + glm::vec3(-shadowDistance,  shadowDistance, -shadowDistance),
-            center + glm::vec3( shadowDistance,  shadowDistance, -shadowDistance),
-            center + glm::vec3(-shadowDistance, -shadowDistance,  shadowDistance),
-            center + glm::vec3( shadowDistance, -shadowDistance,  shadowDistance),
-            center + glm::vec3(-shadowDistance,  shadowDistance,  shadowDistance),
-            center + glm::vec3( shadowDistance,  shadowDistance,  shadowDistance)
+            center + Math::Vec3(-shadowDistance, -shadowDistance, -shadowDistance),
+            center + Math::Vec3( shadowDistance, -shadowDistance, -shadowDistance),
+            center + Math::Vec3(-shadowDistance,  shadowDistance, -shadowDistance),
+            center + Math::Vec3( shadowDistance,  shadowDistance, -shadowDistance),
+            center + Math::Vec3(-shadowDistance, -shadowDistance,  shadowDistance),
+            center + Math::Vec3( shadowDistance, -shadowDistance,  shadowDistance),
+            center + Math::Vec3(-shadowDistance,  shadowDistance,  shadowDistance),
+            center + Math::Vec3( shadowDistance,  shadowDistance,  shadowDistance)
         };
 
-        glm::vec3 minimum(std::numeric_limits<float>::max());
-        glm::vec3 maximum(std::numeric_limits<float>::lowest());
-        for (const glm::vec3& corner : corners)
+        Math::Vec3 minimum(std::numeric_limits<float>::max());
+        Math::Vec3 maximum(std::numeric_limits<float>::lowest());
+        for (const Math::Vec3& corner : corners)
         {
-            const glm::vec3 lightSpaceCorner = lightView * glm::vec4(corner, 1.0f);
-            minimum = glm::min(minimum, lightSpaceCorner);
-            maximum = glm::max(maximum, lightSpaceCorner);
+            const Math::Vec3 lightSpaceCorner = lightView * Math::Vec4(corner, 1.0f);
+            minimum = Math::Min(minimum, lightSpaceCorner);
+            maximum = Math::Max(maximum, lightSpaceCorner);
         }
 
-        // View-space z is negative in front of the light camera; flip the range for glm::ortho.
-        const glm::mat4 lightProjection = glm::ortho(
+        // View-space z is negative in front of the light camera; flip the range for Math::Ortho.
+        const Math::Mat4 lightProjection = Math::Ortho(
             minimum.x,
             maximum.x,
             minimum.y,
@@ -556,7 +555,7 @@ void main()
         return lightProjection * lightView;
     }
 
-    void SceneRenderer::UploadLighting(const Ref<Shader>& shader, const glm::vec3& cameraPosition)
+    void SceneRenderer::UploadLighting(const Ref<Shader>& shader, const Math::Vec3& cameraPosition)
     {
         shader->SetFloat3("u_CameraPosition", cameraPosition);
         shader->SetFloat3("u_AmbientColor", s_Lighting.AmbientColor);

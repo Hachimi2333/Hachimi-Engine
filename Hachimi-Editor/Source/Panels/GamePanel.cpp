@@ -5,10 +5,9 @@
 #include "Renderer/RenderCommand.h"
 #include "Scene/Components.h"
 #include "Scene/Scene.h"
+#include "Math/Math.h"
 
 #include <glad/gl.h>
-#include <glm/gtc/matrix_inverse.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 #include <imgui.h>
 
 #include <algorithm>
@@ -67,9 +66,9 @@ namespace HachimiEngine
 
         const float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
 
-        glm::mat4 viewMatrix(1.0f);
-        glm::mat4 projectionMatrix(1.0f);
-        glm::vec3 cameraPosition(0.0f);
+        Math::Mat4 viewMatrix(1.0f);
+        Math::Mat4 projectionMatrix(1.0f);
+        Math::Vec3 cameraPosition(0.0f);
 
         // Render from the primary scene camera, falling back to the editor camera.
         const Entity primaryCamera = context.ActiveScene->GetPrimaryCameraEntity();
@@ -78,11 +77,11 @@ namespace HachimiEngine
             && primaryCamera.HasComponent<CameraComponent>())
         {
             const auto& cameraComponent = primaryCamera.GetComponent<CameraComponent>();
-            const glm::mat4 cameraWorld = context.ActiveScene->GetWorldTransform(primaryCamera.GetHandle());
-            viewMatrix = glm::inverse(cameraWorld);
-            cameraPosition = glm::vec3(cameraWorld[3].x, cameraWorld[3].y, cameraWorld[3].z);
-            projectionMatrix = glm::perspective(
-                glm::radians(cameraComponent.FieldOfView),
+            const Math::Mat4 cameraWorld = context.ActiveScene->GetWorldTransform(primaryCamera.GetHandle());
+            viewMatrix = Math::Inverse(cameraWorld);
+            cameraPosition = Math::Vec3(cameraWorld[3].x, cameraWorld[3].y, cameraWorld[3].z);
+            projectionMatrix = Math::Perspective(
+                Math::Radians(cameraComponent.FieldOfView),
                 aspectRatio,
                 cameraComponent.NearClip,
                 cameraComponent.FarClip);
@@ -91,7 +90,7 @@ namespace HachimiEngine
         {
             viewMatrix = context.Camera.GetViewMatrix();
             cameraPosition = context.Camera.GetPosition();
-            projectionMatrix = glm::perspective(glm::radians(context.Camera.GetFieldOfView()), aspectRatio, 0.1f, 1000.0f);
+            projectionMatrix = Math::Perspective(Math::Radians(context.Camera.GetFieldOfView()), aspectRatio, 0.1f, 1000.0f);
         }
 
         m_SceneFramebuffer->Bind();

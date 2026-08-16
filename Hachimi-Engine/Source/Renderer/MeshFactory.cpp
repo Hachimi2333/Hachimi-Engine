@@ -1,6 +1,5 @@
 #include "Renderer/MeshFactory.h"
-
-#include <glm/gtc/constants.hpp>
+#include "Math/Math.h"
 
 #include <cmath>
 #include <utility>
@@ -10,7 +9,7 @@ namespace HachimiEngine
     Ref<Mesh> MeshFactory::CreateCube(float size)
     {
         const float half = size * 0.5f;
-        const glm::vec4 color(0.82f, 0.82f, 0.86f, 1.0f);
+        const Math::Vec4 color(0.82f, 0.82f, 0.86f, 1.0f);
 
         std::vector<MeshVertex> vertices =
         {
@@ -67,22 +66,22 @@ namespace HachimiEngine
         for (uint32_t y = 0; y <= stackCount; ++y)
         {
             const float stackPosition = static_cast<float>(y) / static_cast<float>(stackCount);
-            const float phi = stackPosition * glm::pi<float>();
+            const float phi = stackPosition * Math::Pi<float>();
 
             for (uint32_t x = 0; x <= sectorCount; ++x)
             {
                 const float sectorPosition = static_cast<float>(x) / static_cast<float>(sectorCount);
-                const float theta = sectorPosition * glm::two_pi<float>();
+                const float theta = sectorPosition * Math::TwoPi<float>();
 
                 const float sinPhi = std::sin(phi);
-                const glm::vec3 position(
+                const Math::Vec3 position(
                     radius * sinPhi * std::cos(theta),
                     radius * std::cos(phi),
                     radius * sinPhi * std::sin(theta));
 
                 MeshVertex vertex;
                 vertex.Position = position;
-                vertex.Normal = glm::normalize(position);
+                vertex.Normal = Math::Normalize(position);
                 vertex.TexCoord = { sectorPosition, 1.0f - stackPosition };
                 vertex.Color = { 0.80f, 0.80f, 0.84f, 1.0f };
                 vertices.push_back(vertex);
@@ -113,8 +112,8 @@ namespace HachimiEngine
     {
         const float halfWidth = width * 0.5f;
         const float halfHeight = height * 0.5f;
-        const glm::vec3 normal(0.0f, 1.0f, 0.0f);
-        const glm::vec4 color(0.75f, 0.75f, 0.78f, 1.0f);
+        const Math::Vec3 normal(0.0f, 1.0f, 0.0f);
+        const Math::Vec4 color(0.75f, 0.75f, 0.78f, 1.0f);
 
         const std::vector<MeshVertex> vertices =
         {
@@ -132,7 +131,7 @@ namespace HachimiEngine
     {
         const float halfSize = size * 0.5f;
         const float step = size / static_cast<float>(divisions);
-        const glm::vec4 color(0.35f, 0.35f, 0.38f, 1.0f);
+        const Math::Vec4 color(0.35f, 0.35f, 0.38f, 1.0f);
 
         std::vector<MeshVertex> vertices;
         std::vector<uint32_t> indices;

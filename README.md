@@ -7,6 +7,7 @@ Hachimi-Engine 是一个借鉴 Hazel 架构思路、使用 C++20 编写的 3D �
 - 仅支持 Windows x86_64，Debug / Release 两种配置
 - Premake5 生成 Visual Studio 2026 解决方案
 - OpenGL 4.6 Core 渲染后端
+- 自有数学库 `HachimiEngine::Math`（内部封装 GLM，业务代码不直接依赖 GLM）
 - Application / Entry Point / Layer / LayerStack / Event 系统
 - OpenGL 风格渲染抽象：VertexArray、VertexBuffer、IndexBuffer、Shader、Texture2D、TextureCube、Framebuffer
 - 内置网格：Cube、Sphere、Plane、Grid

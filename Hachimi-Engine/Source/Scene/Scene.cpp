@@ -3,9 +3,7 @@
 #include "Core/Log.h"
 #include "Renderer/MeshFactory.h"
 #include "Renderer/SceneRenderer.h"
-
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/quaternion.hpp>
+#include "Math/Math.h"
 
 namespace HachimiEngine
 {
@@ -191,9 +189,9 @@ namespace HachimiEngine
         return entities;
     }
 
-    glm::mat4 Scene::GetWorldTransform(entt::entity entity) const
+    Math::Mat4 Scene::GetWorldTransform(entt::entity entity) const
     {
-        glm::mat4 transform = m_Registry.get<TransformComponent>(entity).GetTransform();
+        Math::Mat4 transform = m_Registry.get<TransformComponent>(entity).GetTransform();
 
         const auto* relationship = m_Registry.try_get<RelationshipComponent>(entity);
         if (relationship != nullptr && relationship->Parent != UUID::Invalid())
@@ -224,12 +222,12 @@ namespace HachimiEngine
         RenderScene(camera.GetViewMatrix(), camera.GetProjection(), camera.GetPosition(), true);
     }
 
-    void Scene::OnRender(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& cameraPosition)
+    void Scene::OnRender(const Math::Mat4& view, const Math::Mat4& projection, const Math::Vec3& cameraPosition)
     {
         RenderScene(view, projection, cameraPosition, false);
     }
 
-    void Scene::RenderScene(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& cameraPosition, bool drawGrid)
+    void Scene::RenderScene(const Math::Mat4& view, const Math::Mat4& projection, const Math::Vec3& cameraPosition, bool drawGrid)
     {
         ApplyLightsToRenderer();
         SceneRenderer::GetEnvironmentSettings() = m_Environment;
@@ -238,11 +236,11 @@ namespace HachimiEngine
         const LightingEnvironment& lighting = SceneRenderer::GetLightingEnvironment();
         const bool castsDirectionalShadows = lighting.Directional.CastsShadows
             && lighting.Directional.Intensity > 0.0f
-            && glm::length(lighting.Directional.Direction) > 0.001f;
+            && Math::Length(lighting.Directional.Direction) > 0.001f;
 
         if (castsDirectionalShadows)
         {
-            const glm::mat4 lightViewProjection = SceneRenderer::CalculateDirectionalLightViewProjection(cameraPosition);
+            const Math::Mat4 lightViewProjection = SceneRenderer::CalculateDirectionalLightViewProjection(cameraPosition);
             SceneRenderer::BeginDirectionalShadowPass(lightViewProjection);
 
             auto shadowMeshView = m_Registry.view<MeshComponent, TransformComponent>();
@@ -276,7 +274,7 @@ namespace HachimiEngine
                 continue;
             }
 
-            const glm::mat4 worldTransform = GetWorldTransform(entity);
+            const Math::Mat4 worldTransform = GetWorldTransform(entity);
 
             // Keep the per-entity material parameters authoritative even when no
             // explicit material override was created yet.
@@ -317,15 +315,15 @@ namespace HachimiEngine
     void Scene::ApplyLightsToRenderer()
     {
         LightingEnvironment lighting;
-        lighting.Directional.Direction = glm::vec3(0.0f);
-        lighting.Directional.Color = glm::vec3(0.0f);
+        lighting.Directional.Direction = Math::Vec3(0.0f);
+        lighting.Directional.Color = Math::Vec3(0.0f);
         lighting.Directional.Intensity = 0.0f;
         lighting.PointLightCount = 0;
 
         for (PointLight& pointLight : lighting.PointLights)
         {
-            pointLight.Position = glm::vec3(0.0f);
-            pointLight.Color = glm::vec3(0.0f);
+            pointLight.Position = Math::Vec3(0.0f);
+            pointLight.Color = Math::Vec3(0.0f);
             pointLight.Intensity = 0.0f;
             pointLight.Range = 0.0f;
         }
@@ -347,13 +345,13 @@ namespace HachimiEngine
                 lighting.Directional.CastsShadows = lightComponent.CastsShadows;
                 lighting.Directional.ShadowBias = lightComponent.ShadowBias;
 
-                const glm::quat rotation = glm::quat(glm::radians(transformComponent.Rotation));
-                lighting.Directional.Direction = glm::normalize(glm::rotate(rotation, glm::vec3(0.0f, 0.0f, -1.0f)));
+                const Math::Quat rotation = Math::Quat(Math::Radians(transformComponent.Rotation));
+                lighting.Directional.Direction = Math::Normalize(Math::Rotate(rotation, Math::Vec3(0.0f, 0.0f, -1.0f)));
             }
             else if (lighting.PointLightCount < static_cast<int>(lighting.PointLights.size()))
             {
                 PointLight& pointLight = lighting.PointLights[static_cast<size_t>(lighting.PointLightCount++)];
-                pointLight.Position = GetWorldTransform(entity) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+                pointLight.Position = GetWorldTransform(entity) * Math::Vec4(0.0f, 0.0f, 0.0f, 1.0f);
                 pointLight.Color = lightComponent.Color;
                 pointLight.Intensity = lightComponent.Intensity;
                 pointLight.Range = lightComponent.Range;

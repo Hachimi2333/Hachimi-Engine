@@ -2,6 +2,7 @@
 
 #include "Renderer/RendererAPI.h"
 #include "Renderer/VertexArray.h"
+#include "Math/Math.h"
 
 namespace HachimiEngine
 {
@@ -11,7 +12,7 @@ namespace HachimiEngine
         void Init() override;
 
         void SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) override;
-        void SetClearColor(const glm::vec4& color) override;
+        void SetClearColor(const Math::Vec4& color) override;
         void Clear() override;
 
         void SetDepthTest(bool enabled) override;

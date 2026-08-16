@@ -4,10 +4,7 @@
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
 #include "Renderer/MeshFactory.h"
-
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/quaternion.hpp>
+#include "Math/Math.h"
 
 #include <vector>
 
@@ -25,16 +22,16 @@ namespace HachimiEngine
 
     struct TransformComponent
     {
-        glm::vec3 Position { 0.0f };
-        glm::vec3 Rotation { 0.0f }; // Euler angles in degrees.
-        glm::vec3 Scale { 1.0f };
+        Math::Vec3 Position { 0.0f };
+        Math::Vec3 Rotation { 0.0f }; // Euler angles in degrees.
+        Math::Vec3 Scale { 1.0f };
 
-        glm::mat4 GetTransform() const
+        Math::Mat4 GetTransform() const
         {
-            const glm::quat rotation = glm::quat(glm::radians(Rotation));
-            return glm::translate(glm::mat4(1.0f), Position)
-                * glm::toMat4(rotation)
-                * glm::scale(glm::mat4(1.0f), Scale);
+            const Math::Quat rotation = Math::Quat(Math::Radians(Rotation));
+            return Math::Translate(Math::Mat4(1.0f), Position)
+                * Math::ToMat4(rotation)
+                * Math::Scale(Math::Mat4(1.0f), Scale);
         }
     };
 
@@ -49,7 +46,7 @@ namespace HachimiEngine
         Ref<Mesh> Mesh;
         PrimitiveMeshType PrimitiveType = PrimitiveMeshType::Cube;
         Ref<Material> MaterialOverride;
-        glm::vec4 MaterialColor { 0.8f, 0.8f, 0.82f, 1.0f };
+        Math::Vec4 MaterialColor { 0.8f, 0.8f, 0.82f, 1.0f };
         float Roughness = 0.6f;
         float Metallic = 0.05f;
         bool Visible = true;
@@ -72,7 +69,7 @@ namespace HachimiEngine
         };
 
         LightType Type = LightType::Point;
-        glm::vec3 Color { 1.0f, 1.0f, 1.0f };
+        Math::Vec3 Color { 1.0f, 1.0f, 1.0f };
         float Intensity = 10.0f;
         float Range = 12.0f;
         bool CastsShadows = true;

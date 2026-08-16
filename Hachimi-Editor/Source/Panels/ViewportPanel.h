@@ -4,7 +4,6 @@
 #include "Core/Memory.h"
 #include "Renderer/FrameBuffer.h"
 
-#include <glm/glm.hpp>
 #include <imgui.h>
 
 namespace HachimiEngine

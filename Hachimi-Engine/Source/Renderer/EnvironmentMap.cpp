@@ -2,8 +2,7 @@
 
 #include "Core/Assert.h"
 #include "Renderer/TextureCube.h"
-
-#include <glm/gtc/constants.hpp>
+#include "Math/Math.h"
 
 #include <algorithm>
 #include <cmath>
@@ -28,28 +27,28 @@ namespace HachimiEngine
             return static_cast<float>(bits) * 2.3283064365386963e-10f;
         }
 
-        glm::vec2 Hammersley(uint32_t index, uint32_t sampleCount)
+        Math::Vec2 Hammersley(uint32_t index, uint32_t sampleCount)
         {
             return { static_cast<float>(index) / static_cast<float>(sampleCount), RadicalInverseVdC(index) };
         }
 
-        glm::vec3 ImportanceSampleGGX(glm::vec2 xi, float roughness, glm::vec3 normal)
+        Math::Vec3 ImportanceSampleGGX(Math::Vec2 xi, float roughness, Math::Vec3 normal)
         {
             const float roughness2 = roughness * roughness;
-            const float phi = glm::two_pi<float>() * xi.x;
+            const float phi = Math::TwoPi<float>() * xi.x;
             const float cosTheta = std::sqrt((1.0f - xi.y) / (1.0f + (roughness2 * roughness2 - 1.0f) * xi.y));
             const float sinTheta = std::sqrt(std::max(1.0f - cosTheta * cosTheta, 0.0f));
 
-            const glm::vec3 upDirection = std::abs(normal.y) < 0.999f
-                ? glm::vec3(0.0f, 1.0f, 0.0f)
-                : glm::vec3(1.0f, 0.0f, 0.0f);
-            const glm::vec3 tangent = glm::normalize(glm::cross(upDirection, normal));
-            const glm::vec3 bitangent = glm::cross(normal, tangent);
+            const Math::Vec3 upDirection = std::abs(normal.y) < 0.999f
+                ? Math::Vec3(0.0f, 1.0f, 0.0f)
+                : Math::Vec3(1.0f, 0.0f, 0.0f);
+            const Math::Vec3 tangent = Math::Normalize(Math::Cross(upDirection, normal));
+            const Math::Vec3 bitangent = Math::Cross(normal, tangent);
 
-            const glm::vec3 sampleDirection = tangent * (sinTheta * std::cos(phi))
+            const Math::Vec3 sampleDirection = tangent * (sinTheta * std::cos(phi))
                 + bitangent * (sinTheta * std::sin(phi))
                 + normal * cosTheta;
-            return glm::normalize(sampleDirection);
+            return Math::Normalize(sampleDirection);
         }
     }
 
@@ -100,43 +99,43 @@ namespace HachimiEngine
         return m_Prefiltered->GetMipLevelCount();
     }
 
-    glm::vec3 EnvironmentMap::EvaluateSky(glm::vec3 direction)
+    Math::Vec3 EnvironmentMap::EvaluateSky(Math::Vec3 direction)
     {
-        const float height = glm::clamp(direction.y * 0.5f + 0.5f, 0.0f, 1.0f);
+        const float height = Math::Clamp(direction.y * 0.5f + 0.5f, 0.0f, 1.0f);
 
-        const glm::vec3 horizonColor(1.0f, 0.72f, 0.48f);
-        const glm::vec3 zenithColor(0.06f, 0.16f, 0.42f);
-        const glm::vec3 groundColor(0.025f, 0.025f, 0.035f);
+        const Math::Vec3 horizonColor(1.0f, 0.72f, 0.48f);
+        const Math::Vec3 zenithColor(0.06f, 0.16f, 0.42f);
+        const Math::Vec3 groundColor(0.025f, 0.025f, 0.035f);
 
-        glm::vec3 color = glm::mix(horizonColor, zenithColor, std::pow(height, 0.65f));
+        Math::Vec3 color = Math::Mix(horizonColor, zenithColor, std::pow(height, 0.65f));
         if (direction.y < 0.0f)
         {
-            color = glm::mix(groundColor, horizonColor, 1.0f + direction.y);
+            color = Math::Mix(groundColor, horizonColor, 1.0f + direction.y);
         }
 
-        const glm::vec3 sunDirection = glm::normalize(glm::vec3(-0.55f, 0.42f, -0.72f));
-        const float sunDisc = std::pow(std::max(glm::dot(direction, sunDirection), 0.0f), 800.0f);
-        const float sunGlow = std::pow(std::max(glm::dot(direction, sunDirection), 0.0f), 16.0f);
-        color += glm::vec3(60.0f, 48.0f, 34.0f) * sunDisc;
-        color += glm::vec3(1.2f, 0.9f, 0.6f) * sunGlow;
+        const Math::Vec3 sunDirection = Math::Normalize(Math::Vec3(-0.55f, 0.42f, -0.72f));
+        const float sunDisc = std::pow(std::max(Math::Dot(direction, sunDirection), 0.0f), 800.0f);
+        const float sunGlow = std::pow(std::max(Math::Dot(direction, sunDirection), 0.0f), 16.0f);
+        color += Math::Vec3(60.0f, 48.0f, 34.0f) * sunDisc;
+        color += Math::Vec3(1.2f, 0.9f, 0.6f) * sunGlow;
 
         return color;
     }
 
-    glm::vec3 EnvironmentMap::CubeMapFaceDirection(uint32_t faceIndex, float u, float v)
+    Math::Vec3 EnvironmentMap::CubeMapFaceDirection(uint32_t faceIndex, float u, float v)
     {
         switch (static_cast<CubeMapFace>(faceIndex))
         {
-            case CubeMapFace::PositiveX: return glm::normalize(glm::vec3( 1.0f, -v, -u));
-            case CubeMapFace::NegativeX: return glm::normalize(glm::vec3(-1.0f, -v,  u));
-            case CubeMapFace::PositiveY: return glm::normalize(glm::vec3( u,   1.0f,  v));
-            case CubeMapFace::NegativeY: return glm::normalize(glm::vec3( u,  -1.0f, -v));
-            case CubeMapFace::PositiveZ: return glm::normalize(glm::vec3( u,  -v,  1.0f));
-            case CubeMapFace::NegativeZ: return glm::normalize(glm::vec3(-u,  -v, -1.0f));
+            case CubeMapFace::PositiveX: return Math::Normalize(Math::Vec3( 1.0f, -v, -u));
+            case CubeMapFace::NegativeX: return Math::Normalize(Math::Vec3(-1.0f, -v,  u));
+            case CubeMapFace::PositiveY: return Math::Normalize(Math::Vec3( u,   1.0f,  v));
+            case CubeMapFace::NegativeY: return Math::Normalize(Math::Vec3( u,  -1.0f, -v));
+            case CubeMapFace::PositiveZ: return Math::Normalize(Math::Vec3( u,  -v,  1.0f));
+            case CubeMapFace::NegativeZ: return Math::Normalize(Math::Vec3(-u,  -v, -1.0f));
         }
 
         HE_CORE_ASSERT(false);
-        return glm::vec3(0.0f, 1.0f, 0.0f);
+        return Math::Vec3(0.0f, 1.0f, 0.0f);
     }
 
     void EnvironmentMap::GenerateSkybox()
@@ -150,8 +149,8 @@ namespace HachimiEngine
                 {
                     const float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(m_Resolution) * 2.0f - 1.0f;
                     const float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(m_Resolution) * 2.0f - 1.0f;
-                    const glm::vec3 direction = CubeMapFaceDirection(faceIndex, u, v);
-                    const glm::vec3 color = EvaluateSky(direction);
+                    const Math::Vec3 direction = CubeMapFaceDirection(faceIndex, u, v);
+                    const Math::Vec3 color = EvaluateSky(direction);
 
                     float* texel = &faceData[(static_cast<size_t>(y) * m_Resolution + x) * 4];
                     texel[0] = color.r;
@@ -176,31 +175,31 @@ namespace HachimiEngine
                 {
                     const float u = (static_cast<float>(x) + 0.5f) / IrradianceResolution * 2.0f - 1.0f;
                     const float v = (static_cast<float>(y) + 0.5f) / IrradianceResolution * 2.0f - 1.0f;
-                    const glm::vec3 normal = CubeMapFaceDirection(faceIndex, u, v);
+                    const Math::Vec3 normal = CubeMapFaceDirection(faceIndex, u, v);
 
-                    const glm::vec3 upDirection = std::abs(normal.y) < 0.999f
-                        ? glm::vec3(0.0f, 1.0f, 0.0f)
-                        : glm::vec3(1.0f, 0.0f, 0.0f);
-                    const glm::vec3 tangent = glm::normalize(glm::cross(upDirection, normal));
-                    const glm::vec3 bitangent = glm::cross(normal, tangent);
+                    const Math::Vec3 upDirection = std::abs(normal.y) < 0.999f
+                        ? Math::Vec3(0.0f, 1.0f, 0.0f)
+                        : Math::Vec3(1.0f, 0.0f, 0.0f);
+                    const Math::Vec3 tangent = Math::Normalize(Math::Cross(upDirection, normal));
+                    const Math::Vec3 bitangent = Math::Cross(normal, tangent);
 
-                    glm::vec3 irradiance(0.0f);
+                    Math::Vec3 irradiance(0.0f);
                     for (uint32_t sampleIndex = 0; sampleIndex < IrradianceSampleCount; ++sampleIndex)
                     {
-                        const glm::vec2 xi = Hammersley(sampleIndex, IrradianceSampleCount);
-                        const float phi = glm::two_pi<float>() * xi.x;
+                        const Math::Vec2 xi = Hammersley(sampleIndex, IrradianceSampleCount);
+                        const float phi = Math::TwoPi<float>() * xi.x;
                         const float cosTheta = xi.y;
                         const float sinTheta = std::sqrt(std::max(1.0f - cosTheta * cosTheta, 0.0f));
 
-                        glm::vec3 sampleDirection = tangent * (sinTheta * std::cos(phi))
+                        Math::Vec3 sampleDirection = tangent * (sinTheta * std::cos(phi))
                             + bitangent * (sinTheta * std::sin(phi))
                             + normal * cosTheta;
-                        sampleDirection = glm::normalize(sampleDirection);
+                        sampleDirection = Math::Normalize(sampleDirection);
 
                         irradiance += EvaluateSky(sampleDirection) * cosTheta * sinTheta;
                     }
 
-                    irradiance *= glm::pi<float>() / static_cast<float>(IrradianceSampleCount);
+                    irradiance *= Math::Pi<float>() / static_cast<float>(IrradianceSampleCount);
 
                     float* texel = &faceData[(static_cast<size_t>(y) * IrradianceResolution + x) * 4];
                     texel[0] = irradiance.r;
@@ -229,18 +228,18 @@ namespace HachimiEngine
                     {
                         const float u = (static_cast<float>(x) + 0.5f) / IrradianceResolution * 2.0f - 1.0f;
                         const float v = (static_cast<float>(y) + 0.5f) / IrradianceResolution * 2.0f - 1.0f;
-                        const glm::vec3 normal = CubeMapFaceDirection(faceIndex, u, v);
-                        const glm::vec3 viewDirection = normal;
+                        const Math::Vec3 normal = CubeMapFaceDirection(faceIndex, u, v);
+                        const Math::Vec3 viewDirection = normal;
 
-                        glm::vec3 prefilteredColor(0.0f);
+                        Math::Vec3 prefilteredColor(0.0f);
                         float totalWeight = 0.0f;
                         for (uint32_t sampleIndex = 0; sampleIndex < PrefilteredSampleCount; ++sampleIndex)
                         {
-                            const glm::vec2 xi = Hammersley(sampleIndex, PrefilteredSampleCount);
-                            const glm::vec3 halfVector = ImportanceSampleGGX(xi, roughness, normal);
-                            const glm::vec3 lightDirection = glm::normalize(2.0f * glm::dot(viewDirection, halfVector) * halfVector - viewDirection);
+                            const Math::Vec2 xi = Hammersley(sampleIndex, PrefilteredSampleCount);
+                            const Math::Vec3 halfVector = ImportanceSampleGGX(xi, roughness, normal);
+                            const Math::Vec3 lightDirection = Math::Normalize(2.0f * Math::Dot(viewDirection, halfVector) * halfVector - viewDirection);
 
-                            const float normalDotLight = glm::dot(normal, lightDirection);
+                            const float normalDotLight = Math::Dot(normal, lightDirection);
                             if (normalDotLight > 0.0f)
                             {
                                 prefilteredColor += EvaluateSky(lightDirection) * normalDotLight;
@@ -248,7 +247,7 @@ namespace HachimiEngine
                             }
                         }
 
-                        prefilteredColor = totalWeight > 0.0f ? prefilteredColor / totalWeight : glm::vec3(0.0f);
+                        prefilteredColor = totalWeight > 0.0f ? prefilteredColor / totalWeight : Math::Vec3(0.0f);
 
                         float* texel = &faceData[(static_cast<size_t>(y) * IrradianceResolution + x) * 4];
                         texel[0] = prefilteredColor.r;

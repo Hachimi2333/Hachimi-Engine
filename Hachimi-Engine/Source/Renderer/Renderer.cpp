@@ -2,6 +2,7 @@
 
 #include "Renderer/RendererAPI.h"
 #include "Renderer/VertexArray.h"
+#include "Math/Math.h"
 
 namespace HachimiEngine
 {
@@ -23,7 +24,7 @@ namespace HachimiEngine
         s_RendererAPI->SetViewport(x, y, width, height);
     }
 
-    void Renderer::SetClearColor(const glm::vec4& color)
+    void Renderer::SetClearColor(const Math::Vec4& color)
     {
         s_RendererAPI->SetClearColor(color);
     }

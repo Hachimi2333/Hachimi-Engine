@@ -3,8 +3,7 @@
 #include "Core/Base.h"
 #include "Core/Timestep.h"
 #include "Renderer/Camera.h"
-
-#include <glm/glm.hpp>
+#include "Math/Math.h"
 
 namespace HachimiEngine
 {
@@ -16,42 +15,42 @@ namespace HachimiEngine
 
         void OnUpdate(Timestep timestep);
         void OnMouseScroll(float yOffset);
-        void OnMouseDrag(const glm::vec2& mouseDelta, int mouseButton);
+        void OnMouseDrag(const Math::Vec2& mouseDelta, int mouseButton);
         void SetViewportSize(uint32_t width, uint32_t height);
 
-        const glm::mat4& GetViewMatrix() const;
-        const glm::mat4& GetViewProjection() const;
+        const Math::Mat4& GetViewMatrix() const;
+        const Math::Mat4& GetViewProjection() const;
 
-        glm::vec3 GetPosition() const { return m_Position; }
-        glm::vec3 GetFocalPoint() const { return m_FocalPoint; }
-        glm::vec3 GetUpDirection() const;
-        glm::vec3 GetRightDirection() const;
-        glm::vec3 GetForwardDirection() const;
+        Math::Vec3 GetPosition() const { return m_Position; }
+        Math::Vec3 GetFocalPoint() const { return m_FocalPoint; }
+        Math::Vec3 GetUpDirection() const;
+        Math::Vec3 GetRightDirection() const;
+        Math::Vec3 GetForwardDirection() const;
         float GetDistance() const { return m_Distance; }
 
         float GetPitch() const { return m_Pitch; }
         float GetYaw() const { return m_Yaw; }
         float GetFieldOfView() const { return m_FieldOfView; }
 
-        void SetPosition(const glm::vec3& position) { m_Position = position; }
-        void SetFocalPoint(const glm::vec3& focalPoint) { m_FocalPoint = focalPoint; }
+        void SetPosition(const Math::Vec3& position) { m_Position = position; }
+        void SetFocalPoint(const Math::Vec3& focalPoint) { m_FocalPoint = focalPoint; }
         void SetViewportSize(float width, float height);
         void SetFieldOfView(float fieldOfView);
 
-        void Move(const glm::vec3& delta);
+        void Move(const Math::Vec3& delta);
         void SetDistance(float distance);
 
     private:
         void RecalculateView();
         void RecalculateProjection();
 
-        glm::mat4 m_ViewMatrix { 1.0f };
-        mutable glm::mat4 m_ViewProjectionCache { 1.0f };
+        Math::Mat4 m_ViewMatrix { 1.0f };
+        mutable Math::Mat4 m_ViewProjectionCache { 1.0f };
         mutable bool m_ViewProjectionDirty = true;
 
-        glm::vec3 m_Position { 0.0f, 3.0f, 8.0f };
-        glm::vec3 m_FocalPoint { 0.0f, 1.0f, 0.0f };
-        glm::vec3 m_WorldUp { 0.0f, 1.0f, 0.0f };
+        Math::Vec3 m_Position { 0.0f, 3.0f, 8.0f };
+        Math::Vec3 m_FocalPoint { 0.0f, 1.0f, 0.0f };
+        Math::Vec3 m_WorldUp { 0.0f, 1.0f, 0.0f };
 
         float m_FieldOfView = 45.0f;
         float m_AspectRatio = 1.778f;

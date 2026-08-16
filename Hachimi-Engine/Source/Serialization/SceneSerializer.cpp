@@ -6,8 +6,7 @@
 #include "Scene/Components.h"
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
-
-#include <glm/glm.hpp>
+#include "Math/Math.h"
 
 #include <fstream>
 
@@ -15,17 +14,17 @@ namespace HachimiEngine
 {
     namespace
     {
-        void EmitVec3(YAML::Emitter& out, const glm::vec3& value)
+        void EmitVec3(YAML::Emitter& out, const Math::Vec3& value)
         {
             out << YAML::Flow << YAML::BeginSeq << value.x << value.y << value.z << YAML::EndSeq;
         }
 
-        void EmitVec4(YAML::Emitter& out, const glm::vec4& value)
+        void EmitVec4(YAML::Emitter& out, const Math::Vec4& value)
         {
             out << YAML::Flow << YAML::BeginSeq << value.x << value.y << value.z << value.w << YAML::EndSeq;
         }
 
-        glm::vec3 ReadVec3(const YAML::Node& node, const glm::vec3& fallback = glm::vec3(0.0f))
+        Math::Vec3 ReadVec3(const YAML::Node& node, const Math::Vec3& fallback = Math::Vec3(0.0f))
         {
             if (!node || !node.IsSequence() || node.size() < 3)
             {
@@ -34,7 +33,7 @@ namespace HachimiEngine
             return { node[0].as<float>(), node[1].as<float>(), node[2].as<float>() };
         }
 
-        glm::vec4 ReadVec4(const YAML::Node& node, const glm::vec4& fallback = glm::vec4(1.0f))
+        Math::Vec4 ReadVec4(const YAML::Node& node, const Math::Vec4& fallback = Math::Vec4(1.0f))
         {
             if (!node || !node.IsSequence() || node.size() < 4)
             {
@@ -207,7 +206,7 @@ namespace HachimiEngine
             auto& transform = entity.GetComponent<TransformComponent>();
             transform.Position = ReadVec3(transformNode["Position"]);
             transform.Rotation = ReadVec3(transformNode["Rotation"]);
-            transform.Scale = ReadVec3(transformNode["Scale"], glm::vec3(1.0f));
+            transform.Scale = ReadVec3(transformNode["Scale"], Math::Vec3(1.0f));
         }
 
         entity.AddComponent<RelationshipComponent>();
@@ -259,7 +258,7 @@ namespace HachimiEngine
         {
             auto& light = entity.AddComponent<LightComponent>();
             light.Type = static_cast<LightComponent::LightType>(lightNode["Type"].as<int>(1));
-            light.Color = ReadVec3(lightNode["Color"], glm::vec3(1.0f));
+            light.Color = ReadVec3(lightNode["Color"], Math::Vec3(1.0f));
             light.Intensity = lightNode["Intensity"].as<float>(10.0f);
             light.Range = lightNode["Range"].as<float>(12.0f);
             light.CastsShadows = lightNode["CastsShadows"].as<bool>(true);

@@ -3,8 +3,6 @@
 #include "Core/Base.h"
 #include "Core/Memory.h"
 
-#include <glm/glm.hpp>
-
 #include <initializer_list>
 #include <string>
 #include <vector>

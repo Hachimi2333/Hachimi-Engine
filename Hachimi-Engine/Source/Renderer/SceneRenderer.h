@@ -6,8 +6,7 @@
 #include "Renderer/EnvironmentSettings.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
-
-#include <glm/glm.hpp>
+#include "Math/Math.h"
 
 #include <array>
 
@@ -18,8 +17,8 @@ namespace HachimiEngine
 
     struct DirectionalLight
     {
-        glm::vec3 Direction { -0.5f, -1.0f, -0.3f };
-        glm::vec3 Color { 1.0f, 0.98f, 0.95f };
+        Math::Vec3 Direction { -0.5f, -1.0f, -0.3f };
+        Math::Vec3 Color { 1.0f, 0.98f, 0.95f };
         float Intensity = 1.4f;
         bool CastsShadows = true;
         float ShadowBias = 0.0005f;
@@ -27,8 +26,8 @@ namespace HachimiEngine
 
     struct PointLight
     {
-        glm::vec3 Position { 3.0f, 4.0f, 2.0f };
-        glm::vec3 Color { 1.0f, 0.9f, 0.7f };
+        Math::Vec3 Position { 3.0f, 4.0f, 2.0f };
+        Math::Vec3 Color { 1.0f, 0.9f, 0.7f };
         float Intensity = 12.0f;
         float Range = 12.0f;
     };
@@ -38,7 +37,7 @@ namespace HachimiEngine
         DirectionalLight Directional;
         std::array<PointLight, 4> PointLights;
         int PointLightCount = 1;
-        glm::vec3 AmbientColor { 0.08f, 0.08f, 0.10f };
+        Math::Vec3 AmbientColor { 0.08f, 0.08f, 0.10f };
         float AmbientIntensity = 1.0f;
     };
 
@@ -50,24 +49,24 @@ namespace HachimiEngine
         static void Shutdown();
 
         static void BeginScene(const EditorCamera& camera);
-        static void BeginScene(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& cameraPosition);
-        static void SubmitMesh(const Ref<Mesh>& mesh, const glm::mat4& transform, const Ref<Material>& material);
+        static void BeginScene(const Math::Mat4& view, const Math::Mat4& projection, const Math::Vec3& cameraPosition);
+        static void SubmitMesh(const Ref<Mesh>& mesh, const Math::Mat4& transform, const Ref<Material>& material);
         static void DrawGrid(float size = 20.0f, uint32_t divisions = 20);
         static void DrawSkybox();
         static void EndScene();
 
-        static void BeginDirectionalShadowPass(const glm::mat4& lightViewProjection);
-        static void SubmitShadowMesh(const Ref<Mesh>& mesh, const glm::mat4& transform);
+        static void BeginDirectionalShadowPass(const Math::Mat4& lightViewProjection);
+        static void SubmitShadowMesh(const Ref<Mesh>& mesh, const Math::Mat4& transform);
         static void EndDirectionalShadowPass();
 
-        static glm::mat4 CalculateDirectionalLightViewProjection(const glm::vec3& cameraPosition);
+        static Math::Mat4 CalculateDirectionalLightViewProjection(const Math::Vec3& cameraPosition);
 
         static LightingEnvironment& GetLightingEnvironment() { return s_Lighting; }
         static EnvironmentSettings& GetEnvironmentSettings() { return s_Environment; }
         static Ref<Material> GetDefaultMaterial() { return s_DefaultMaterial; }
 
     private:
-        static void UploadLighting(const Ref<Shader>& shader, const glm::vec3& cameraPosition);
+        static void UploadLighting(const Ref<Shader>& shader, const Math::Vec3& cameraPosition);
 
     private:
         static Ref<Shader> s_DefaultShader;
@@ -81,12 +80,12 @@ namespace HachimiEngine
         static Ref<EnvironmentMap> s_EnvironmentMap;
         static LightingEnvironment s_Lighting;
         static EnvironmentSettings s_Environment;
-        static glm::mat4 s_ViewProjection;
-        static glm::mat4 s_View;
-        static glm::mat4 s_Projection;
-        static glm::vec3 s_CameraPosition;
-        static glm::vec3 s_CameraForward;
-        static glm::mat4 s_DirectionalLightViewProjection;
+        static Math::Mat4 s_ViewProjection;
+        static Math::Mat4 s_View;
+        static Math::Mat4 s_Projection;
+        static Math::Vec3 s_CameraPosition;
+        static Math::Vec3 s_CameraForward;
+        static Math::Mat4 s_DirectionalLightViewProjection;
         static bool s_DirectionalShadowEnabled;
         static bool s_DirectionalShadowPassActive;
     };

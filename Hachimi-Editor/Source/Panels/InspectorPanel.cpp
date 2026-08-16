@@ -4,8 +4,8 @@
 #include "Renderer/MeshFactory.h"
 #include "Scene/Components.h"
 #include "Scene/Scene.h"
+#include "Math/Math.h"
 
-#include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 
 #include <algorithm>
@@ -139,9 +139,9 @@ namespace HachimiEngine
         }
 
         auto& transform = entity.Transform();
-        ImGui::DragFloat3("Position", glm::value_ptr(transform.Position), 0.05f);
-        ImGui::DragFloat3("Rotation", glm::value_ptr(transform.Rotation), 0.25f);
-        ImGui::DragFloat3("Scale", glm::value_ptr(transform.Scale), 0.05f, 0.01f, 100.0f);
+        ImGui::DragFloat3("Position", Math::ValuePtr(transform.Position), 0.05f);
+        ImGui::DragFloat3("Rotation", Math::ValuePtr(transform.Rotation), 0.25f);
+        ImGui::DragFloat3("Scale", Math::ValuePtr(transform.Scale), 0.05f, 0.01f, 100.0f);
     }
 
     void InspectorPanel::DrawMesh(Entity entity)
@@ -168,7 +168,7 @@ namespace HachimiEngine
             mesh.Mesh = MeshFactory::CreatePrimitive(mesh.PrimitiveType);
         }
 
-        ImGui::ColorEdit4("Albedo Color", glm::value_ptr(mesh.MaterialColor));
+        ImGui::ColorEdit4("Albedo Color", Math::ValuePtr(mesh.MaterialColor));
         ImGui::SliderFloat("Roughness", &mesh.Roughness, 0.01f, 1.0f);
         ImGui::SliderFloat("Metallic", &mesh.Metallic, 0.0f, 1.0f);
         ImGui::Checkbox("Visible", &mesh.Visible);
@@ -216,7 +216,7 @@ namespace HachimiEngine
             light.Type = static_cast<LightComponent::LightType>(lightType);
         }
 
-        ImGui::ColorEdit3("Color", glm::value_ptr(light.Color));
+        ImGui::ColorEdit3("Color", Math::ValuePtr(light.Color));
         ImGui::DragFloat("Intensity", &light.Intensity, 0.1f, 0.0f, 1000.0f);
         if (light.Type == LightComponent::LightType::Point)
         {

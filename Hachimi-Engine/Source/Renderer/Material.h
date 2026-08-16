@@ -4,8 +4,7 @@
 #include "Core/Memory.h"
 #include "Renderer/Shader.h"
 #include "Renderer/Texture.h"
-
-#include <glm/glm.hpp>
+#include "Math/Math.h"
 
 namespace HachimiEngine
 {
@@ -24,8 +23,8 @@ namespace HachimiEngine
         Ref<Texture2D> GetAlbedoTexture() const { return m_AlbedoTexture; }
         void SetAlbedoTexture(const Ref<Texture2D>& texture) { m_AlbedoTexture = texture; }
 
-        glm::vec4 GetAlbedoColor() const { return m_AlbedoColor; }
-        void SetAlbedoColor(const glm::vec4& color) { m_AlbedoColor = color; }
+        Math::Vec4 GetAlbedoColor() const { return m_AlbedoColor; }
+        void SetAlbedoColor(const Math::Vec4& color) { m_AlbedoColor = color; }
 
         float GetRoughness() const { return m_Roughness; }
         void SetRoughness(float roughness) { m_Roughness = roughness; }
@@ -38,7 +37,7 @@ namespace HachimiEngine
     private:
         Ref<Shader> m_Shader;
         Ref<Texture2D> m_AlbedoTexture;
-        glm::vec4 m_AlbedoColor { 0.8f, 0.8f, 0.82f, 1.0f };
+        Math::Vec4 m_AlbedoColor { 0.8f, 0.8f, 0.82f, 1.0f };
         float m_Roughness = 0.6f;
         float m_Metallic = 0.05f;
     };

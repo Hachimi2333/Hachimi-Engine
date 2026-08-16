@@ -4,8 +4,7 @@
 #include "Renderer/MeshFactory.h"
 #include "Serialization/SceneSerializer.h"
 #include "Utils/FileSystem.h"
-
-#include <glm/glm.hpp>
+#include "Math/Math.h"
 
 namespace HachimiEngine
 {
@@ -16,10 +15,10 @@ namespace HachimiEngine
             const std::string& name,
             const Ref<Mesh>& mesh,
             PrimitiveMeshType primitiveType,
-            const glm::vec3& position,
-            const glm::vec3& rotation,
-            const glm::vec3& scale,
-            const glm::vec4& color,
+            const Math::Vec3& position,
+            const Math::Vec3& rotation,
+            const Math::Vec3& scale,
+            const Math::Vec4& color,
             float roughness,
             float metallic)
         {
@@ -40,9 +39,9 @@ namespace HachimiEngine
         Entity CreateCubeEntity(
             Scene& scene,
             const std::string& name,
-            const glm::vec3& position,
-            const glm::vec3& scale,
-            const glm::vec4& color,
+            const Math::Vec3& position,
+            const Math::Vec3& scale,
+            const Math::Vec4& color,
             float roughness,
             float metallic)
         {
@@ -52,7 +51,7 @@ namespace HachimiEngine
                 MeshFactory::CreateCube(1.0f),
                 PrimitiveMeshType::Cube,
                 position,
-                glm::vec3(0.0f),
+                Math::Vec3(0.0f),
                 scale,
                 color,
                 roughness,
@@ -62,9 +61,9 @@ namespace HachimiEngine
         Entity CreateSphereEntity(
             Scene& scene,
             const std::string& name,
-            const glm::vec3& position,
-            const glm::vec3& scale,
-            const glm::vec4& color,
+            const Math::Vec3& position,
+            const Math::Vec3& scale,
+            const Math::Vec4& color,
             float roughness,
             float metallic)
         {
@@ -74,7 +73,7 @@ namespace HachimiEngine
                 MeshFactory::CreateSphere(1.0f, 64, 32),
                 PrimitiveMeshType::Sphere,
                 position,
-                glm::vec3(0.0f),
+                Math::Vec3(0.0f),
                 scale,
                 color,
                 roughness,
@@ -136,18 +135,18 @@ namespace HachimiEngine
                 "Ground",
                 MeshFactory::CreatePlane(24.0f, 24.0f),
                 PrimitiveMeshType::Plane,
-                glm::vec3(0.0f),
-                glm::vec3(0.0f),
-                glm::vec3(1.0f),
+                Math::Vec3(0.0f),
+                Math::Vec3(0.0f),
+                Math::Vec3(1.0f),
                 { 0.26f, 0.26f, 0.30f, 1.0f },
                 0.92f,
                 0.0f);
 
-            CreateSphereEntity(*scene, "Polished Metal Sphere", { -4.0f, 1.0f, 1.5f }, glm::vec3(1.0f), { 0.88f, 0.88f, 0.92f, 1.0f }, 0.12f, 1.0f);
-            CreateSphereEntity(*scene, "Matte Red Sphere", { -2.0f, 1.0f, 1.5f }, glm::vec3(1.0f), { 0.80f, 0.20f, 0.16f, 1.0f }, 0.88f, 0.0f);
-            CreateCubeEntity(*scene, "Glossy Blue Cube", { 0.0f, 1.0f, 1.5f }, glm::vec3(0.9f), { 0.15f, 0.45f, 0.95f, 1.0f }, 0.15f, 0.0f);
-            CreateCubeEntity(*scene, "Brass Cube", { 2.0f, 1.0f, 1.5f }, glm::vec3(0.8f), { 1.0f, 0.72f, 0.25f, 1.0f }, 0.35f, 1.0f);
-            CreateCubeEntity(*scene, "Purple Pillar", { 4.0f, 1.75f, 1.5f }, glm::vec3(0.9f, 3.5f, 0.9f), { 0.55f, 0.15f, 0.75f, 1.0f }, 0.45f, 0.3f);
+            CreateSphereEntity(*scene, "Polished Metal Sphere", { -4.0f, 1.0f, 1.5f }, Math::Vec3(1.0f), { 0.88f, 0.88f, 0.92f, 1.0f }, 0.12f, 1.0f);
+            CreateSphereEntity(*scene, "Matte Red Sphere", { -2.0f, 1.0f, 1.5f }, Math::Vec3(1.0f), { 0.80f, 0.20f, 0.16f, 1.0f }, 0.88f, 0.0f);
+            CreateCubeEntity(*scene, "Glossy Blue Cube", { 0.0f, 1.0f, 1.5f }, Math::Vec3(0.9f), { 0.15f, 0.45f, 0.95f, 1.0f }, 0.15f, 0.0f);
+            CreateCubeEntity(*scene, "Brass Cube", { 2.0f, 1.0f, 1.5f }, Math::Vec3(0.8f), { 1.0f, 0.72f, 0.25f, 1.0f }, 0.35f, 1.0f);
+            CreateCubeEntity(*scene, "Purple Pillar", { 4.0f, 1.75f, 1.5f }, Math::Vec3(0.9f, 3.5f, 0.9f), { 0.55f, 0.15f, 0.75f, 1.0f }, 0.45f, 0.3f);
 
             // This raised platform receives shadows cast by the cluster meshes above it,
             // demonstrating object-to-object shadow projection.
@@ -157,7 +156,7 @@ namespace HachimiEngine
                 MeshFactory::CreateCube(1.0f),
                 PrimitiveMeshType::Cube,
                 { 0.0f, 0.4f, -2.5f },
-                glm::vec3(0.0f),
+                Math::Vec3(0.0f),
                 { 4.4f, 0.8f, 2.8f },
                 { 0.72f, 0.72f, 0.76f, 1.0f },
                 0.9f,
@@ -168,15 +167,15 @@ namespace HachimiEngine
             cluster.Transform().Position = { 0.0f, 1.4f, -2.5f };
             auto& clusterRelationship = cluster.GetComponent<RelationshipComponent>();
 
-            Entity childA = CreateCubeEntity(*scene, "Cluster Cube A", { -1.2f, 0.0f, 0.0f }, glm::vec3(0.7f), { 0.90f, 0.30f, 0.20f, 1.0f }, 0.3f, 0.6f);
+            Entity childA = CreateCubeEntity(*scene, "Cluster Cube A", { -1.2f, 0.0f, 0.0f }, Math::Vec3(0.7f), { 0.90f, 0.30f, 0.20f, 1.0f }, 0.3f, 0.6f);
             childA.GetComponent<RelationshipComponent>().Parent = cluster.GetUUID();
             clusterRelationship.Children.push_back(childA.GetUUID());
 
-            Entity childB = CreateCubeEntity(*scene, "Cluster Cube B", { 1.2f, 0.0f, 0.0f }, glm::vec3(0.7f), { 0.20f, 0.80f, 0.90f, 1.0f }, 0.2f, 1.0f);
+            Entity childB = CreateCubeEntity(*scene, "Cluster Cube B", { 1.2f, 0.0f, 0.0f }, Math::Vec3(0.7f), { 0.20f, 0.80f, 0.90f, 1.0f }, 0.2f, 1.0f);
             childB.GetComponent<RelationshipComponent>().Parent = cluster.GetUUID();
             clusterRelationship.Children.push_back(childB.GetUUID());
 
-            Entity childC = CreateSphereEntity(*scene, "Cluster Sphere C", { 0.0f, 0.9f, 0.0f }, glm::vec3(0.8f), { 0.30f, 0.90f, 0.35f, 1.0f }, 0.6f, 0.2f);
+            Entity childC = CreateSphereEntity(*scene, "Cluster Sphere C", { 0.0f, 0.9f, 0.0f }, Math::Vec3(0.8f), { 0.30f, 0.90f, 0.35f, 1.0f }, 0.6f, 0.2f);
             childC.GetComponent<RelationshipComponent>().Parent = cluster.GetUUID();
             clusterRelationship.Children.push_back(childC.GetUUID());
         }
