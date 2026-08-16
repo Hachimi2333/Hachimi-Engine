@@ -9,10 +9,12 @@
 .vs/
 
 # Temporary library download area
-TMP/
+Vendor/Downloads/
 
-# Local MSBuild temporary directory
-.msbuild-tmp/
+# Ad-hoc tool build artifacts (Utils/FramebufferTest, Utils/UIAutomation)
+Utils/**/*.obj
+Utils/**/*.exe
+Utils/**/*.log
 
 # OS / editor junk
 Thumbs.db

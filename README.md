@@ -1,73 +1,86 @@
 # Hachimi-Engine
 
-Hachimi-Engine 是一个借鉴 Hazel 架构思路、使用 C++20 编写的 3D 游戏引擎与编辑器项目。
+> **English** | [简体中文](README.zh-CN.md)
 
-## 当前功能
+A C++20 3D game engine and editor for Windows, built on OpenGL 4.6 Core and inspired by the architecture of Hazel.
 
-- 仅支持 Windows x86_64，Debug / Release 两种配置
-- Premake5 生成 Visual Studio 2026 解决方案
-- OpenGL 4.6 Core 渲染后端
-- 自有数学库 `HachimiEngine::Math`（内部封装 GLM，业务代码不直接依赖 GLM）
-- Application / Entry Point / Layer / LayerStack / Event 系统
-- OpenGL 风格渲染抽象：VertexArray、VertexBuffer、IndexBuffer、Shader、Texture2D、TextureCube、Framebuffer
-- 内置网格：Cube、Sphere、Plane、Grid
-- HDR 渲染管线：ACES Tone Mapping + Gamma 后处理
-- Cook-Torrance PBR 直接光照、方向光阴影映射（3×3 PCF）
-- 程序化天空盒与基于环境贴图的 IBL（irradiance + prefiltered specular）
-- 编辑器相机：右键旋转、中键平移、滚轮缩放、WASD 移动
-- 基于 EnTT 的 Scene / ECS
-- Box3D 物理系统：Static / Kinematic / Dynamic 刚体、Box / Sphere / Capsule / Plane 碰撞体、固定步长模拟与 Play 模式 Transform 同步
-- yaml-cpp 场景（`.hscene`）与项目（`.hproj`）序列化
-- ImGui Docking 编辑器：Project Hub、Viewport、Scene Hierarchy、Inspector、Content Browser、Console；Inter 字体与显示器 DPI 自适应 UI 缩放
-- 选中相机 / 灯光实体时，在视口中绘制视锥、光照范围与方向等调试指示线
-- ImGuizmo 变换工具：Translate / Rotate / Scale
-- ImGuiFileDialog 文件对话框
-- 控制台日志（引擎与客户端双 logger，暂不输出日志文件）
+## Features
 
-## 环境要求
+### Core
+
+- Windows x86_64 only, Debug / Release configurations
+- Premake5 generates Visual Studio 2026 solutions
+- Application / Entry Point / Layer / LayerStack / Event system
+- Custom math library `HachimiEngine::Math` (internally wraps GLM; game code does not depend on GLM directly)
+- Scene / ECS based on EnTT
+- yaml-cpp scene (`.hscene`) and project (`.hproj`) serialization
+- Console logging with dual loggers (engine and client)
+
+### Rendering
+
+- OpenGL 4.6 Core backend with an OpenGL-style rendering abstraction: VertexArray, VertexBuffer, IndexBuffer, Shader, Texture2D, TextureCube, Framebuffer
+- Built-in meshes: Cube, Sphere, Plane, Grid
+- HDR rendering pipeline: ACES tone mapping + gamma post-processing
+- Cook-Torrance PBR direct lighting with directional light shadow mapping (3×3 PCF)
+- Procedural skybox and image-based lighting from environment maps (irradiance + prefiltered specular)
+
+### Physics
+
+- Box3D integration: Static / Kinematic / Dynamic rigid bodies, Box / Sphere / Capsule / Plane colliders
+- Fixed-timestep simulation with Transform sync in Play mode
+
+### Editor
+
+- ImGui Docking-based editor: Project Hub, Viewport, Scene Hierarchy, Inspector, Content Browser, Console
+- Inter font and DPI-aware UI scaling
+- Debug indicator overlays for selected camera / light entities (frustum, light range and direction)
+- ImGuizmo transform gizmos: Translate / Rotate / Scale
+- ImGuiFileDialog file dialogs
+- Editor camera: RMB orbit, MMB pan, wheel zoom, WASD fly
+
+## Requirements
 
 - Windows
-- Visual Studio 2026（Community 或更高版本）
-- 已安装 OpenGL 4.6 Core 驱动
-- 仓库已包含 Premake5 与全部第三方库源码
+- Visual Studio 2026 (Community or later)
+- A driver with OpenGL 4.6 Core support
 
-## 生成解决方案
+The repository already includes Premake5 and all third-party library sources; no additional setup is required.
 
-双击仓库根目录的：
+## Getting Started
 
-```
-GenerateSolution.bat
-```
+### Generate the Solution
 
-或手动执行：
+Double-click `GenerateSolution.bat` at the repository root, or run manually:
 
 ```
 Vendor\Premake\Bin\premake5.exe vs2026 --file=premake5.lua
 ```
 
-生成 `Hachimi-Engine.slnx` 后，用 Visual Studio 2026 打开并构建。
+### Build
 
-## 构建输出
+Open the generated `Hachimi-Engine.slnx` in Visual Studio 2026 and build the solution.
 
-- 最终产物：`Bin/<configuration>-<system>-<architecture>/`
-- 中间产物：`Bin/Obj/<configuration>-<system>-<architecture>/<ProjectName>/`
+Output directories:
 
-例如：
+- Final output: `Bin/<configuration>-<system>-<architecture>/`
+- Intermediate output: `Bin/Obj/<configuration>-<system>-<architecture>/<ProjectName>/`
+
+For example:
 
 ```
 Bin/Debug-windows-x86_64/Hachimi-Editor.exe
 Bin/Release-windows-x86_64/Hachimi-Editor.exe
 ```
 
-## 编辑器使用
+### Run
 
-启动 `Hachimi-Editor.exe` 后会进入 Project Hub：
+Launch `Hachimi-Editor.exe`. The Project Hub appears:
 
-- 新建项目：项目默认创建在 `%USERPROFILE%\Documents\HachimiProjects`
-- 打开最近项目
-- 打开任意 `.hproj` 项目文件
+- Create a new project (default location: `%USERPROFILE%\Documents\HachimiProjects`)
+- Open a recent project
+- Open any `.hproj` project file
 
-新建项目会自动生成：
+A new project is generated with:
 
 ```
 <ProjectName>/
@@ -80,49 +93,74 @@ Bin/Release-windows-x86_64/Hachimi-Editor.exe
         └── Default.hscene
 ```
 
-默认 `Default.hscene` 是一个渲染与物理特性展示场景：PBR 金属/粗糙材质球与立方体、地面、
-方向光阴影（含平台上的物体间投影）、两盏点光源、父级层级物体、天空盒与 IBL；
-进入 Play 模式后，场景中的球体、立方体与簇状子物体会在 Box3D 物理模拟中下落、碰撞并停稳。
-Game 面板使用主相机视角。
+The default `Default.hscene` showcases rendering and physics features: PBR metal/roughness material balls and cubes, ground plane, directional light shadows (including inter-object shadows on the platform), two point lights, a parented object hierarchy, skybox and IBL. In Play mode, the scene's spheres, cubes and clustered child objects fall, collide and settle under Box3D physics simulation. The Game panel uses the main camera view.
 
-### 视口操作
+### Viewport Controls
 
-| 操作 | 按键 |
+| Action | Input |
 | --- | --- |
-| 旋转视角 | 鼠标右键拖动（或 Alt + 左键拖动） |
-| 平移视角 | 鼠标中键拖动 |
-| 缩放 | 鼠标滚轮（或 Alt + 右键上下拖动） |
-| 移动 | 按住鼠标右键 + W / A / S / D / Q / E |
-| 加速移动 | 按住 Left Shift |
-| 平移 Gizmo | Translate 按钮 |
-| 旋转 Gizmo | Rotate 按钮 |
-| 缩放 Gizmo | Scale 按钮 |
+| Orbit | Right mouse button drag (or Alt + LMB drag) |
+| Pan | Middle mouse button drag |
+| Zoom | Mouse wheel (or Alt + RMB drag up/down) |
+| Move | RMB held + W / A / S / D / Q / E |
+| Fast move | Hold Left Shift |
+| Translate gizmo | Translate button |
+| Rotate gizmo | Rotate button |
+| Scale gizmo | Scale button |
 
-## 仓库结构
+## Repository Layout
 
 ```text
-Hachimi-Engine/          # 引擎核心（静态库）
-  Source/                # 引擎源码
-  Vendor/                # 引擎使用的第三方库
-Hachimi-Editor/          # 编辑器客户端（可执行文件）
-  Source/                # 编辑器源码
-  Vendor/                # 编辑器使用的第三方库
-Vendor/Premake/          # Premake5 工具链
-Bin/                     # 构建产物（gitignore）
-TMP/                     # 第三方库下载暂存区（gitignore）
+Hachimi-Engine/          # Engine core (static library)
+  Source/                # Engine source
+  Vendor/                # Third-party libraries used by the engine
+Hachimi-Editor/          # Editor client (executable)
+  Source/                # Editor source
+  Vendor/                # Third-party libraries used by the editor
+Vendor/Premake/          # Premake5 toolchain
+Bin/                     # Build output (gitignored)
+Vendor/Downloads/        # Third-party library download staging area (gitignored)
+Utils/                   # Ad-hoc debugging tools (FramebufferTest, UIAutomation)
 ```
 
-## 当前范围说明
+## Current Scope
 
-以下内容已预留架构位置，但暂未实现：
+The following have reserved architecture slots but are not yet implemented:
 
-- 音频系统
-- 脚本系统
-- 除 OpenGL 4.6 Core 外的渲染后端
-- 外部 3D 模型导入（当前使用内置网格）
-- 日志文件输出（当前仅控制台）
-- 物理 Joints / Character Mover / Mesh / HeightField 碰撞体 / 物理 Debug Draw / Box3D 多线程（当前使用基础刚体与凸碰撞体）
+- Audio system
+- Scripting system
+- Rendering backends other than OpenGL 4.6 Core
+- External 3D model import (built-in meshes are used)
+- Log file output (console only)
+- Physics joints / character mover / mesh / heightfield colliders / physics debug draw / Box3D multithreading (basic rigid bodies and convex colliders are used)
 
-## 开发规范
+See `FUTURE.md` for the planned rendering effects and engine systems.
 
-仓库根目录的 `AGENTS.md` 包含完整约束与开发规范，请在开发前阅读。
+## Development
+
+Read `AGENTS.md` at the repository root for the complete development constraints and conventions before contributing.
+
+## License
+
+Hachimi-Engine is licensed under the [MIT License](LICENSE). Copyright (c) 2026 Hachimi2333.
+
+## Acknowledgments
+
+Hachimi-Engine builds upon the following open-source projects. Special thanks to their authors and contributors:
+
+- [Hazel](https://github.com/TheCherno/Hazel) — architectural reference for the engine design
+- [Box3D](https://github.com/erincatto/box3d) — physics engine
+- [EnTT](https://github.com/skypjack/entt) — ECS framework
+- [GLAD](https://github.com/Dav1dde/glad) — OpenGL function loader
+- [GLFW](https://github.com/glfw/glfw) — window and input handling
+- [GLM](https://github.com/g-truc/glm) — math library (wrapped internally by `HachimiEngine::Math`)
+- [Dear ImGui](https://github.com/ocornut/imgui) — editor user interface
+- [ImGuiFileDialog](https://github.com/aiekick/ImGuiFileDialog) — file dialogs
+- [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo) — transform gizmos
+- [spdlog](https://github.com/gabime/spdlog) — logging library
+- [stb](https://github.com/nothings/stb) — single-header image library
+- [yaml-cpp](https://github.com/jbeder/yaml-cpp) — YAML serialization
+- [Inter](https://github.com/rsms/inter) — editor font, licensed under the SIL Open Font License 1.1
+- [Premake5](https://github.com/premake/premake-core) — build system generator
+
+The license of each third-party library can be found in its own `LICENSE` file under the corresponding `Vendor` directory.

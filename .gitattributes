@@ -1,0 +1,38 @@
+# Repository line-ending policy:
+# - All text files use LF in the repository and in the working tree.
+# - Batch files are the only exception and always use CRLF for cmd.exe.
+# These attributes override any machine-local core.autocrlf setting, so
+# checkouts and commits are identical on every machine.
+
+* text=auto
+
+# Source / build / doc files: LF everywhere
+*.c text eol=lf
+*.cpp text eol=lf
+*.cppm text eol=lf
+*.h text eol=lf
+*.hpp text eol=lf
+*.inl text eol=lf
+*.lua text eol=lf
+*.m text eol=lf
+*.mm text eol=lf
+*.natvis text eol=lf
+*.vert text eol=lf
+*.frag text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.txt text eol=lf
+*.md text eol=lf
+*.rst text eol=lf
+*.sh text eol=lf
+*.bazel text eol=lf
+*.imp text eol=lf
+*.in text eol=lf
+
+# Windows batch files: CRLF required by cmd.exe
+*.bat text eol=crlf
+
+# Extensionless text files
+LICENSE text eol=lf
+ChangeLog text eol=lf
