@@ -149,9 +149,23 @@ namespace HachimiEngine
             CreateCubeEntity(*scene, "Brass Cube", { 2.0f, 1.0f, 1.5f }, glm::vec3(0.8f), { 1.0f, 0.72f, 0.25f, 1.0f }, 0.35f, 1.0f);
             CreateCubeEntity(*scene, "Purple Pillar", { 4.0f, 1.75f, 1.5f }, glm::vec3(0.9f, 3.5f, 0.9f), { 0.55f, 0.15f, 0.75f, 1.0f }, 0.45f, 0.3f);
 
+            // This raised platform receives shadows cast by the cluster meshes above it,
+            // demonstrating object-to-object shadow projection.
+            CreateMeshEntity(
+                *scene,
+                "Shadow Platform",
+                MeshFactory::CreateCube(1.0f),
+                PrimitiveMeshType::Cube,
+                { 0.0f, 0.4f, -2.5f },
+                glm::vec3(0.0f),
+                { 4.4f, 0.8f, 2.8f },
+                { 0.72f, 0.72f, 0.76f, 1.0f },
+                0.9f,
+                0.0f);
+
             // A parent entity with child meshes demonstrates hierarchy and local transforms.
             Entity cluster = scene->CreateEntity("Crystal Cluster");
-            cluster.Transform().Position = { 0.0f, 1.5f, -2.8f };
+            cluster.Transform().Position = { 0.0f, 1.4f, -2.5f };
             auto& clusterRelationship = cluster.GetComponent<RelationshipComponent>();
 
             Entity childA = CreateCubeEntity(*scene, "Cluster Cube A", { -1.2f, 0.0f, 0.0f }, glm::vec3(0.7f), { 0.90f, 0.30f, 0.20f, 1.0f }, 0.3f, 0.6f);
