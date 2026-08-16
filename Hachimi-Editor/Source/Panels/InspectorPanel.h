@@ -16,6 +16,8 @@ namespace HachimiEngine
     private:
         void DrawAddComponentMenu(EditorContext& context, Entity entity);
         void DrawTransform(Entity entity);
+        void DrawRigidbody(Entity entity);
+        void DrawCollider(Entity entity);
         void DrawMesh(Entity entity);
         void DrawCamera(Entity entity);
         void DrawLight(Entity entity);

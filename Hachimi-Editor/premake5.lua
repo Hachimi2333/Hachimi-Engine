@@ -43,6 +43,7 @@ project "Hachimi-Editor"
         "ImGui",
         "spdlog",
         "yaml-cpp",
+        "Box3D",
         "GLAD",
         "GLFW",
         "opengl32"

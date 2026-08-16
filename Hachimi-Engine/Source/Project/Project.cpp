@@ -67,10 +67,13 @@ namespace HachimiEngine
             float roughness,
             float metallic)
         {
+            // Use the same canonical primitive dimensions that SceneSerializer
+            // recreates after loading, otherwise a freshly created project and
+            // a reloaded project render different-sized meshes.
             return CreateMeshEntity(
                 scene,
                 name,
-                MeshFactory::CreateSphere(1.0f, 64, 32),
+                MeshFactory::CreateSphere(),
                 PrimitiveMeshType::Sphere,
                 position,
                 Math::Vec3(0.0f),
@@ -78,6 +81,18 @@ namespace HachimiEngine
                 color,
                 roughness,
                 metallic);
+        }
+
+        void AddRigidbody(Entity entity, RigidbodyComponent::RigidbodyType type)
+        {
+            entity.AddComponent<RigidbodyComponent>().Type = type;
+        }
+
+        ColliderComponent& AddCollider(Entity entity, ColliderComponent::ColliderShapeType shapeType)
+        {
+            auto& collider = entity.AddComponent<ColliderComponent>();
+            collider.ShapeType = shapeType;
+            return collider;
         }
 
         void ConfigureShowcaseScene(const Ref<Scene>& scene)
@@ -130,27 +145,47 @@ namespace HachimiEngine
             coolPointComponent.Intensity = 12.0f;
             coolPointComponent.Range = 12.0f;
 
-            CreateMeshEntity(
+            Entity ground = CreateMeshEntity(
                 *scene,
                 "Ground",
-                MeshFactory::CreatePlane(24.0f, 24.0f),
+                MeshFactory::CreatePlane(),
                 PrimitiveMeshType::Plane,
                 Math::Vec3(0.0f),
                 Math::Vec3(0.0f),
-                Math::Vec3(1.0f),
+                { 2.4f, 1.0f, 2.4f }, // Canonical 10x10 plane scaled to 24x24; scale is serialized.
                 { 0.26f, 0.26f, 0.30f, 1.0f },
                 0.92f,
                 0.0f);
+            AddRigidbody(ground, RigidbodyComponent::RigidbodyType::Static);
+            auto& groundCollider = AddCollider(ground, ColliderComponent::ColliderShapeType::Plane);
+            groundCollider.HalfExtents = { 5.0f, 0.05f, 5.0f }; // Local half extents; world scale produces 12x12.
+            groundCollider.Friction = 0.8f;
 
-            CreateSphereEntity(*scene, "Polished Metal Sphere", { -4.0f, 1.0f, 1.5f }, Math::Vec3(1.0f), { 0.88f, 0.88f, 0.92f, 1.0f }, 0.12f, 1.0f);
-            CreateSphereEntity(*scene, "Matte Red Sphere", { -2.0f, 1.0f, 1.5f }, Math::Vec3(1.0f), { 0.80f, 0.20f, 0.16f, 1.0f }, 0.88f, 0.0f);
-            CreateCubeEntity(*scene, "Glossy Blue Cube", { 0.0f, 1.0f, 1.5f }, Math::Vec3(0.9f), { 0.15f, 0.45f, 0.95f, 1.0f }, 0.15f, 0.0f);
-            CreateCubeEntity(*scene, "Brass Cube", { 2.0f, 1.0f, 1.5f }, Math::Vec3(0.8f), { 1.0f, 0.72f, 0.25f, 1.0f }, 0.35f, 1.0f);
-            CreateCubeEntity(*scene, "Purple Pillar", { 4.0f, 1.75f, 1.5f }, Math::Vec3(0.9f, 3.5f, 0.9f), { 0.55f, 0.15f, 0.75f, 1.0f }, 0.45f, 0.3f);
+            Entity polishedSphere = CreateSphereEntity(*scene, "Polished Metal Sphere", { -4.0f, 1.0f, 1.5f }, Math::Vec3(1.0f), { 0.88f, 0.88f, 0.92f, 1.0f }, 0.12f, 1.0f);
+            AddRigidbody(polishedSphere, RigidbodyComponent::RigidbodyType::Dynamic);
+            auto& polishedSphereCollider = AddCollider(polishedSphere, ColliderComponent::ColliderShapeType::Sphere);
+            polishedSphereCollider.Friction = 0.1f;
+            polishedSphereCollider.Restitution = 0.1f;
+
+            Entity redSphere = CreateSphereEntity(*scene, "Matte Red Sphere", { -2.0f, 1.0f, 1.5f }, Math::Vec3(1.0f), { 0.80f, 0.20f, 0.16f, 1.0f }, 0.88f, 0.0f);
+            AddRigidbody(redSphere, RigidbodyComponent::RigidbodyType::Dynamic);
+            AddCollider(redSphere, ColliderComponent::ColliderShapeType::Sphere).Friction = 0.8f;
+
+            Entity blueCube = CreateCubeEntity(*scene, "Glossy Blue Cube", { 0.0f, 1.0f, 1.5f }, Math::Vec3(0.9f), { 0.15f, 0.45f, 0.95f, 1.0f }, 0.15f, 0.0f);
+            AddRigidbody(blueCube, RigidbodyComponent::RigidbodyType::Dynamic);
+            AddCollider(blueCube, ColliderComponent::ColliderShapeType::Box).Friction = 0.4f;
+
+            Entity brassCube = CreateCubeEntity(*scene, "Brass Cube", { 2.0f, 1.0f, 1.5f }, Math::Vec3(0.8f), { 1.0f, 0.72f, 0.25f, 1.0f }, 0.35f, 1.0f);
+            AddRigidbody(brassCube, RigidbodyComponent::RigidbodyType::Dynamic);
+            AddCollider(brassCube, ColliderComponent::ColliderShapeType::Box).Friction = 0.5f;
+
+            Entity purplePillar = CreateCubeEntity(*scene, "Purple Pillar", { 4.0f, 1.75f, 1.5f }, Math::Vec3(0.9f, 3.5f, 0.9f), { 0.55f, 0.15f, 0.75f, 1.0f }, 0.45f, 0.3f);
+            AddRigidbody(purplePillar, RigidbodyComponent::RigidbodyType::Dynamic);
+            AddCollider(purplePillar, ColliderComponent::ColliderShapeType::Box).Friction = 0.6f;
 
             // This raised platform receives shadows cast by the cluster meshes above it,
             // demonstrating object-to-object shadow projection.
-            CreateMeshEntity(
+            Entity shadowPlatform = CreateMeshEntity(
                 *scene,
                 "Shadow Platform",
                 MeshFactory::CreateCube(1.0f),
@@ -161,6 +196,8 @@ namespace HachimiEngine
                 { 0.72f, 0.72f, 0.76f, 1.0f },
                 0.9f,
                 0.0f);
+            AddRigidbody(shadowPlatform, RigidbodyComponent::RigidbodyType::Static);
+            AddCollider(shadowPlatform, ColliderComponent::ColliderShapeType::Box).Friction = 0.8f;
 
             // A parent entity with child meshes demonstrates hierarchy and local transforms.
             Entity cluster = scene->CreateEntity("Crystal Cluster");
@@ -170,14 +207,20 @@ namespace HachimiEngine
             Entity childA = CreateCubeEntity(*scene, "Cluster Cube A", { -1.2f, 0.0f, 0.0f }, Math::Vec3(0.7f), { 0.90f, 0.30f, 0.20f, 1.0f }, 0.3f, 0.6f);
             childA.GetComponent<RelationshipComponent>().Parent = cluster.GetUUID();
             clusterRelationship.Children.push_back(childA.GetUUID());
+            AddRigidbody(childA, RigidbodyComponent::RigidbodyType::Dynamic);
+            AddCollider(childA, ColliderComponent::ColliderShapeType::Box).Friction = 0.6f;
 
             Entity childB = CreateCubeEntity(*scene, "Cluster Cube B", { 1.2f, 0.0f, 0.0f }, Math::Vec3(0.7f), { 0.20f, 0.80f, 0.90f, 1.0f }, 0.2f, 1.0f);
             childB.GetComponent<RelationshipComponent>().Parent = cluster.GetUUID();
             clusterRelationship.Children.push_back(childB.GetUUID());
+            AddRigidbody(childB, RigidbodyComponent::RigidbodyType::Dynamic);
+            AddCollider(childB, ColliderComponent::ColliderShapeType::Box).Friction = 0.3f;
 
             Entity childC = CreateSphereEntity(*scene, "Cluster Sphere C", { 0.0f, 0.9f, 0.0f }, Math::Vec3(0.8f), { 0.30f, 0.90f, 0.35f, 1.0f }, 0.6f, 0.2f);
             childC.GetComponent<RelationshipComponent>().Parent = cluster.GetUUID();
             clusterRelationship.Children.push_back(childC.GetUUID());
+            AddRigidbody(childC, RigidbodyComponent::RigidbodyType::Dynamic);
+            AddCollider(childC, ColliderComponent::ColliderShapeType::Sphere).Friction = 0.6f;
         }
     }
 

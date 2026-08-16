@@ -16,6 +16,7 @@ Hachimi-Engine 是一个借鉴 Hazel 架构思路、使用 C++20 编写的 3D �
 - 程序化天空盒与基于环境贴图的 IBL（irradiance + prefiltered specular）
 - 编辑器相机：右键旋转、中键平移、滚轮缩放、WASD 移动
 - 基于 EnTT 的 Scene / ECS
+- Box3D 物理系统：Static / Kinematic / Dynamic 刚体、Box / Sphere / Capsule / Plane 碰撞体、固定步长模拟与 Play 模式 Transform 同步
 - yaml-cpp 场景（`.hscene`）与项目（`.hproj`）序列化
 - ImGui Docking 编辑器：Project Hub、Viewport、Scene Hierarchy、Inspector、Content Browser、Console
 - ImGuizmo 变换工具：Translate / Rotate / Scale
@@ -78,8 +79,9 @@ Bin/Release-windows-x86_64/Hachimi-Editor.exe
         └── Default.hscene
 ```
 
-默认 `Default.hscene` 是一个渲染特性展示场景：PBR 金属/粗糙材质球与立方体、地面、
+默认 `Default.hscene` 是一个渲染与物理特性展示场景：PBR 金属/粗糙材质球与立方体、地面、
 方向光阴影（含平台上的物体间投影）、两盏点光源、父级层级物体、天空盒与 IBL；
+进入 Play 模式后，场景中的球体、立方体与簇状子物体会在 Box3D 物理模拟中下落、碰撞并停稳。
 Game 面板使用主相机视角。
 
 ### 视口操作
@@ -118,6 +120,7 @@ TMP/                     # 第三方库下载暂存区（gitignore）
 - 除 OpenGL 4.6 Core 外的渲染后端
 - 外部 3D 模型导入（当前使用内置网格）
 - 日志文件输出（当前仅控制台）
+- 物理 Joints / Character Mover / Mesh / HeightField 碰撞体 / 物理 Debug Draw / Box3D 多线程（当前使用基础刚体与凸碰撞体）
 
 ## 开发规范
 

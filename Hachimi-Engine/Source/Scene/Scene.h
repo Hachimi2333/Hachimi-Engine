@@ -2,7 +2,9 @@
 
 #include "Core/Base.h"
 #include "Core/Memory.h"
+#include "Core/Timestep.h"
 #include "Core/UUID.h"
+#include "Physics/PhysicsWorld.h"
 #include "Renderer/EditorCamera.h"
 #include "Renderer/EnvironmentSettings.h"
 #include "Scene/Components.h"
@@ -39,6 +41,8 @@ namespace HachimiEngine
         Math::Mat4 GetWorldTransform(entt::entity entity) const;
 
         void SetViewportSize(uint32_t width, uint32_t height);
+        void OnRuntimeStart();
+        void OnRuntimeStop();
         void OnUpdate(Timestep timestep);
         void OnRender(const EditorCamera& camera);
         void OnRender(const Math::Mat4& view, const Math::Mat4& projection, const Math::Vec3& cameraPosition);
@@ -51,6 +55,10 @@ namespace HachimiEngine
 
         EnvironmentSettings& GetEnvironmentSettings() { return m_Environment; }
         const EnvironmentSettings& GetEnvironmentSettings() const { return m_Environment; }
+
+        PhysicsSettings& GetPhysicsSettings() { return m_PhysicsSettings; }
+        const PhysicsSettings& GetPhysicsSettings() const { return m_PhysicsSettings; }
+        bool IsPhysicsRunning() const { return m_PhysicsWorld != nullptr && m_PhysicsWorld->IsRunning(); }
 
         entt::registry& GetRegistry() { return m_Registry; }
         const std::unordered_map<UUID, entt::entity>& GetEntityMap() const { return m_EntityMap; }
@@ -68,6 +76,8 @@ namespace HachimiEngine
         uint32_t m_ViewportWidth = 1280;
         uint32_t m_ViewportHeight = 720;
         EnvironmentSettings m_Environment;
+        PhysicsSettings m_PhysicsSettings;
+        Scope<PhysicsWorld> m_PhysicsWorld;
 
         friend class Entity;
         friend class SceneSerializer;

@@ -7,6 +7,7 @@ project "Hachimi-Engine"
     includedirs
     {
         "%{prj.location}/Source",
+        "%{prj.location}/Vendor/Box3D/include",
         "%{prj.location}/Vendor/EnTT/src",
         "%{prj.location}/Vendor/EnTT/single_include",
         "%{prj.location}/Vendor/glm",
@@ -34,6 +35,7 @@ project "Hachimi-Engine"
 
     links
     {
+        "Box3D",
         "GLFW",
         "GLAD",
         "ImGui",

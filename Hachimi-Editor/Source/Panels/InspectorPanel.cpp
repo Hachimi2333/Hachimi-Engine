@@ -41,6 +41,38 @@ namespace HachimiEngine
 
             return open;
         }
+
+        // Creates sensible collider dimensions for the built-in mesh primitives.
+        void ConfigureColliderForPrimitive(ColliderComponent& collider, PrimitiveMeshType primitiveType)
+        {
+            switch (primitiveType)
+            {
+                case PrimitiveMeshType::Sphere:
+                    collider.ShapeType = ColliderComponent::ColliderShapeType::Sphere;
+                    collider.Radius = 0.5f;
+                    break;
+                case PrimitiveMeshType::Plane:
+                    collider.ShapeType = ColliderComponent::ColliderShapeType::Plane;
+                    collider.HalfExtents = { 5.0f, 0.05f, 5.0f };
+                    break;
+                case PrimitiveMeshType::Cube:
+                case PrimitiveMeshType::Grid:
+                case PrimitiveMeshType::None:
+                default:
+                    collider.ShapeType = ColliderComponent::ColliderShapeType::Box;
+                    collider.HalfExtents = { 0.5f, 0.5f, 0.5f };
+                    break;
+            }
+        }
+
+        void AddDefaultCollider(Entity entity)
+        {
+            auto& collider = entity.AddComponent<ColliderComponent>();
+            if (entity.HasComponent<MeshComponent>())
+            {
+                ConfigureColliderForPrimitive(collider, entity.GetComponent<MeshComponent>().PrimitiveType);
+            }
+        }
     }
 
     void InspectorPanel::Draw(EditorContext& context)
@@ -68,6 +100,14 @@ namespace HachimiEngine
 
         DrawTransform(entity);
 
+        if (entity.HasComponent<RigidbodyComponent>())
+        {
+            DrawRigidbody(entity);
+        }
+        if (entity.HasComponent<ColliderComponent>())
+        {
+            DrawCollider(entity);
+        }
         if (entity.HasComponent<MeshComponent>())
         {
             DrawMesh(entity);
@@ -112,6 +152,37 @@ namespace HachimiEngine
                 mesh.PrimitiveType = PrimitiveMeshType::Cube;
                 mesh.Mesh = MeshFactory::CreateCube();
             }
+            if (!entity.HasComponent<RigidbodyComponent>() && ImGui::MenuItem("Rigidbody Component"))
+            {
+                entity.AddComponent<RigidbodyComponent>();
+                if (!entity.HasComponent<ColliderComponent>())
+                {
+                    AddDefaultCollider(entity);
+                }
+            }
+            if (!entity.HasComponent<ColliderComponent>() && ImGui::MenuItem("Box Collider"))
+            {
+                auto& collider = entity.AddComponent<ColliderComponent>();
+                collider.ShapeType = ColliderComponent::ColliderShapeType::Box;
+            }
+            if (!entity.HasComponent<ColliderComponent>() && ImGui::MenuItem("Sphere Collider"))
+            {
+                auto& collider = entity.AddComponent<ColliderComponent>();
+                collider.ShapeType = ColliderComponent::ColliderShapeType::Sphere;
+            }
+            if (!entity.HasComponent<ColliderComponent>() && ImGui::MenuItem("Capsule Collider"))
+            {
+                auto& collider = entity.AddComponent<ColliderComponent>();
+                collider.ShapeType = ColliderComponent::ColliderShapeType::Capsule;
+                collider.Radius = 0.25f;
+                collider.Height = 1.0f;
+            }
+            if (!entity.HasComponent<ColliderComponent>() && ImGui::MenuItem("Plane Collider"))
+            {
+                auto& collider = entity.AddComponent<ColliderComponent>();
+                collider.ShapeType = ColliderComponent::ColliderShapeType::Plane;
+                collider.HalfExtents = { 5.0f, 0.05f, 5.0f };
+            }
             if (!entity.HasComponent<CameraComponent>() && ImGui::MenuItem("Camera Component"))
             {
                 entity.AddComponent<CameraComponent>();
@@ -142,6 +213,85 @@ namespace HachimiEngine
         ImGui::DragFloat3("Position", Math::ValuePtr(transform.Position), 0.05f);
         ImGui::DragFloat3("Rotation", Math::ValuePtr(transform.Rotation), 0.25f);
         ImGui::DragFloat3("Scale", Math::ValuePtr(transform.Scale), 0.05f, 0.01f, 100.0f);
+    }
+
+    void InspectorPanel::DrawRigidbody(Entity entity)
+    {
+        bool removed = false;
+        const bool open = DrawComponentHeader<RigidbodyComponent>(entity, "Rigidbody", true, removed);
+        if (removed || !open)
+        {
+            return;
+        }
+
+        auto& rigidbody = entity.GetComponent<RigidbodyComponent>();
+
+        const char* typeNames[] = { "Static", "Kinematic", "Dynamic" };
+        int type = static_cast<int>(rigidbody.Type);
+        if (ImGui::Combo("Type", &type, typeNames, IM_ARRAYSIZE(typeNames)))
+        {
+            rigidbody.Type = static_cast<RigidbodyComponent::RigidbodyType>(type);
+        }
+
+        if (rigidbody.Type != RigidbodyComponent::RigidbodyType::Static)
+        {
+            ImGui::DragFloat3("Linear Velocity", Math::ValuePtr(rigidbody.LinearVelocity), 0.05f);
+            ImGui::DragFloat3("Angular Velocity", Math::ValuePtr(rigidbody.AngularVelocity), 0.05f);
+        }
+
+        ImGui::DragFloat("Linear Damping", &rigidbody.LinearDamping, 0.01f, 0.0f, 10.0f);
+        ImGui::DragFloat("Angular Damping", &rigidbody.AngularDamping, 0.01f, 0.0f, 10.0f);
+        ImGui::DragFloat("Gravity Scale", &rigidbody.GravityScale, 0.05f, 0.0f, 10.0f);
+        ImGui::Checkbox("Enable Sleep", &rigidbody.EnableSleep);
+        ImGui::Checkbox("Initially Awake", &rigidbody.InitiallyAwake);
+        ImGui::Checkbox("Is Bullet", &rigidbody.IsBullet);
+        ImGui::Checkbox("Enabled", &rigidbody.IsEnabled);
+    }
+
+    void InspectorPanel::DrawCollider(Entity entity)
+    {
+        bool removed = false;
+        const bool open = DrawComponentHeader<ColliderComponent>(entity, "Collider", true, removed);
+        if (removed || !open)
+        {
+            return;
+        }
+
+        auto& collider = entity.GetComponent<ColliderComponent>();
+
+        const char* shapeNames[] = { "Box", "Sphere", "Capsule", "Plane" };
+        int shapeType = static_cast<int>(collider.ShapeType);
+        if (ImGui::Combo("Shape", &shapeType, shapeNames, IM_ARRAYSIZE(shapeNames)))
+        {
+            collider.ShapeType = static_cast<ColliderComponent::ColliderShapeType>(shapeType);
+        }
+
+        switch (collider.ShapeType)
+        {
+            case ColliderComponent::ColliderShapeType::Box:
+                ImGui::DragFloat3("Half Extents", Math::ValuePtr(collider.HalfExtents), 0.05f, 0.01f, 100.0f);
+                break;
+            case ColliderComponent::ColliderShapeType::Sphere:
+                ImGui::DragFloat("Radius", &collider.Radius, 0.05f, 0.01f, 100.0f);
+                break;
+            case ColliderComponent::ColliderShapeType::Capsule:
+                ImGui::DragFloat("Radius", &collider.Radius, 0.05f, 0.01f, 100.0f);
+                ImGui::DragFloat("Height", &collider.Height, 0.05f, 0.01f, 100.0f);
+                break;
+            case ColliderComponent::ColliderShapeType::Plane:
+                ImGui::DragFloat("Half Width", &collider.HalfExtents.x, 0.05f, 0.01f, 1000.0f);
+                ImGui::DragFloat("Half Depth", &collider.HalfExtents.z, 0.05f, 0.01f, 1000.0f);
+                break;
+        }
+
+        ImGui::DragFloat3("Offset", Math::ValuePtr(collider.Offset), 0.05f);
+        ImGui::DragFloat("Density", &collider.Density, 0.05f, 0.0f, 100000.0f);
+        ImGui::SliderFloat("Friction", &collider.Friction, 0.0f, 1.0f);
+        ImGui::SliderFloat("Restitution", &collider.Restitution, 0.0f, 1.0f);
+        ImGui::SliderFloat("Rolling Resistance", &collider.RollingResistance, 0.0f, 1.0f);
+        ImGui::Checkbox("Is Trigger", &collider.IsTrigger);
+        ImGui::InputScalar("Category Bits", ImGuiDataType_U64, &collider.CategoryBits, nullptr, nullptr, "%llX", ImGuiInputTextFlags_CharsHexadecimal);
+        ImGui::InputScalar("Mask Bits", ImGuiDataType_U64, &collider.MaskBits, nullptr, nullptr, "%llX", ImGuiInputTextFlags_CharsHexadecimal);
     }
 
     void InspectorPanel::DrawMesh(Entity entity)

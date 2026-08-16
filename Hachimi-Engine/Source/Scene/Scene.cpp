@@ -47,6 +47,11 @@ namespace HachimiEngine
 
         DestroyChildren(entity.GetHandle());
 
+        if (m_PhysicsWorld != nullptr)
+        {
+            m_PhysicsWorld->DestroyBody(static_cast<uint64_t>(entt::to_integral(entity.GetHandle())));
+        }
+
         m_EntityMap.erase(entity.GetUUID());
         m_Registry.destroy(entity.GetHandle());
     }
@@ -84,6 +89,14 @@ namespace HachimiEngine
         {
             duplicate.AddComponent<LightComponent>() = entity.GetComponent<LightComponent>();
         }
+        if (entity.HasComponent<RigidbodyComponent>())
+        {
+            duplicate.AddComponent<RigidbodyComponent>() = entity.GetComponent<RigidbodyComponent>();
+        }
+        if (entity.HasComponent<ColliderComponent>())
+        {
+            duplicate.AddComponent<ColliderComponent>() = entity.GetComponent<ColliderComponent>();
+        }
 
         return duplicate;
     }
@@ -100,6 +113,7 @@ namespace HachimiEngine
         clone->m_ViewportWidth = m_ViewportWidth;
         clone->m_ViewportHeight = m_ViewportHeight;
         clone->m_Environment = m_Environment;
+        clone->m_PhysicsSettings = m_PhysicsSettings;
 
         const auto entities = m_Registry.view<IDComponent>();
         for (const entt::entity sourceHandle : entities)
@@ -145,6 +159,16 @@ namespace HachimiEngine
             if (const auto* sourceLight = m_Registry.try_get<LightComponent>(sourceHandle))
             {
                 targetEntity.AddComponent<LightComponent>() = *sourceLight;
+            }
+
+            if (const auto* sourceRigidbody = m_Registry.try_get<RigidbodyComponent>(sourceHandle))
+            {
+                targetEntity.AddComponent<RigidbodyComponent>() = *sourceRigidbody;
+            }
+
+            if (const auto* sourceCollider = m_Registry.try_get<ColliderComponent>(sourceHandle))
+            {
+                targetEntity.AddComponent<ColliderComponent>() = *sourceCollider;
             }
 
             clone->m_EntityMap[targetEntity.GetUUID()] = targetEntity.GetHandle();
@@ -212,9 +236,37 @@ namespace HachimiEngine
         m_ViewportHeight = height;
     }
 
+    void Scene::OnRuntimeStart()
+    {
+        if (m_PhysicsWorld != nullptr)
+        {
+            HE_CORE_WARN("Scene runtime physics is already running");
+            return;
+        }
+
+        m_PhysicsWorld = CreateScope<PhysicsWorld>(m_PhysicsSettings);
+        if (!m_PhysicsWorld->IsRunning())
+        {
+            m_PhysicsWorld = nullptr;
+            return;
+        }
+
+        m_PhysicsWorld->CreateBodies(*this);
+    }
+
+    void Scene::OnRuntimeStop()
+    {
+        m_PhysicsWorld = nullptr;
+    }
+
     void Scene::OnUpdate(Timestep timestep)
     {
-        // Scene-level update hook; entity behavior can be added here later.
+        if (m_PhysicsWorld == nullptr)
+        {
+            return;
+        }
+
+        m_PhysicsWorld->Update(*this, timestep);
     }
 
     void Scene::OnRender(const EditorCamera& camera)

@@ -61,6 +61,16 @@ namespace HachimiEngine
         out << YAML::Key << "EnvironmentIntensity" << YAML::Value << environment.EnvironmentIntensity;
         out << YAML::EndMap;
 
+        const PhysicsSettings& physics = m_Scene->GetPhysicsSettings();
+        out << YAML::Key << "Physics" << YAML::Value << YAML::BeginMap;
+        out << YAML::Key << "Gravity" << YAML::Value;
+        EmitVec3(out, physics.Gravity);
+        out << YAML::Key << "FixedTimeStep" << YAML::Value << physics.FixedTimeStep;
+        out << YAML::Key << "SubStepCount" << YAML::Value << physics.SubStepCount;
+        out << YAML::Key << "EnableSleep" << YAML::Value << physics.EnableSleep;
+        out << YAML::Key << "EnableContinuous" << YAML::Value << physics.EnableContinuous;
+        out << YAML::EndMap;
+
         out << YAML::Key << "Entities" << YAML::Value << YAML::BeginSeq;
 
         for (const Entity entity : m_Scene->GetAllEntities())
@@ -84,6 +94,7 @@ namespace HachimiEngine
             return false;
         }
 
+        m_Scene->OnRuntimeStop();
         m_Scene->m_EntityMap.clear();
         m_Scene->m_Registry.clear();
         m_Scene->SetName(data["Scene"].as<std::string>());
@@ -94,6 +105,16 @@ namespace HachimiEngine
             environment.ShowSkybox = environmentNode["ShowSkybox"].as<bool>(true);
             environment.Exposure = environmentNode["Exposure"].as<float>(1.0f);
             environment.EnvironmentIntensity = environmentNode["EnvironmentIntensity"].as<float>(1.0f);
+        }
+
+        if (const YAML::Node physicsNode = data["Physics"])
+        {
+            PhysicsSettings& physics = m_Scene->GetPhysicsSettings();
+            physics.Gravity = ReadVec3(physicsNode["Gravity"], physics.Gravity);
+            physics.FixedTimeStep = physicsNode["FixedTimeStep"].as<float>(physics.FixedTimeStep);
+            physics.SubStepCount = physicsNode["SubStepCount"].as<int>(physics.SubStepCount);
+            physics.EnableSleep = physicsNode["EnableSleep"].as<bool>(physics.EnableSleep);
+            physics.EnableContinuous = physicsNode["EnableContinuous"].as<bool>(physics.EnableContinuous);
         }
 
         const YAML::Node entities = data["Entities"];
@@ -145,6 +166,46 @@ namespace HachimiEngine
                 out << child.ToString();
             }
             out << YAML::EndSeq;
+            out << YAML::EndMap;
+        }
+
+        if (entity.HasComponent<RigidbodyComponent>())
+        {
+            const auto& rigidbody = entity.GetComponent<RigidbodyComponent>();
+            out << YAML::Key << "RigidbodyComponent" << YAML::Value << YAML::BeginMap;
+            out << YAML::Key << "Type" << YAML::Value << static_cast<int>(rigidbody.Type);
+            out << YAML::Key << "LinearVelocity" << YAML::Value;
+            EmitVec3(out, rigidbody.LinearVelocity);
+            out << YAML::Key << "AngularVelocity" << YAML::Value;
+            EmitVec3(out, rigidbody.AngularVelocity);
+            out << YAML::Key << "LinearDamping" << YAML::Value << rigidbody.LinearDamping;
+            out << YAML::Key << "AngularDamping" << YAML::Value << rigidbody.AngularDamping;
+            out << YAML::Key << "GravityScale" << YAML::Value << rigidbody.GravityScale;
+            out << YAML::Key << "EnableSleep" << YAML::Value << rigidbody.EnableSleep;
+            out << YAML::Key << "InitiallyAwake" << YAML::Value << rigidbody.InitiallyAwake;
+            out << YAML::Key << "IsBullet" << YAML::Value << rigidbody.IsBullet;
+            out << YAML::Key << "IsEnabled" << YAML::Value << rigidbody.IsEnabled;
+            out << YAML::EndMap;
+        }
+
+        if (entity.HasComponent<ColliderComponent>())
+        {
+            const auto& collider = entity.GetComponent<ColliderComponent>();
+            out << YAML::Key << "ColliderComponent" << YAML::Value << YAML::BeginMap;
+            out << YAML::Key << "ShapeType" << YAML::Value << static_cast<int>(collider.ShapeType);
+            out << YAML::Key << "HalfExtents" << YAML::Value;
+            EmitVec3(out, collider.HalfExtents);
+            out << YAML::Key << "Radius" << YAML::Value << collider.Radius;
+            out << YAML::Key << "Height" << YAML::Value << collider.Height;
+            out << YAML::Key << "Offset" << YAML::Value;
+            EmitVec3(out, collider.Offset);
+            out << YAML::Key << "Density" << YAML::Value << collider.Density;
+            out << YAML::Key << "Friction" << YAML::Value << collider.Friction;
+            out << YAML::Key << "Restitution" << YAML::Value << collider.Restitution;
+            out << YAML::Key << "RollingResistance" << YAML::Value << collider.RollingResistance;
+            out << YAML::Key << "IsTrigger" << YAML::Value << collider.IsTrigger;
+            out << YAML::Key << "CategoryBits" << YAML::Value << collider.CategoryBits;
+            out << YAML::Key << "MaskBits" << YAML::Value << collider.MaskBits;
             out << YAML::EndMap;
         }
 
@@ -224,6 +285,38 @@ namespace HachimiEngine
                     relationship.Children.push_back(UUID(childUUID));
                 }
             }
+        }
+
+        if (const YAML::Node rigidbodyNode = entityNode["RigidbodyComponent"])
+        {
+            auto& rigidbody = entity.AddComponent<RigidbodyComponent>();
+            rigidbody.Type = static_cast<RigidbodyComponent::RigidbodyType>(rigidbodyNode["Type"].as<int>(static_cast<int>(rigidbody.Type)));
+            rigidbody.LinearVelocity = ReadVec3(rigidbodyNode["LinearVelocity"]);
+            rigidbody.AngularVelocity = ReadVec3(rigidbodyNode["AngularVelocity"]);
+            rigidbody.LinearDamping = rigidbodyNode["LinearDamping"].as<float>(0.0f);
+            rigidbody.AngularDamping = rigidbodyNode["AngularDamping"].as<float>(0.0f);
+            rigidbody.GravityScale = rigidbodyNode["GravityScale"].as<float>(1.0f);
+            rigidbody.EnableSleep = rigidbodyNode["EnableSleep"].as<bool>(true);
+            rigidbody.InitiallyAwake = rigidbodyNode["InitiallyAwake"].as<bool>(true);
+            rigidbody.IsBullet = rigidbodyNode["IsBullet"].as<bool>(false);
+            rigidbody.IsEnabled = rigidbodyNode["IsEnabled"].as<bool>(true);
+        }
+
+        if (const YAML::Node colliderNode = entityNode["ColliderComponent"])
+        {
+            auto& collider = entity.AddComponent<ColliderComponent>();
+            collider.ShapeType = static_cast<ColliderComponent::ColliderShapeType>(colliderNode["ShapeType"].as<int>(static_cast<int>(collider.ShapeType)));
+            collider.HalfExtents = ReadVec3(colliderNode["HalfExtents"], collider.HalfExtents);
+            collider.Radius = colliderNode["Radius"].as<float>(0.5f);
+            collider.Height = colliderNode["Height"].as<float>(1.0f);
+            collider.Offset = ReadVec3(colliderNode["Offset"]);
+            collider.Density = colliderNode["Density"].as<float>(1.0f);
+            collider.Friction = colliderNode["Friction"].as<float>(0.6f);
+            collider.Restitution = colliderNode["Restitution"].as<float>(0.0f);
+            collider.RollingResistance = colliderNode["RollingResistance"].as<float>(0.0f);
+            collider.IsTrigger = colliderNode["IsTrigger"].as<bool>(false);
+            collider.CategoryBits = colliderNode["CategoryBits"].as<uint64_t>(~0ull);
+            collider.MaskBits = colliderNode["MaskBits"].as<uint64_t>(~0ull);
         }
 
         if (const YAML::Node meshNode = entityNode["MeshComponent"])

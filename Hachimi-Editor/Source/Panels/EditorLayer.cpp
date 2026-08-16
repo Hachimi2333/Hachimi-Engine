@@ -74,6 +74,11 @@ namespace HachimiEngine
 
     void EditorLayer::OnDetach()
     {
+        if (m_Context.ActiveScene != nullptr && m_Context.PlayState != EditorPlayState::Stopped)
+        {
+            m_Context.ActiveScene->OnRuntimeStop();
+        }
+
         m_ConsolePanel.UnregisterCallbacks();
         AssetManager::Shutdown();
     }
@@ -115,6 +120,7 @@ namespace HachimiEngine
         // Clone the editor scene so Play mode edits are discarded when stopping.
         m_Context.EditorScene = m_Context.ActiveScene;
         m_Context.ActiveScene = m_Context.EditorScene->Clone();
+        m_Context.ActiveScene->OnRuntimeStart();
 
         if (m_Context.SelectedEntity)
         {
@@ -148,6 +154,11 @@ namespace HachimiEngine
         }
 
         m_Context.PlayState = EditorPlayState::Stopped;
+
+        if (m_Context.ActiveScene != nullptr)
+        {
+            m_Context.ActiveScene->OnRuntimeStop();
+        }
 
         if (m_Context.EditorScene != nullptr)
         {

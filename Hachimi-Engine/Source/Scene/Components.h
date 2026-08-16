@@ -6,6 +6,8 @@
 #include "Renderer/MeshFactory.h"
 #include "Math/Math.h"
 
+#include <cstdint>
+#include <string>
 #include <vector>
 
 namespace HachimiEngine
@@ -39,6 +41,51 @@ namespace HachimiEngine
     {
         UUID Parent = UUID::Invalid();
         std::vector<UUID> Children;
+    };
+
+    struct RigidbodyComponent
+    {
+        enum class RigidbodyType
+        {
+            Static = 0,
+            Kinematic = 1,
+            Dynamic = 2
+        };
+
+        RigidbodyType Type = RigidbodyType::Dynamic;
+        Math::Vec3 LinearVelocity { 0.0f };
+        Math::Vec3 AngularVelocity { 0.0f };
+        float LinearDamping = 0.0f;
+        float AngularDamping = 0.0f;
+        float GravityScale = 1.0f;
+        bool EnableSleep = true;
+        bool InitiallyAwake = true;
+        bool IsBullet = false;
+        bool IsEnabled = true;
+    };
+
+    struct ColliderComponent
+    {
+        enum class ColliderShapeType
+        {
+            Box = 0,
+            Sphere = 1,
+            Capsule = 2,
+            Plane = 3
+        };
+
+        ColliderShapeType ShapeType = ColliderShapeType::Box;
+        Math::Vec3 HalfExtents { 0.5f, 0.5f, 0.5f }; // Box half sizes; Plane half width/depth.
+        float Radius = 0.5f;                          // Sphere radius; Capsule radius.
+        float Height = 1.0f;                          // Capsule total height, including both caps.
+        Math::Vec3 Offset { 0.0f };
+        float Density = 1.0f;
+        float Friction = 0.6f;
+        float Restitution = 0.0f;
+        float RollingResistance = 0.0f;
+        bool IsTrigger = false;
+        uint64_t CategoryBits = ~0ull;
+        uint64_t MaskBits = ~0ull;
     };
 
     struct MeshComponent
