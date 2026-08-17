@@ -12,10 +12,15 @@ namespace HachimiEngine
 {
     namespace
     {
-        constexpr uint32_t IrradianceResolution = 16;
-        constexpr uint32_t IrradianceSampleCount = 128;
+        constexpr uint32_t IrradianceResolution = 32;
+        constexpr uint32_t IrradianceSampleCount = 512;
         constexpr uint32_t PrefilteredMipLevelCount = 4;
-        constexpr uint32_t PrefilteredSampleCount = 64;
+        constexpr uint32_t PrefilteredSampleCount = 128;
+
+        constexpr float SunDiscExponent = 800.0f;
+        const Math::Vec3 SunDirection = Math::Normalize(Math::Vec3(-0.55f, 0.42f, -0.72f));
+        const Math::Vec3 SunDiscColor(60.0f, 48.0f, 34.0f);
+        const Math::Vec3 SunGlowColor(1.2f, 0.9f, 0.6f);
 
         float RadicalInverseVdC(uint32_t bits)
         {
@@ -50,6 +55,35 @@ namespace HachimiEngine
                 + normal * cosTheta;
             return Math::Normalize(sampleDirection);
         }
+
+        float DistributionGGX(float normalDotHalf, float roughness)
+        {
+            const float roughness2 = roughness * roughness;
+            const float roughness4 = roughness2 * roughness2;
+            const float denominator = normalDotHalf * normalDotHalf * (roughness4 - 1.0f) + 1.0f;
+            return roughness4 / (Math::Pi<float>() * denominator * denominator);
+        }
+
+        // Sky gradient plus the broad sun glow. The narrow sun disc is handled
+        // separately by the integrators below because finite-sample convolution
+        // cannot resolve such a small lobe without producing bright speckles.
+        Math::Vec3 EvaluateSkyBase(Math::Vec3 direction)
+        {
+            const float height = Math::Clamp(direction.y * 0.5f + 0.5f, 0.0f, 1.0f);
+
+            const Math::Vec3 horizonColor(1.0f, 0.72f, 0.48f);
+            const Math::Vec3 zenithColor(0.06f, 0.16f, 0.42f);
+            const Math::Vec3 groundColor(0.025f, 0.025f, 0.035f);
+
+            Math::Vec3 color = Math::Mix(horizonColor, zenithColor, std::pow(height, 0.65f));
+            if (direction.y < 0.0f)
+            {
+                color = Math::Mix(groundColor, horizonColor, 1.0f + direction.y);
+            }
+
+            const float sunGlow = std::pow(std::max(Math::Dot(direction, SunDirection), 0.0f), 16.0f);
+            return color + SunGlowColor * sunGlow;
+        }
     }
 
     EnvironmentMap::EnvironmentMap(uint32_t resolution)
@@ -57,7 +91,7 @@ namespace HachimiEngine
     {
         m_Skybox = TextureCube::Create(m_Resolution, 1);
         m_Irradiance = TextureCube::Create(IrradianceResolution, 1);
-        m_Prefiltered = TextureCube::Create(IrradianceResolution, PrefilteredMipLevelCount);
+        m_Prefiltered = TextureCube::Create(m_Resolution, PrefilteredMipLevelCount);
 
         GenerateSkybox();
         GenerateIrradianceMap();
@@ -101,25 +135,10 @@ namespace HachimiEngine
 
     Math::Vec3 EnvironmentMap::EvaluateSky(Math::Vec3 direction)
     {
-        const float height = Math::Clamp(direction.y * 0.5f + 0.5f, 0.0f, 1.0f);
+        Math::Vec3 color = EvaluateSkyBase(direction);
 
-        const Math::Vec3 horizonColor(1.0f, 0.72f, 0.48f);
-        const Math::Vec3 zenithColor(0.06f, 0.16f, 0.42f);
-        const Math::Vec3 groundColor(0.025f, 0.025f, 0.035f);
-
-        Math::Vec3 color = Math::Mix(horizonColor, zenithColor, std::pow(height, 0.65f));
-        if (direction.y < 0.0f)
-        {
-            color = Math::Mix(groundColor, horizonColor, 1.0f + direction.y);
-        }
-
-        const Math::Vec3 sunDirection = Math::Normalize(Math::Vec3(-0.55f, 0.42f, -0.72f));
-        const float sunDisc = std::pow(std::max(Math::Dot(direction, sunDirection), 0.0f), 800.0f);
-        const float sunGlow = std::pow(std::max(Math::Dot(direction, sunDirection), 0.0f), 16.0f);
-        color += Math::Vec3(60.0f, 48.0f, 34.0f) * sunDisc;
-        color += Math::Vec3(1.2f, 0.9f, 0.6f) * sunGlow;
-
-        return color;
+        const float sunDisc = std::pow(std::max(Math::Dot(direction, SunDirection), 0.0f), SunDiscExponent);
+        return color + SunDiscColor * sunDisc;
     }
 
     Math::Vec3 EnvironmentMap::CubeMapFaceDirection(uint32_t faceIndex, float u, float v)
@@ -188,7 +207,7 @@ namespace HachimiEngine
                     {
                         const Math::Vec2 xi = Hammersley(sampleIndex, IrradianceSampleCount);
                         const float phi = Math::TwoPi<float>() * xi.x;
-                        const float cosTheta = xi.y;
+                        const float cosTheta = std::sqrt(xi.y);
                         const float sinTheta = std::sqrt(std::max(1.0f - cosTheta * cosTheta, 0.0f));
 
                         Math::Vec3 sampleDirection = tangent * (sinTheta * std::cos(phi))
@@ -196,10 +215,18 @@ namespace HachimiEngine
                             + normal * cosTheta;
                         sampleDirection = Math::Normalize(sampleDirection);
 
-                        irradiance += EvaluateSky(sampleDirection) * cosTheta * sinTheta;
+                        irradiance += EvaluateSkyBase(sampleDirection);
                     }
 
-                    irradiance *= Math::Pi<float>() / static_cast<float>(IrradianceSampleCount);
+                    irradiance /= static_cast<float>(IrradianceSampleCount);
+
+                    // The sun disc is a narrow, high-energy lobe. Monte Carlo
+                    // sampling misses it on some texels and produces the bright
+                    // speckles on diffuse materials, so add its cosine-weighted
+                    // irradiance contribution analytically instead.
+                    const float sunMass = Math::TwoPi<float>() / (SunDiscExponent + 1.0f);
+                    const float normalDotSun = std::max(Math::Dot(normal, SunDirection), 0.0f);
+                    irradiance += SunDiscColor * (sunMass / Math::Pi<float>()) * normalDotSun;
 
                     float* texel = &faceData[(static_cast<size_t>(y) * IrradianceResolution + x) * 4];
                     texel[0] = irradiance.r;
@@ -218,38 +245,73 @@ namespace HachimiEngine
         for (uint32_t mipLevel = 0; mipLevel < PrefilteredMipLevelCount; ++mipLevel)
         {
             const float roughness = static_cast<float>(mipLevel) / static_cast<float>(PrefilteredMipLevelCount - 1);
+            const uint32_t mipResolution = std::max(m_Resolution >> mipLevel, 1u);
 
             for (uint32_t faceIndex = 0; faceIndex < 6; ++faceIndex)
             {
-                std::vector<float> faceData(static_cast<size_t>(IrradianceResolution) * IrradianceResolution * 4);
-                for (uint32_t y = 0; y < IrradianceResolution; ++y)
+                std::vector<float> faceData(static_cast<size_t>(mipResolution) * mipResolution * 4);
+                for (uint32_t y = 0; y < mipResolution; ++y)
                 {
-                    for (uint32_t x = 0; x < IrradianceResolution; ++x)
+                    for (uint32_t x = 0; x < mipResolution; ++x)
                     {
-                        const float u = (static_cast<float>(x) + 0.5f) / IrradianceResolution * 2.0f - 1.0f;
-                        const float v = (static_cast<float>(y) + 0.5f) / IrradianceResolution * 2.0f - 1.0f;
+                        const float u = (static_cast<float>(x) + 0.5f) / mipResolution * 2.0f - 1.0f;
+                        const float v = (static_cast<float>(y) + 0.5f) / mipResolution * 2.0f - 1.0f;
                         const Math::Vec3 normal = CubeMapFaceDirection(faceIndex, u, v);
                         const Math::Vec3 viewDirection = normal;
 
                         Math::Vec3 prefilteredColor(0.0f);
-                        float totalWeight = 0.0f;
-                        for (uint32_t sampleIndex = 0; sampleIndex < PrefilteredSampleCount; ++sampleIndex)
+                        if (mipLevel == 0)
                         {
-                            const Math::Vec2 xi = Hammersley(sampleIndex, PrefilteredSampleCount);
-                            const Math::Vec3 halfVector = ImportanceSampleGGX(xi, roughness, normal);
-                            const Math::Vec3 lightDirection = Math::Normalize(2.0f * Math::Dot(viewDirection, halfVector) * halfVector - viewDirection);
-
-                            const float normalDotLight = Math::Dot(normal, lightDirection);
-                            if (normalDotLight > 0.0f)
+                            // With zero roughness every GGX sample collapses to the
+                            // same direction, so evaluate the mirror image directly.
+                            prefilteredColor = EvaluateSky(normal);
+                        }
+                        else
+                        {
+                            float totalWeight = 0.0f;
+                            for (uint32_t sampleIndex = 0; sampleIndex < PrefilteredSampleCount; ++sampleIndex)
                             {
-                                prefilteredColor += EvaluateSky(lightDirection) * normalDotLight;
-                                totalWeight += normalDotLight;
+                                const Math::Vec2 xi = Hammersley(sampleIndex, PrefilteredSampleCount);
+                                const Math::Vec3 halfVector = ImportanceSampleGGX(xi, roughness, normal);
+                                const Math::Vec3 lightDirection = Math::Normalize(2.0f * Math::Dot(viewDirection, halfVector) * halfVector - viewDirection);
+
+                                const float normalDotLight = Math::Dot(normal, lightDirection);
+                                if (normalDotLight > 0.0f)
+                                {
+                                    prefilteredColor += EvaluateSkyBase(lightDirection) * normalDotLight;
+                                    totalWeight += normalDotLight;
+                                }
+                            }
+
+                            if (totalWeight > 0.0f)
+                            {
+                                prefilteredColor /= totalWeight;
+
+                                // Add the narrow sun disc analytically. The GGX
+                                // samples cover the broad sky and glow; finite
+                                // sampling of the sun lobe itself leaves bright
+                                // speckles in the rough reflection.
+                                const float normalDotSun = std::max(Math::Dot(normal, SunDirection), 0.0f);
+                                if (normalDotSun > 0.0f)
+                                {
+                                    const Math::Vec3 sunHalfVector = Math::Normalize(normal + SunDirection);
+                                    const float normalDotHalf = std::max(Math::Dot(normal, sunHalfVector), 0.0f);
+                                    if (normalDotHalf > 0.0f)
+                                    {
+                                        const float distribution = DistributionGGX(normalDotHalf, roughness);
+                                        const float sunMass = Math::TwoPi<float>() / (SunDiscExponent + 1.0f);
+                                        const Math::Vec3 sunContribution = SunDiscColor * (normalDotSun * distribution * sunMass / 4.0f);
+
+                                        // totalWeight is the sum over N samples;
+                                        // rescale the continuous sun integral to
+                                        // the same estimator normalization.
+                                        prefilteredColor += sunContribution * static_cast<float>(PrefilteredSampleCount) / totalWeight;
+                                    }
+                                }
                             }
                         }
 
-                        prefilteredColor = totalWeight > 0.0f ? prefilteredColor / totalWeight : Math::Vec3(0.0f);
-
-                        float* texel = &faceData[(static_cast<size_t>(y) * IrradianceResolution + x) * 4];
+                        float* texel = &faceData[(static_cast<size_t>(y) * mipResolution + x) * 4];
                         texel[0] = prefilteredColor.r;
                         texel[1] = prefilteredColor.g;
                         texel[2] = prefilteredColor.b;

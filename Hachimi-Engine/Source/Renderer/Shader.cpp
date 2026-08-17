@@ -2,6 +2,9 @@
 
 #include "Core/Assert.h"
 #include "Platform/OpenGL/OpenGLShader.h"
+#include "Utils/PlatformUtils.h"
+
+#include <filesystem>
 
 namespace HachimiEngine
 {
@@ -13,6 +16,12 @@ namespace HachimiEngine
     Ref<Shader> Shader::Create(const std::string& filepath)
     {
         return CreateRef<OpenGLShader>(filepath);
+    }
+
+    Ref<Shader> Shader::CreateEngineShader(const std::string& fileName)
+    {
+        const std::filesystem::path shaderPath = PlatformUtils::GetExecutableDirectory() / "Shaders" / fileName;
+        return Create(shaderPath.string());
     }
 
     void ShaderLibrary::Add(const Ref<Shader>& shader)

@@ -13,36 +13,6 @@ namespace HachimiEngine
 {
     namespace
     {
-        constexpr const char* VertexShader = R"(
-#version 460 core
-
-layout(location = 0) in vec3 a_Position;
-layout(location = 1) in vec4 a_Color;
-
-uniform mat4 u_ViewProjection;
-
-out vec4 v_Color;
-
-void main()
-{
-    v_Color = a_Color;
-    gl_Position = u_ViewProjection * vec4(a_Position, 1.0);
-}
-)";
-
-        constexpr const char* FragmentShader = R"(
-#version 460 core
-
-layout(location = 0) out vec4 o_Color;
-
-in vec4 v_Color;
-
-void main()
-{
-    o_Color = v_Color;
-}
-)";
-
         // 4096 lines (8192 vertices) is far more than the editor gizmos submit.
         constexpr uint32_t MaxVertexCount = 8192;
 
@@ -77,7 +47,7 @@ void main()
 
     void DebugDraw::Init()
     {
-        s_Shader = Shader::Create("DebugDraw", VertexShader, FragmentShader);
+        s_Shader = Shader::CreateEngineShader("DebugDraw.glsl");
 
         s_VertexBuffer = VertexBuffer::Create(MaxVertexCount * static_cast<uint32_t>(sizeof(Vertex)));
         s_VertexBuffer->SetLayout({

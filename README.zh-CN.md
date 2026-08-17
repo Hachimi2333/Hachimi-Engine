@@ -115,6 +115,7 @@ Game 面板使用主相机视角。
 
 ```text
 Hachimi-Engine/          # 引擎核心（静态库）
+  Resources/Shaders/     # 引擎内置 GLSL 着色器
   Source/                # 引擎源码
   Vendor/                # 引擎使用的第三方库
 Hachimi-Editor/          # 编辑器客户端（可执行文件）

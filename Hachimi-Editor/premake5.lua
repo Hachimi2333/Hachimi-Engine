@@ -55,5 +55,7 @@ project "Hachimi-Editor"
     {
         "{MKDIR} \"%{cfg.targetdir}/Assets/Fonts\"",
         "copy /Y \"%{prj.location}Assets\\Fonts\\Inter-Regular.ttf\" \"%{cfg.targetdir}/Assets/Fonts/Inter-Regular.ttf\"",
-        "copy /Y \"%{prj.location}Assets\\Fonts\\OFL.txt\" \"%{cfg.targetdir}/Assets/Fonts/OFL.txt\""
+        "copy /Y \"%{prj.location}Assets\\Fonts\\OFL.txt\" \"%{cfg.targetdir}/Assets/Fonts/OFL.txt\"",
+        "{MKDIR} \"%{cfg.targetdir}/Shaders\"",
+        "copy /Y \"%{wks.location}Hachimi-Engine\\Resources\\Shaders\\*.glsl\" \"%{cfg.targetdir}/Shaders/\""
     }

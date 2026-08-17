@@ -19,6 +19,7 @@
 *.natvis text eol=lf
 *.vert text eol=lf
 *.frag text eol=lf
+*.glsl text eol=lf
 *.json text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf

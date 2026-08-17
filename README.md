@@ -112,6 +112,7 @@ The default `Default.hscene` showcases rendering and physics features: PBR metal
 
 ```text
 Hachimi-Engine/          # Engine core (static library)
+  Resources/Shaders/     # Engine-owned GLSL shaders
   Source/                # Engine source
   Vendor/                # Third-party libraries used by the engine
 Hachimi-Editor/          # Editor client (executable)

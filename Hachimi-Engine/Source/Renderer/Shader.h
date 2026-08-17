@@ -29,6 +29,7 @@ namespace HachimiEngine
 
         static Ref<Shader> Create(const std::string& name, const std::string& vertexSource, const std::string& fragmentSource);
         static Ref<Shader> Create(const std::string& filepath);
+        static Ref<Shader> CreateEngineShader(const std::string& fileName);
     };
 
     class ShaderLibrary

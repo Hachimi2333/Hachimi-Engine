@@ -110,7 +110,12 @@ namespace HachimiEngine
     std::string OpenGLShader::ReadFile(const std::string& filepath)
     {
         std::ifstream file(filepath, std::ios::in | std::ios::binary);
-        HE_CORE_ASSERT(file.is_open());
+        if (!file.is_open())
+        {
+            HE_CORE_CRITICAL("Failed to open shader file: {}", filepath);
+            HE_CORE_ASSERT(false);
+            return {};
+        }
 
         std::stringstream buffer;
         buffer << file.rdbuf();
@@ -156,6 +161,12 @@ namespace HachimiEngine
 
             shaderSources[stage] = source.substr(sourceBegin, sourceEnd - sourceBegin);
             tokenPosition = nextTokenPosition;
+        }
+
+        if (!shaderSources.contains(GL_VERTEX_SHADER) || !shaderSources.contains(GL_FRAGMENT_SHADER))
+        {
+            HE_CORE_ERROR("Shader file must contain both #type vertex and #type fragment sections");
+            HE_CORE_ASSERT(false);
         }
 
         return shaderSources;
