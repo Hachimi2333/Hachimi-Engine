@@ -21,5 +21,9 @@ namespace HachimiEngine
         void DrawMesh(Entity entity);
         void DrawCamera(Entity entity);
         void DrawLight(Entity entity);
+        void DrawScript(Entity entity);
+
+    private:
+        int m_PendingScriptFileDialogSlot = -1;
     };
 }

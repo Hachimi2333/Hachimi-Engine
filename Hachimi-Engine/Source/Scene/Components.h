@@ -122,4 +122,18 @@ namespace HachimiEngine
         bool CastsShadows = true;
         float ShadowBias = 0.0005f;
     };
+
+    struct ScriptComponent
+    {
+        struct ScriptReference
+        {
+            // Path relative to the project Assets/Scripts directory, for example
+            // "Rotator.lua" or "Player/Controller.lua". The backend language is
+            // resolved from the file extension by ScriptManager.
+            std::string Path;
+            bool Enabled = true;
+        };
+
+        std::vector<ScriptReference> Scripts;
+    };
 }

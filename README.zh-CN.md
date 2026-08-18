@@ -15,6 +15,7 @@
 - 基于 EnTT 的 Scene / ECS
 - yaml-cpp 场景（`.hscene`）与项目（`.hproj`）序列化
 - 控制台日志（引擎与客户端双 logger，暂不输出日志文件）
+- Lua 5.4 脚本系统，底层采用语言无关的后端抽象，为后续支持更多脚本语言预留
 
 ### 渲染
 
@@ -37,6 +38,34 @@
 - ImGuizmo 变换工具：Translate / Rotate / Scale
 - ImGuiFileDialog 文件对话框
 - 编辑器相机：右键旋转、中键平移、滚轮缩放、WASD 移动
+
+## 脚本系统
+
+脚本为 `Assets/Scripts` 下的 Lua 5.4 源文件，通过 Inspector 的 `Script` 组件挂到实体上。路径相对 `Assets/Scripts` 存储，因此也支持 `Player/Controller.lua` 这样的子目录路径。
+
+脚本文件返回一个模块表，并提供可选的生命周期回调：
+
+```lua
+local MyScript = {}
+
+function MyScript:OnCreate() end
+function MyScript:OnUpdate(deltaTime) end
+function MyScript:OnDestroy() end
+
+return MyScript
+```
+
+回调中 `self.entity` 为挂载该脚本的实体，全局 `HE` 表提供沙箱化引擎 API：
+
+- `HE.Log.Info / Warn / Error`
+- `HE.Time.DeltaTime / ElapsedTime`
+- `HE.Input.IsKeyDown / IsMouseButtonDown / GetMousePosition`
+- `HE.Key.*`、`HE.Mouse.*`
+- `HE.Math.Vec3`，以及 `Length / Normalize / Dot / Cross / Clamp / Lerp / Radians / Degrees`
+- `HE.Scene.FindEntityByName`
+- 实体方法：`GetName / SetName / GetPosition / SetPosition / GetRotation / SetRotation / GetScale / SetScale / Translate / Rotate / GetWorldPosition`
+
+脚本只在 Play 模式运行。每次 Play 会话使用独立 Lua VM，脚本报错只会输出到 Console，不会导致编辑器崩溃。
 
 ## 环境要求
 
@@ -89,13 +118,16 @@ Bin/Release-windows-x86_64/Hachimi-Editor.exe
     ├── Meshes/
     ├── Textures/
     ├── Materials/
+    ├── Scripts/
+    │   └── Rotator.lua
     └── Scenes/
         └── Default.hscene
 ```
 
 默认 `Default.hscene` 是一个渲染与物理特性展示场景：PBR 金属/粗糙材质球与立方体、地面、
 方向光阴影（含平台上的物体间投影）、两盏点光源、父级层级物体、天空盒与 IBL；
-进入 Play 模式后，场景中的球体、立方体与簇状子物体会在 Box3D 物理模拟中下落、碰撞并停稳。
+进入 Play 模式后，场景中的球体、立方体与簇状子物体会在 Box3D 物理模拟中下落、碰撞并停稳，
+同时 `Scripted Spinner` 实体会由内置的 `Rotator.lua` 脚本持续旋转。
 Game 面板使用主相机视角。
 
 ### 视口操作
@@ -117,7 +149,10 @@ Game 面板使用主相机视角。
 Hachimi-Engine/          # 引擎核心（静态库）
   Resources/Shaders/     # 引擎内置 GLSL 着色器
   Source/                # 引擎源码
+  Source/Scripting/      # 语言无关脚本核心与 Lua 后端
   Vendor/                # 引擎使用的第三方库
+  Vendor/Lua/            # Lua 5.4 运行时
+  Vendor/sol2/           # C++ Lua 绑定（header-only）
 Hachimi-Editor/          # 编辑器客户端（可执行文件）
   Source/                # 编辑器源码
   Vendor/                # 编辑器使用的第三方库
@@ -132,7 +167,7 @@ Utils/                   # 临时调试工具（FramebufferTest 帧缓冲测试�
 以下内容已预留架构位置，但暂未实现：
 
 - 音频系统
-- 脚本系统
+- 除 Lua 外的更多脚本语言（后端抽象已预留）
 - 除 OpenGL 4.6 Core 外的渲染后端
 - 外部 3D 模型导入（当前使用内置网格）
 - 日志文件输出（当前仅控制台）
@@ -158,6 +193,8 @@ Hachimi-Engine 建立在以下开源项目之上，感谢所有作者与贡献�
 - [GLAD](https://github.com/Dav1dde/glad) — OpenGL 函数加载器
 - [GLFW](https://github.com/glfw/glfw) — 窗口与输入处理
 - [GLM](https://github.com/g-truc/glm) — 数学库（内部封装为 `HachimiEngine::Math`）
+- [Lua](https://www.lua.org/) — Lua 5.4 脚本语言运行时
+- [sol2](https://github.com/ThePhD/sol2) — 现代 C++ Lua 绑定库
 - [Dear ImGui](https://github.com/ocornut/imgui) — 编辑器用户界面
 - [ImGuiFileDialog](https://github.com/aiekick/ImGuiFileDialog) — 文件对话框
 - [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo) — 变换 Gizmo

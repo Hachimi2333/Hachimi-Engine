@@ -46,6 +46,7 @@ project "Hachimi-Editor"
         "spdlog",
         "yaml-cpp",
         "Box3D",
+        "Lua",
         "GLAD",
         "GLFW",
         "opengl32"

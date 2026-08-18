@@ -6,10 +6,58 @@
 #include "Utils/FileSystem.h"
 #include "Math/Math.h"
 
+#include <fstream>
+#include <string_view>
+
 namespace HachimiEngine
 {
     namespace
     {
+        constexpr std::string_view DefaultRotatorScript = R"(-- Rotator.lua
+-- Demonstrates the Hachimi-Engine Lua script lifecycle.
+-- Scripts run only while the editor is in Play mode.
+
+local Rotator = {}
+
+Rotator.speed = 90.0 -- Degrees per second around the local Y axis.
+
+function Rotator:OnCreate()
+    HE.Log.Info("Rotator attached to " .. self.entity:GetName())
+end
+
+function Rotator:OnUpdate(deltaTime)
+    local rotation = self.entity:GetRotation()
+    rotation.y = rotation.y + Rotator.speed * deltaTime
+    self.entity:SetRotation(rotation)
+end
+
+function Rotator:OnDestroy()
+    HE.Log.Info("Rotator stopped")
+end
+
+return Rotator
+)";
+
+        void CreateDefaultLuaScript(const std::filesystem::path& scriptsDirectory)
+        {
+            FileSystem::CreateDirectories(scriptsDirectory);
+
+            const std::filesystem::path scriptPath = scriptsDirectory / "Rotator.lua";
+            if (FileSystem::Exists(scriptPath))
+            {
+                return;
+            }
+
+            std::ofstream file(scriptPath);
+            if (!file)
+            {
+                HE_CORE_ERROR("Failed to create default Lua script: {}", scriptPath.string());
+                return;
+            }
+
+            file << DefaultRotatorScript;
+        }
+
         Entity CreateMeshEntity(
             Scene& scene,
             const std::string& name,
@@ -221,6 +269,12 @@ namespace HachimiEngine
             clusterRelationship.Children.push_back(childC.GetUUID());
             AddRigidbody(childC, RigidbodyComponent::RigidbodyType::Dynamic);
             AddCollider(childC, ColliderComponent::ColliderShapeType::Sphere).Friction = 0.6f;
+
+            // A non-physical decorative cube driven by the bundled Lua template.
+            Entity scriptedSpinner = CreateCubeEntity(*scene, "Scripted Spinner", { 3.5f, 2.0f, -2.5f }, Math::Vec3(0.8f), { 0.25f, 0.90f, 0.55f, 1.0f }, 0.25f, 0.5f);
+            ScriptComponent::ScriptReference& rotator = scriptedSpinner.AddComponent<ScriptComponent>().Scripts.emplace_back();
+            rotator.Path = "Rotator.lua";
+            rotator.Enabled = true;
         }
     }
 
@@ -263,6 +317,8 @@ namespace HachimiEngine
         FileSystem::CreateDirectories(projectDirectory / "Assets" / "Textures");
         FileSystem::CreateDirectories(projectDirectory / "Assets" / "Materials");
         FileSystem::CreateDirectories(projectDirectory / "Assets" / "Scenes");
+        FileSystem::CreateDirectories(projectDirectory / "Assets" / "Scripts");
+        CreateDefaultLuaScript(projectDirectory / "Assets" / "Scripts");
 
         const Ref<Scene> defaultScene = CreateRef<Scene>();
         ConfigureShowcaseScene(defaultScene);

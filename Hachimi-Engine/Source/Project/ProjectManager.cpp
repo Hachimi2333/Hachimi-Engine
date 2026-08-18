@@ -59,6 +59,10 @@ namespace HachimiEngine
             return nullptr;
         }
 
+        // Older projects predate the scripting system; make the asset folder
+        // available without touching any other project content.
+        FileSystem::CreateDirectories(project->GetAssetsDirectory() / "Scripts");
+
         if (!FileSystem::Exists(project->GetStartScenePath()))
         {
             HE_CLIENT_WARN("Start scene is missing, creating a default scene");

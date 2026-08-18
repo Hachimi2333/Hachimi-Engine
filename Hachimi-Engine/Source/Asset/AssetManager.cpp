@@ -48,6 +48,7 @@ namespace HachimiEngine
 
         registerFiles(s_AssetsDirectory / "Textures", AssetType::Texture);
         registerFiles(s_AssetsDirectory / "Scenes", AssetType::Scene);
+        registerFiles(s_AssetsDirectory / "Scripts", AssetType::Script);
     }
 
     Ref<Texture2D> AssetManager::GetTexture(const std::filesystem::path& relativePath)

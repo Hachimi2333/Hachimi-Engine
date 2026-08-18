@@ -22,5 +22,8 @@ namespace HachimiEngine
 
         static void OpenSceneFileDialog(const std::filesystem::path& startPath);
         static bool DrawSceneFileDialog(std::string& selectedPath);
+
+        static void OpenScriptFileDialog(const std::filesystem::path& startPath);
+        static bool DrawScriptFileDialog(std::string& selectedPath);
     };
 }

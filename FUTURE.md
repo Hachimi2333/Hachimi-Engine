@@ -18,6 +18,34 @@
 - **天空盒自定义贴图导入**
   - 当前使用内置程序化天空；后续可支持 6 面图 / equirectangular 贴图导入并接入场景环境设置。
 
+## 脚本系统后续规划
+
+当前脚本系统以 Lua 5.4 为第一个后端，`ScriptEngine / ScriptRuntime / ScriptWorld` 抽象已就位。
+
+- **脚本字段（可序列化变量）**
+  - 在 `ScriptComponent` 中增加字段名/类型/默认值，并在 Inspector 中编辑；运行时注入到脚本模块表。
+- **热重载**
+  - Play 模式下监听 `Assets/Scripts` 文件变化，重新加载变更的脚本实例。
+- **安全场景修改接口**
+  - 通过延迟命令队列开放 `CreateEntity` / `DestroyEntity` 等写操作，避免在脚本更新循环中直接修改 ECS。
+- **动态刚体脚本物理 API**
+  - 当前脚本只能读写 Transform；Dynamic 刚体的 Transform 每帧会被 Box3D 写回 ECS，脚本直接旋转/移动不会保留。
+  - 后续在 `PhysicsWorld` 增加按 entity 查询与设置刚体运动状态的接口，并通过 `ScriptEntity` 暴露：
+    - `GetLinearVelocity` / `SetLinearVelocity`
+    - `GetAngularVelocity` / `SetAngularVelocity`
+    - `ApplyForce` / `ApplyImpulse`
+    - `ApplyTorque` / `ApplyAngularImpulse`
+    - `Teleport(position, rotation)`：用于重生、传送等瞬间位移
+  - Dynamic 刚体应通过上述接口驱动；Static / Kinematic 继续由 Transform 驱动。
+- **物理事件回调**
+  - 将 `b3ContactEvents` / `b3SensorEvents` 转换为 `OnCollisionEnter/Exit`、`OnTriggerEnter/Exit` 脚本回调。
+- **Lua 模块 `require`**
+  - 当前沙箱禁用 `package`；后续实现限定在 `Assets/Scripts` 内的安全模块加载。
+- **更多语言后端**
+  - 新增后端只需实现 `ScriptEngine` / `ScriptRuntime` 并注册扩展名，ECS、序列化与编辑器组件无需改动。
+- **脚本调试支持**
+  - 运行时断点、变量查看与 Console 内跳转脚本报错位置。
+
 ## 物理系统后续规划
 
 - **Joints 关节**

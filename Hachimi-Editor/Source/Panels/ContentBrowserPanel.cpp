@@ -7,6 +7,7 @@
 #include "Project/ProjectManager.h"
 #include "Utils/FileDialogs.h"
 #include "Utils/FileSystem.h"
+#include "Utils/PlatformUtils.h"
 
 #include <imgui.h>
 
@@ -95,6 +96,11 @@ namespace HachimiEngine
                         context.PlayState = EditorPlayState::Stopped;
                         HE_CLIENT_INFO("Opened scene {}", file.string());
                     }
+                }
+                else if (FileSystem::GetExtension(file) == ".lua")
+                {
+                    // Scripts are plain text assets; hand them to the system editor.
+                    PlatformUtils::OpenPathInExplorer(file);
                 }
             }
         }

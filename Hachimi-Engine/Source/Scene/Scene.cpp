@@ -97,6 +97,10 @@ namespace HachimiEngine
         {
             duplicate.AddComponent<ColliderComponent>() = entity.GetComponent<ColliderComponent>();
         }
+        if (entity.HasComponent<ScriptComponent>())
+        {
+            duplicate.AddComponent<ScriptComponent>() = entity.GetComponent<ScriptComponent>();
+        }
 
         return duplicate;
     }
@@ -171,6 +175,11 @@ namespace HachimiEngine
                 targetEntity.AddComponent<ColliderComponent>() = *sourceCollider;
             }
 
+            if (const auto* sourceScript = m_Registry.try_get<ScriptComponent>(sourceHandle))
+            {
+                targetEntity.AddComponent<ScriptComponent>() = *sourceScript;
+            }
+
             clone->m_EntityMap[targetEntity.GetUUID()] = targetEntity.GetHandle();
         }
 
@@ -238,9 +247,9 @@ namespace HachimiEngine
 
     void Scene::OnRuntimeStart()
     {
-        if (m_PhysicsWorld != nullptr)
+        if (m_PhysicsWorld != nullptr || m_ScriptWorld != nullptr)
         {
-            HE_CORE_WARN("Scene runtime physics is already running");
+            HE_CORE_WARN("Scene runtime is already running");
             return;
         }
 
@@ -252,10 +261,21 @@ namespace HachimiEngine
         }
 
         m_PhysicsWorld->CreateBodies(*this);
+
+        m_ScriptWorld = CreateScope<ScriptWorld>();
+        m_ScriptWorld->OnRuntimeStart(*this);
     }
 
     void Scene::OnRuntimeStop()
     {
+        // Destroy scripts before physics so OnDestroy callbacks can still query
+        // the physics world during teardown.
+        if (m_ScriptWorld != nullptr)
+        {
+            m_ScriptWorld->OnRuntimeStop(*this);
+            m_ScriptWorld = nullptr;
+        }
+
         m_PhysicsWorld = nullptr;
     }
 
@@ -267,6 +287,11 @@ namespace HachimiEngine
         }
 
         m_PhysicsWorld->Update(*this, timestep);
+
+        if (m_ScriptWorld != nullptr)
+        {
+            m_ScriptWorld->OnUpdate(timestep, *this);
+        }
     }
 
     void Scene::OnRender(const EditorCamera& camera)

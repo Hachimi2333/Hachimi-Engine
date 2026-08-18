@@ -43,6 +43,7 @@ workspace "Hachimi-Engine"
 -- Group all third-party library projects into a "Dependencies" solution folder.
 group "Dependencies"
 includeIfPresent("Hachimi-Engine/Vendor/Box3D/premake5.lua")
+includeIfPresent("Hachimi-Engine/Vendor/Lua/premake5.lua")
 includeIfPresent("Hachimi-Engine/Vendor/GLFW/premake5.lua")
 includeIfPresent("Hachimi-Engine/Vendor/GLAD/premake5.lua")
 includeIfPresent("Hachimi-Engine/Vendor/imgui/premake5.lua")

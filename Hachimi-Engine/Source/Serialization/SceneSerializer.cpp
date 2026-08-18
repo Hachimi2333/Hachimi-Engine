@@ -247,6 +247,22 @@ namespace HachimiEngine
             out << YAML::EndMap;
         }
 
+        if (entity.HasComponent<ScriptComponent>())
+        {
+            const auto& script = entity.GetComponent<ScriptComponent>();
+            out << YAML::Key << "ScriptComponent" << YAML::Value << YAML::BeginMap;
+            out << YAML::Key << "Scripts" << YAML::Value << YAML::BeginSeq;
+            for (const ScriptComponent::ScriptReference& reference : script.Scripts)
+            {
+                out << YAML::BeginMap;
+                out << YAML::Key << "Path" << YAML::Value << reference.Path;
+                out << YAML::Key << "Enabled" << YAML::Value << reference.Enabled;
+                out << YAML::EndMap;
+            }
+            out << YAML::EndSeq;
+            out << YAML::EndMap;
+        }
+
         out << YAML::EndMap;
     }
 
@@ -356,6 +372,21 @@ namespace HachimiEngine
             light.Range = lightNode["Range"].as<float>(12.0f);
             light.CastsShadows = lightNode["CastsShadows"].as<bool>(true);
             light.ShadowBias = lightNode["ShadowBias"].as<float>(0.0005f);
+        }
+
+        if (const YAML::Node scriptNode = entityNode["ScriptComponent"])
+        {
+            auto& script = entity.AddComponent<ScriptComponent>();
+            if (const YAML::Node scriptsNode = scriptNode["Scripts"]; scriptsNode && scriptsNode.IsSequence())
+            {
+                for (const YAML::Node referenceNode : scriptsNode)
+                {
+                    ScriptComponent::ScriptReference reference;
+                    reference.Path = referenceNode["Path"].as<std::string>("");
+                    reference.Enabled = referenceNode["Enabled"].as<bool>(true);
+                    script.Scripts.push_back(std::move(reference));
+                }
+            }
         }
 
         scene.m_EntityMap[UUID(uuidValue)] = entity.GetHandle();

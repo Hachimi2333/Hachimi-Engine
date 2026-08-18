@@ -8,6 +8,8 @@ project "Hachimi-Engine"
     {
         "%{prj.location}/Source",
         "%{prj.location}/Vendor/Box3D/include",
+        "%{prj.location}/Vendor/Lua/include",
+        "%{prj.location}/Vendor/sol2/include",
         "%{prj.location}/Vendor/EnTT/src",
         "%{prj.location}/Vendor/EnTT/single_include",
         "%{prj.location}/Vendor/glm",
@@ -36,6 +38,7 @@ project "Hachimi-Engine"
     links
     {
         "Box3D",
+        "Lua",
         "GLFW",
         "GLAD",
         "ImGui",
@@ -43,3 +46,8 @@ project "Hachimi-Engine"
         "yaml-cpp",
         "opengl32"
     }
+
+    filter "configurations:Debug"
+        defines { "SOL_ALL_SAFETIES_ON" }
+
+    filter {}

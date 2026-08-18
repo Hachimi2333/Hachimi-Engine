@@ -9,6 +9,7 @@
 #include "Renderer/EnvironmentSettings.h"
 #include "Scene/Components.h"
 #include "Scene/Entity.h"
+#include "Scripting/ScriptWorld.h"
 #include "Math/Math.h"
 
 #include <entt/entt.hpp>
@@ -59,6 +60,7 @@ namespace HachimiEngine
         PhysicsSettings& GetPhysicsSettings() { return m_PhysicsSettings; }
         const PhysicsSettings& GetPhysicsSettings() const { return m_PhysicsSettings; }
         bool IsPhysicsRunning() const { return m_PhysicsWorld != nullptr && m_PhysicsWorld->IsRunning(); }
+        bool IsScriptRunning() const { return m_ScriptWorld != nullptr && m_ScriptWorld->IsRunning(); }
 
         entt::registry& GetRegistry() { return m_Registry; }
         const std::unordered_map<UUID, entt::entity>& GetEntityMap() const { return m_EntityMap; }
@@ -78,6 +80,7 @@ namespace HachimiEngine
         EnvironmentSettings m_Environment;
         PhysicsSettings m_PhysicsSettings;
         Scope<PhysicsWorld> m_PhysicsWorld;
+        Scope<ScriptWorld> m_ScriptWorld;
 
         friend class Entity;
         friend class SceneSerializer;

@@ -15,6 +15,7 @@ A C++20 3D game engine and editor for Windows, built on OpenGL 4.6 Core and insp
 - Scene / ECS based on EnTT
 - yaml-cpp scene (`.hscene`) and project (`.hproj`) serialization
 - Console logging with dual loggers (engine and client)
+- Lua 5.4 scripting with a language-agnostic backend abstraction, ready for future script languages
 
 ### Rendering
 
@@ -37,6 +38,34 @@ A C++20 3D game engine and editor for Windows, built on OpenGL 4.6 Core and insp
 - ImGuizmo transform gizmos: Translate / Rotate / Scale
 - ImGuiFileDialog file dialogs
 - Editor camera: RMB orbit, MMB pan, wheel zoom, WASD fly
+
+## Scripting
+
+Scripts are Lua 5.4 files under `Assets/Scripts`, attached to entities through the Inspector's `Script` component. The path is stored relative to `Assets/Scripts`, so `Player/Controller.lua` works for nested folders.
+
+A script returns a module table with optional lifecycle callbacks:
+
+```lua
+local MyScript = {}
+
+function MyScript:OnCreate() end
+function MyScript:OnUpdate(deltaTime) end
+function MyScript:OnDestroy() end
+
+return MyScript
+```
+
+Inside a callback, `self.entity` is the owning entity and the global `HE` table exposes the sandboxed engine API:
+
+- `HE.Log.Info / Warn / Error`
+- `HE.Time.DeltaTime / ElapsedTime`
+- `HE.Input.IsKeyDown / IsMouseButtonDown / GetMousePosition`
+- `HE.Key.*`, `HE.Mouse.*`
+- `HE.Math.Vec3` plus `Length / Normalize / Dot / Cross / Clamp / Lerp / Radians / Degrees`
+- `HE.Scene.FindEntityByName`
+- Entity methods: `GetName / SetName / GetPosition / SetPosition / GetRotation / SetRotation / GetScale / SetScale / Translate / Rotate / GetWorldPosition`
+
+Scripts run only in Play mode. Each Play session creates an isolated Lua VM, and script errors are reported to the Console without crashing the editor.
 
 ## Requirements
 
@@ -89,11 +118,13 @@ A new project is generated with:
     ├── Meshes/
     ├── Textures/
     ├── Materials/
+    ├── Scripts/
+    │   └── Rotator.lua
     └── Scenes/
         └── Default.hscene
 ```
 
-The default `Default.hscene` showcases rendering and physics features: PBR metal/roughness material balls and cubes, ground plane, directional light shadows (including inter-object shadows on the platform), two point lights, a parented object hierarchy, skybox and IBL. In Play mode, the scene's spheres, cubes and clustered child objects fall, collide and settle under Box3D physics simulation. The Game panel uses the main camera view.
+The default `Default.hscene` showcases rendering and physics features: PBR metal/roughness material balls and cubes, ground plane, directional light shadows (including inter-object shadows on the platform), two point lights, a parented object hierarchy, skybox and IBL. In Play mode, the scene's spheres, cubes and clustered child objects fall, collide and settle under Box3D physics simulation, while the `Scripted Spinner` entity rotates from the bundled `Rotator.lua` script. The Game panel uses the main camera view.
 
 ### Viewport Controls
 
@@ -114,7 +145,10 @@ The default `Default.hscene` showcases rendering and physics features: PBR metal
 Hachimi-Engine/          # Engine core (static library)
   Resources/Shaders/     # Engine-owned GLSL shaders
   Source/                # Engine source
+  Source/Scripting/      # Language-agnostic scripting core + Lua backend
   Vendor/                # Third-party libraries used by the engine
+  Vendor/Lua/            # Lua 5.4 runtime
+  Vendor/sol2/           # C++ Lua bindings (header-only)
 Hachimi-Editor/          # Editor client (executable)
   Source/                # Editor source
   Vendor/                # Third-party libraries used by the editor
@@ -129,7 +163,7 @@ Utils/                   # Ad-hoc debugging tools (FramebufferTest, UIAutomation
 The following have reserved architecture slots but are not yet implemented:
 
 - Audio system
-- Scripting system
+- Additional scripting languages beyond Lua (the backend abstraction is in place)
 - Rendering backends other than OpenGL 4.6 Core
 - External 3D model import (built-in meshes are used)
 - Log file output (console only)
@@ -155,6 +189,8 @@ Hachimi-Engine builds upon the following open-source projects. Special thanks to
 - [GLAD](https://github.com/Dav1dde/glad) — OpenGL function loader
 - [GLFW](https://github.com/glfw/glfw) — window and input handling
 - [GLM](https://github.com/g-truc/glm) — math library (wrapped internally by `HachimiEngine::Math`)
+- [Lua](https://www.lua.org/) — Lua 5.4 scripting language runtime
+- [sol2](https://github.com/ThePhD/sol2) — modern C++ Lua bindings
 - [Dear ImGui](https://github.com/ocornut/imgui) — editor user interface
 - [ImGuiFileDialog](https://github.com/aiekick/ImGuiFileDialog) — file dialogs
 - [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo) — transform gizmos

@@ -13,7 +13,8 @@ namespace HachimiEngine
         None = 0,
         Texture = 1,
         Scene = 2,
-        Project = 3
+        Project = 3,
+        Script = 4
     };
 
     struct Asset

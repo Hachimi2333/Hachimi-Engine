@@ -10,6 +10,7 @@
 #include "Renderer/PostProcessPass.h"
 #include "Renderer/RenderCommand.h"
 #include "Renderer/SceneRenderer.h"
+#include "Scripting/ScriptManager.h"
 
 #include <chrono>
 
@@ -30,6 +31,7 @@ namespace HachimiEngine
         SceneRenderer::Init();
         DebugDraw::Init();
         PostProcessPass::Init();
+        ScriptManager::Init();
 
         m_ImGuiLayer = CreateRef<ImGuiLayer>();
         PushOverlay(m_ImGuiLayer);
@@ -37,6 +39,7 @@ namespace HachimiEngine
 
     Application::~Application()
     {
+        ScriptManager::Shutdown();
         PostProcessPass::Shutdown();
         DebugDraw::Shutdown();
         SceneRenderer::Shutdown();

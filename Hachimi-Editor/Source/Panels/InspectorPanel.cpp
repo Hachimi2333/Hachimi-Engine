@@ -1,15 +1,18 @@
 #include "Panels/InspectorPanel.h"
 
+#include "Asset/AssetManager.h"
 #include "Panels/EditorContext.h"
 #include "Renderer/MeshFactory.h"
 #include "Scene/Components.h"
 #include "Scene/Scene.h"
+#include "Utils/FileDialogs.h"
 #include "Math/Math.h"
 
 #include <imgui.h>
 
 #include <algorithm>
 #include <cstdio>
+#include <filesystem>
 
 namespace HachimiEngine
 {
@@ -73,6 +76,21 @@ namespace HachimiEngine
                 ConfigureColliderForPrimitive(collider, entity.GetComponent<MeshComponent>().PrimitiveType);
             }
         }
+
+        void MakeScriptPathRelative(const std::string& selectedPath, ScriptComponent::ScriptReference& reference)
+        {
+            const std::filesystem::path scriptsDirectory = AssetManager::GetAssetsDirectory() / "Scripts";
+
+            std::error_code errorCode;
+            const std::filesystem::path relativePath = std::filesystem::relative(selectedPath, scriptsDirectory, errorCode);
+            if (errorCode)
+            {
+                reference.Path = std::filesystem::path(selectedPath).filename().string();
+                return;
+            }
+
+            reference.Path = relativePath.generic_string();
+        }
     }
 
     void InspectorPanel::Draw(EditorContext& context)
@@ -119,6 +137,10 @@ namespace HachimiEngine
         if (entity.HasComponent<LightComponent>())
         {
             DrawLight(entity);
+        }
+        if (entity.HasComponent<ScriptComponent>())
+        {
+            DrawScript(entity);
         }
 
         ImGui::Separator();
@@ -190,6 +212,10 @@ namespace HachimiEngine
             if (!entity.HasComponent<LightComponent>() && ImGui::MenuItem("Light Component"))
             {
                 entity.AddComponent<LightComponent>();
+            }
+            if (!entity.HasComponent<ScriptComponent>() && ImGui::MenuItem("Script Component"))
+            {
+                entity.AddComponent<ScriptComponent>().Scripts.emplace_back();
             }
             ImGui::EndPopup();
         }
@@ -376,6 +402,70 @@ namespace HachimiEngine
         {
             ImGui::Checkbox("Casts Shadows", &light.CastsShadows);
             ImGui::DragFloat("Shadow Bias", &light.ShadowBias, 0.0001f, 0.0f, 0.05f, "%.5f");
+        }
+    }
+
+    void InspectorPanel::DrawScript(Entity entity)
+    {
+        bool removed = false;
+        const bool open = DrawComponentHeader<ScriptComponent>(entity, "Script", true, removed);
+        if (removed || !open)
+        {
+            return;
+        }
+
+        auto& script = entity.GetComponent<ScriptComponent>();
+
+        int removeSlot = -1;
+        for (int slotIndex = 0; slotIndex < static_cast<int>(script.Scripts.size()); ++slotIndex)
+        {
+            ScriptComponent::ScriptReference& reference = script.Scripts[slotIndex];
+
+            ImGui::PushID(slotIndex);
+            ImGui::Checkbox("Enabled", &reference.Enabled);
+
+            char pathBuffer[256] = {};
+            std::snprintf(pathBuffer, sizeof(pathBuffer), "%s", reference.Path.c_str());
+            ImGui::SetNextItemWidth(std::max(ImGui::GetContentRegionAvail().x - ImGui::GetFrameHeight() - ImGui::GetStyle().ItemSpacing.x, 40.0f));
+            if (ImGui::InputText("Path", pathBuffer, sizeof(pathBuffer)))
+            {
+                reference.Path = pathBuffer;
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("..."))
+            {
+                m_PendingScriptFileDialogSlot = slotIndex;
+                FileDialogs::OpenScriptFileDialog(AssetManager::GetAssetsDirectory() / "Scripts");
+            }
+
+            if (ImGui::SmallButton("Remove Script"))
+            {
+                removeSlot = slotIndex;
+            }
+            ImGui::PopID();
+
+            ImGui::Separator();
+        }
+
+        if (ImGui::Button("Add Script"))
+        {
+            script.Scripts.emplace_back();
+        }
+
+        std::string selectedPath;
+        if (FileDialogs::DrawScriptFileDialog(selectedPath))
+        {
+            if (!selectedPath.empty() && m_PendingScriptFileDialogSlot >= 0 && m_PendingScriptFileDialogSlot < static_cast<int>(script.Scripts.size()))
+            {
+                MakeScriptPathRelative(selectedPath, script.Scripts[m_PendingScriptFileDialogSlot]);
+            }
+            m_PendingScriptFileDialogSlot = -1;
+        }
+
+        if (removeSlot >= 0)
+        {
+            script.Scripts.erase(script.Scripts.begin() + removeSlot);
         }
     }
 }

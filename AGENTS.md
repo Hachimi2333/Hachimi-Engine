@@ -84,7 +84,8 @@ When using the VS 2026 Developer Command Prompt, `msbuild Hachimi-Engine.slnx -p
 ## Project Scope
 
 - Audio is not implemented in the current phase.
-- Scripting is not implemented in the current phase.
+- Scripting is implemented with Lua 5.4 as the first backend. All script-facing engine APIs must go through the language-agnostic `ScriptRuntime` abstraction; Lua-specific code stays in `Hachimi-Engine/Source/Scripting/Lua`.
+- Additional scripting languages beyond Lua are reserved architecture slots and are not implemented yet.
 - 3D model import is not implemented in the current phase; built-in mesh primitives are used.
 - Mesh optimization (meshoptimizer) is not included in the current phase.
 

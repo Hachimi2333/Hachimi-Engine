@@ -10,6 +10,7 @@ namespace HachimiEngine
         constexpr const char* DirectoryDialogKey = "DirectoryDialog";
         constexpr const char* TextureDialogKey = "TextureImportDialog";
         constexpr const char* SceneDialogKey = "SceneFileDialog";
+        constexpr const char* ScriptDialogKey = "ScriptFileDialog";
 
         bool FinishDialog(const char* key, std::string& selectedPath)
         {
@@ -78,5 +79,18 @@ namespace HachimiEngine
     bool FileDialogs::DrawSceneFileDialog(std::string& selectedPath)
     {
         return FinishDialog(SceneDialogKey, selectedPath);
+    }
+
+    void FileDialogs::OpenScriptFileDialog(const std::filesystem::path& startPath)
+    {
+        IGFD::FileDialogConfig config;
+        config.path = startPath.string();
+        config.flags = ImGuiFileDialogFlags_Default;
+        ImGuiFileDialog::Instance()->OpenDialog(ScriptDialogKey, "Choose Script", "Lua scripts (*.lua){.lua}", config);
+    }
+
+    bool FileDialogs::DrawScriptFileDialog(std::string& selectedPath)
+    {
+        return FinishDialog(ScriptDialogKey, selectedPath);
     }
 }
