@@ -40,6 +40,8 @@ workspace "Hachimi-Engine"
 
     filter {}
 
+-- Group all third-party library projects into a "Dependencies" solution folder.
+group "Dependencies"
 includeIfPresent("Hachimi-Engine/Vendor/Box3D/premake5.lua")
 includeIfPresent("Hachimi-Engine/Vendor/GLFW/premake5.lua")
 includeIfPresent("Hachimi-Engine/Vendor/GLAD/premake5.lua")
@@ -49,5 +51,6 @@ includeIfPresent("Hachimi-Engine/Vendor/yaml-cpp/premake5.lua")
 includeIfPresent("Hachimi-Editor/Vendor/ImGuiFileDialog/premake5.lua")
 includeIfPresent("Hachimi-Editor/Vendor/ImGuizmo/premake5.lua")
 
+group ""
 includeIfPresent("Hachimi-Engine/premake5.lua")
 includeIfPresent("Hachimi-Editor/premake5.lua")
