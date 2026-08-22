@@ -1,4 +1,5 @@
 #include "ImGui/ImGuiLayer.h"
+#include "ImGui/ThemeConfig.h"
 
 #include "Core/Application.h"
 #include "Core/Log.h"
@@ -76,8 +77,8 @@ namespace HachimiEngine
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-        // Default styling only; the project intentionally avoids visual beautification.
-        ImGui::StyleColorsDark();
+        // Apply the centralized square, blue-accented dark editor theme.
+        ThemeConfig::Apply(ImGui::GetStyle());
 
         auto* window = static_cast<GLFWwindow*>(Application::Get().GetWindow().GetNativeWindow());
         LoadUiFont(io, window);

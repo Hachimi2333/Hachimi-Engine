@@ -78,7 +78,7 @@ When using the VS 2026 Developer Command Prompt, `msbuild Hachimi-Engine.slnx -p
 
 - Only OpenGL 4.6 Core is implemented in the current phase.
 - The renderer abstraction uses a simple OpenGL-like API style, not a Vulkan-style complex abstraction.
-- ImGui must use the docking branch and default styling; no visual beautification in the current phase.
+- ImGui must use the docking branch. Editor UI styling must be defined only in `Hachimi-Engine/Source/ImGui/ThemeConfig.*` and applied once through `ThemeConfig::Apply` in `ImGuiLayer::OnAttach`; do not scatter hardcoded style or color tweaks across panels.
 - Engine-owned shaders must live in `Hachimi-Engine/Resources/Shaders/*.glsl` and be loaded with `Shader::CreateEngineShader`; do not embed GLSL source in `.cpp` or `.h` files.
 
 ## Project Scope
