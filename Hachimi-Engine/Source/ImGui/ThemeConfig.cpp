@@ -160,7 +160,7 @@ namespace HachimiEngine
             style.WindowBorderHoverPadding = 4.0f;
             style.WindowMinSize = ImVec2{ 32.0f, 32.0f };
             style.WindowTitleAlign = ImVec2{ 0.0f, 0.5f };
-            style.WindowMenuButtonPosition = ImGuiDir_Left;
+            style.WindowMenuButtonPosition = ImGuiDir_Right;
             style.ChildRounding = 0.0f;
             style.ChildBorderSize = 1.0f;
             style.PopupRounding = 0.0f;

@@ -76,6 +76,7 @@ namespace HachimiEngine
         ImGuiIO& io = ImGui::GetIO();
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
         // Apply the centralized square, blue-accented dark editor theme.
         ThemeConfig::Apply(ImGui::GetStyle());
@@ -118,5 +119,15 @@ namespace HachimiEngine
     {
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        if ((ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) != 0)
+        {
+            // Render secondary viewports (panels dragged outside the main window) and restore the main GLFW context
+            // before the application swaps the main window buffers.
+            GLFWwindow* mainContext = glfwGetCurrentContext();
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
+            glfwMakeContextCurrent(mainContext);
+        }
     }
 }
