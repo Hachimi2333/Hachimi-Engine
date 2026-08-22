@@ -207,6 +207,11 @@ namespace HachimiEngine
         m_ViewportPanel.Draw(m_Context);
     }
 
+    void EditorLayer::ResetLayout()
+    {
+        m_ResetLayoutRequested = true;
+    }
+
     void EditorLayer::OnEvent(Event& event)
     {
         // Panels mostly poll ImGui state; additional event handling can be added here.
@@ -218,10 +223,12 @@ namespace HachimiEngine
         // Versioned dock space ID gives the new Toolbar/Game panels a clean default layout.
         const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpaceV2");
 
-        // Build the layout once, before the dock space is submitted for this frame.
-        if (ImGui::DockBuilderGetNode(dockspaceId) == nullptr)
+        // Build the layout once, before the dock space is submitted for this frame. A menu-triggered reset is
+        // deferred here because dock builder calls must happen before the dock space is submitted.
+        if (m_ResetLayoutRequested || ImGui::DockBuilderGetNode(dockspaceId) == nullptr)
         {
             SetupDefaultEditorDockLayout(dockspaceId, viewport->WorkSize);
+            m_ResetLayoutRequested = false;
         }
 
         ImGui::SetNextWindowPos(viewport->WorkPos);

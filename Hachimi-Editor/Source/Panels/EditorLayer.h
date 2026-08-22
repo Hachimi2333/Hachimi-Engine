@@ -35,6 +35,9 @@ namespace HachimiEngine
         void OnPause();
         void OnStop();
 
+        // Rebuilds the default docking layout at the start of the next frame.
+        void ResetLayout();
+
     private:
         void DrawDockSpace();
 
@@ -48,5 +51,6 @@ namespace HachimiEngine
         ConsolePanel m_ConsolePanel;
         EditorMenuBar m_MenuBar;
         ToolbarPanel m_ToolbarPanel;
+        bool m_ResetLayoutRequested = false;
     };
 }
