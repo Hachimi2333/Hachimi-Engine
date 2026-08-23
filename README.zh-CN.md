@@ -33,10 +33,11 @@
 ### 编辑器
 
 - ImGui Docking 编辑器：Project Hub、Viewport、Scene Hierarchy、Inspector、Content Browser、Console
+- 大图标 Content Browser 网格，支持纹理缩略图，可将文件拖拽到 Inspector 资产字段
+- Native File Dialog Extended 系统原生文件对话框
 - Inter 字体与显示器 DPI 自适应 UI 缩放
 - 选中相机 / 灯光实体时，在视口中绘制视锥、光照范围与方向等调试指示线
 - ImGuizmo 变换工具：Translate / Rotate / Scale
-- ImGuiFileDialog 文件对话框
 - 编辑器相机：右键旋转、中键平移、滚轮缩放、WASD 移动
 
 ## 脚本系统
@@ -196,7 +197,7 @@ Hachimi-Engine 建立在以下开源项目之上，感谢所有作者与贡献�
 - [Lua](https://www.lua.org/) — Lua 5.4 脚本语言运行时
 - [sol2](https://github.com/ThePhD/sol2) — 现代 C++ Lua 绑定库
 - [Dear ImGui](https://github.com/ocornut/imgui) — 编辑器用户界面
-- [ImGuiFileDialog](https://github.com/aiekick/ImGuiFileDialog) — 文件对话框
+- [Native File Dialog Extended](https://github.com/btzy/nativefiledialog-extended) — 系统原生文件对话框
 - [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo) — 变换 Gizmo
 - [spdlog](https://github.com/gabime/spdlog) — 日志库
 - [stb](https://github.com/nothings/stb) — 单头文件图像库

@@ -1,96 +1,140 @@
 #include "Utils/FileDialogs.h"
 
-#include <ImGuiFileDialog.h>
+#include "Core/Log.h"
+
+#include <nfd.h>
+
+#include <array>
+#include <cstdlib>
+#include <span>
+#include <string>
 
 namespace HachimiEngine
 {
     namespace
     {
-        constexpr const char* ProjectDialogKey = "ProjectFileDialog";
-        constexpr const char* DirectoryDialogKey = "DirectoryDialog";
-        constexpr const char* TextureDialogKey = "TextureImportDialog";
-        constexpr const char* SceneDialogKey = "SceneFileDialog";
-        constexpr const char* ScriptDialogKey = "ScriptFileDialog";
-
-        bool FinishDialog(const char* key, std::string& selectedPath)
+        // Converts a UTF-8 path returned by NFD into the native filesystem path type.
+        std::filesystem::path ToNativePath(const char* utf8Path)
         {
-            if (!ImGuiFileDialog::Instance()->Display(key))
+            if (utf8Path == nullptr || utf8Path[0] == '\0')
             {
-                return false;
+                return {};
             }
 
-            if (ImGuiFileDialog::Instance()->IsOk())
+            return std::filesystem::path(std::u8string(reinterpret_cast<const char8_t*>(utf8Path)));
+        }
+
+        // Converts a native filesystem path into the UTF-8 string expected by the NFD U8 API.
+        std::string ToUtf8(const std::filesystem::path& path)
+        {
+            const std::u8string utf8Path = path.u8string();
+            return { reinterpret_cast<const char*>(utf8Path.data()), utf8Path.size() };
+        }
+
+        nfdresult_t InitializeNfd()
+        {
+            const nfdresult_t result = NFD_Init();
+            if (result != NFD_OKAY)
             {
-                selectedPath = ImGuiFileDialog::Instance()->GetFilePathName();
+                HE_CLIENT_ERROR("Failed to initialize native file dialogs: {}", NFD_GetError());
+                return result;
             }
 
-            ImGuiFileDialog::Instance()->Close();
-            return true;
+            std::atexit([] { NFD_Quit(); });
+            return result;
+        }
+
+        bool IsNfdReady()
+        {
+            static const nfdresult_t initResult = InitializeNfd();
+            return initResult == NFD_OKAY;
+        }
+
+        // Shared single-file open dialog. Pass an empty filters array to show every file type.
+        std::filesystem::path OpenFileDialog(
+            const std::filesystem::path& startPath,
+            std::span<const nfdu8filteritem_t> filters)
+        {
+            if (!IsNfdReady())
+            {
+                return {};
+            }
+
+            const std::string defaultPath = ToUtf8(startPath);
+            nfdu8char_t* selectedPath = nullptr;
+            const nfdresult_t result = NFD_OpenDialogU8(
+                &selectedPath,
+                filters.data(),
+                static_cast<nfdfiltersize_t>(filters.size()),
+                defaultPath.empty() ? nullptr : defaultPath.c_str());
+
+            if (result == NFD_CANCEL)
+            {
+                return {};
+            }
+
+            if (result == NFD_ERROR)
+            {
+                HE_CLIENT_ERROR("Native file dialog failed: {}", NFD_GetError());
+                return {};
+            }
+
+            const std::filesystem::path path = ToNativePath(selectedPath);
+            NFD_FreePathU8(selectedPath);
+            return path;
         }
     }
 
-    void FileDialogs::OpenProjectFileDialog(const std::filesystem::path& startPath)
+    std::filesystem::path FileDialogs::OpenProjectFileDialog(const std::filesystem::path& startPath)
     {
-        IGFD::FileDialogConfig config;
-        config.path = startPath.string();
-        config.flags = ImGuiFileDialogFlags_Default;
-        ImGuiFileDialog::Instance()->OpenDialog(ProjectDialogKey, "Open Hachimi Project", ".hproj", config);
+        constexpr std::array filters = {
+            nfdu8filteritem_t{ "Hachimi Project", "hproj" }
+        };
+        return OpenFileDialog(startPath, filters);
     }
 
-    bool FileDialogs::DrawProjectFileDialog(std::string& selectedPath)
+    std::filesystem::path FileDialogs::OpenDirectoryDialog(const std::filesystem::path& startPath)
     {
-        return FinishDialog(ProjectDialogKey, selectedPath);
+        if (!IsNfdReady())
+        {
+            return {};
+        }
+
+        const std::string defaultPath = ToUtf8(startPath);
+        nfdu8char_t* selectedPath = nullptr;
+        const nfdresult_t result = NFD_PickFolderU8(
+            &selectedPath,
+            defaultPath.empty() ? nullptr : defaultPath.c_str());
+
+        if (result == NFD_CANCEL)
+        {
+            return {};
+        }
+
+        if (result == NFD_ERROR)
+        {
+            HE_CLIENT_ERROR("Native folder dialog failed: {}", NFD_GetError());
+            return {};
+        }
+
+        const std::filesystem::path path = ToNativePath(selectedPath);
+        NFD_FreePathU8(selectedPath);
+        return path;
     }
 
-    void FileDialogs::OpenDirectoryDialog(const std::filesystem::path& startPath)
+    std::filesystem::path FileDialogs::OpenTextureImportDialog(const std::filesystem::path& startPath)
     {
-        IGFD::FileDialogConfig config;
-        config.path = startPath.string();
-        config.flags = ImGuiFileDialogFlags_Default;
-        ImGuiFileDialog::Instance()->OpenDialog(DirectoryDialogKey, "Choose Project Location", nullptr, config);
+        constexpr std::array filters = {
+            nfdu8filteritem_t{ "Image files", "png,jpg,jpeg,tga,bmp" }
+        };
+        return OpenFileDialog(startPath, filters);
     }
 
-    bool FileDialogs::DrawDirectoryDialog(std::string& selectedPath)
+    std::filesystem::path FileDialogs::OpenSceneFileDialog(const std::filesystem::path& startPath)
     {
-        return FinishDialog(DirectoryDialogKey, selectedPath);
-    }
-
-    void FileDialogs::OpenTextureImportDialog(const std::filesystem::path& startPath)
-    {
-        IGFD::FileDialogConfig config;
-        config.path = startPath.string();
-        config.flags = ImGuiFileDialogFlags_Default;
-        ImGuiFileDialog::Instance()->OpenDialog(TextureDialogKey, "Import Texture", "Image files (*.png *.jpg *.jpeg *.tga *.bmp){.png,.jpg,.jpeg,.tga,.bmp}", config);
-    }
-
-    bool FileDialogs::DrawTextureImportDialog(std::string& selectedPath)
-    {
-        return FinishDialog(TextureDialogKey, selectedPath);
-    }
-
-    void FileDialogs::OpenSceneFileDialog(const std::filesystem::path& startPath)
-    {
-        IGFD::FileDialogConfig config;
-        config.path = startPath.string();
-        config.flags = ImGuiFileDialogFlags_Default;
-        ImGuiFileDialog::Instance()->OpenDialog(SceneDialogKey, "Open Scene", ".hscene", config);
-    }
-
-    bool FileDialogs::DrawSceneFileDialog(std::string& selectedPath)
-    {
-        return FinishDialog(SceneDialogKey, selectedPath);
-    }
-
-    void FileDialogs::OpenScriptFileDialog(const std::filesystem::path& startPath)
-    {
-        IGFD::FileDialogConfig config;
-        config.path = startPath.string();
-        config.flags = ImGuiFileDialogFlags_Default;
-        ImGuiFileDialog::Instance()->OpenDialog(ScriptDialogKey, "Choose Script", "Lua scripts (*.lua){.lua}", config);
-    }
-
-    bool FileDialogs::DrawScriptFileDialog(std::string& selectedPath)
-    {
-        return FinishDialog(ScriptDialogKey, selectedPath);
+        constexpr std::array filters = {
+            nfdu8filteritem_t{ "Hachimi Scene", "hscene" }
+        };
+        return OpenFileDialog(startPath, filters);
     }
 }

@@ -17,7 +17,7 @@ project "Hachimi-Editor"
         "%{wks.location}/Hachimi-Engine/Vendor/spdlog/include",
         "%{wks.location}/Hachimi-Engine/Vendor/yaml-cpp/include",
         "%{wks.location}/Hachimi-Engine/Vendor/stb/src",
-        "%{wks.location}/Hachimi-Editor/Vendor/ImGuiFileDialog/src",
+        "%{wks.location}/Hachimi-Editor/Vendor/NativeFileDialogExtended/src/include",
         "%{wks.location}/Hachimi-Editor/Vendor/ImGuizmo/src"
     }
 
@@ -40,7 +40,7 @@ project "Hachimi-Editor"
     links
     {
         "Hachimi-Engine",
-        "ImGuiFileDialog",
+        "NativeFileDialogExtended",
         "ImGuizmo",
         "ImGui",
         "spdlog",
@@ -49,7 +49,10 @@ project "Hachimi-Editor"
         "Lua",
         "GLAD",
         "GLFW",
-        "opengl32"
+        "opengl32",
+        "Ole32",
+        "Shell32",
+        "Uuid"
     }
 
     postbuildcommands

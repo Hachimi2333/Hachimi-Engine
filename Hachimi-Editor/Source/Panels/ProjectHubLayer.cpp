@@ -64,15 +64,11 @@ namespace HachimiEngine
         ImGui::SameLine();
         if (ImGui::Button("Browse..."))
         {
-            FileDialogs::OpenDirectoryDialog(m_ProjectLocation);
-        }
-
-        std::string selectedDirectory;
-        if (FileDialogs::DrawDirectoryDialog(selectedDirectory))
-        {
+            const std::filesystem::path selectedDirectory =
+                FileDialogs::OpenDirectoryDialog(m_ProjectLocation);
             if (!selectedDirectory.empty())
             {
-                std::snprintf(m_ProjectLocation, sizeof(m_ProjectLocation), "%s", selectedDirectory.c_str());
+                std::snprintf(m_ProjectLocation, sizeof(m_ProjectLocation), "%s", selectedDirectory.string().c_str());
             }
         }
 
@@ -118,12 +114,8 @@ namespace HachimiEngine
 
         if (ImGui::Button("Open Project..."))
         {
-            FileDialogs::OpenProjectFileDialog(PlatformUtils::GetUserDocumentsDirectory());
-        }
-
-        std::string selectedProjectPath;
-        if (FileDialogs::DrawProjectFileDialog(selectedProjectPath))
-        {
+            const std::filesystem::path selectedProjectPath =
+                FileDialogs::OpenProjectFileDialog(PlatformUtils::GetUserDocumentsDirectory());
             if (!selectedProjectPath.empty())
             {
                 OpenProject(selectedProjectPath);

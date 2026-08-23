@@ -33,10 +33,11 @@ A C++20 3D game engine and editor for Windows, built on OpenGL 4.6 Core and insp
 ### Editor
 
 - ImGui Docking-based editor: Project Hub, Viewport, Scene Hierarchy, Inspector, Content Browser, Console
+- Large-icon Content Browser grid with texture thumbnails and drag-and-drop to Inspector asset fields
+- Native File Dialog Extended system file dialogs
 - Inter font and DPI-aware UI scaling
 - Debug indicator overlays for selected camera / light entities (frustum, light range and direction)
 - ImGuizmo transform gizmos: Translate / Rotate / Scale
-- ImGuiFileDialog file dialogs
 - Editor camera: RMB orbit, MMB pan, wheel zoom, WASD fly
 
 ## Scripting
@@ -192,7 +193,7 @@ Hachimi-Engine builds upon the following open-source projects. Special thanks to
 - [Lua](https://www.lua.org/) — Lua 5.4 scripting language runtime
 - [sol2](https://github.com/ThePhD/sol2) — modern C++ Lua bindings
 - [Dear ImGui](https://github.com/ocornut/imgui) — editor user interface
-- [ImGuiFileDialog](https://github.com/aiekick/ImGuiFileDialog) — file dialogs
+- [Native File Dialog Extended](https://github.com/btzy/nativefiledialog-extended) — system native file dialogs
 - [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo) — transform gizmos
 - [spdlog](https://github.com/gabime/spdlog) — logging library
 - [stb](https://github.com/nothings/stb) — single-header image library

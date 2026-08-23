@@ -5,14 +5,129 @@
 #include "Panels/EditorContext.h"
 #include "Panels/EditorLayer.h"
 #include "Project/ProjectManager.h"
+#include "UI/AssetBrowserGrid.h"
 #include "Utils/FileDialogs.h"
 #include "Utils/FileSystem.h"
 #include "Utils/PlatformUtils.h"
 
 #include <imgui.h>
 
+#include <filesystem>
+
 namespace HachimiEngine
 {
+    namespace
+    {
+        constexpr const char* BackGlyph = "\uE72B";
+        constexpr const char* ForwardGlyph = "\uE72A";
+        constexpr const char* UpGlyph = "\uE74A";
+
+        bool DrawToolbarButton(const char* glyph, const char* tooltip, bool enabled)
+        {
+            ImGui::BeginDisabled(!enabled);
+            const bool clicked = ImGui::Button(glyph, ImVec2(ImGui::GetFrameHeight() * 1.6f, 0.0f));
+            ImGui::EndDisabled();
+
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            {
+                ImGui::SetTooltip("%s", tooltip);
+            }
+
+            return clicked;
+        }
+    }
+
+    void ContentBrowserPanel::NavigateTo(const std::filesystem::path& directory)
+    {
+        if (m_CurrentDirectory == directory)
+        {
+            return;
+        }
+
+        if (!m_CurrentDirectory.empty())
+        {
+            m_BackHistory.push_back(m_CurrentDirectory);
+        }
+        m_ForwardHistory.clear();
+        m_CurrentDirectory = directory;
+        m_SelectedPath.clear();
+    }
+
+    void ContentBrowserPanel::NavigateBack()
+    {
+        if (m_BackHistory.empty())
+        {
+            return;
+        }
+
+        m_ForwardHistory.push_back(m_CurrentDirectory);
+        m_CurrentDirectory = m_BackHistory.back();
+        m_BackHistory.pop_back();
+        m_SelectedPath.clear();
+    }
+
+    void ContentBrowserPanel::NavigateForward()
+    {
+        if (m_ForwardHistory.empty())
+        {
+            return;
+        }
+
+        m_BackHistory.push_back(m_CurrentDirectory);
+        m_CurrentDirectory = m_ForwardHistory.back();
+        m_ForwardHistory.pop_back();
+        m_SelectedPath.clear();
+    }
+
+    void ContentBrowserPanel::NavigateUp(const std::filesystem::path& assetsDirectory)
+    {
+        if (m_CurrentDirectory == assetsDirectory)
+        {
+            return;
+        }
+
+        NavigateTo(m_CurrentDirectory.parent_path());
+    }
+
+    void ContentBrowserPanel::DrawBreadcrumb(const std::filesystem::path& assetsDirectory)
+    {
+        if (m_CurrentDirectory == assetsDirectory)
+        {
+            ImGui::TextUnformatted("Assets");
+            return;
+        }
+
+        ImGui::TextUnformatted("Assets");
+
+        const std::filesystem::path relativePath = m_CurrentDirectory.lexically_relative(assetsDirectory);
+        std::filesystem::path accumulatedPath = assetsDirectory;
+        const size_t componentCount = std::distance(relativePath.begin(), relativePath.end());
+
+        size_t componentIndex = 0;
+        for (const auto& component : relativePath)
+        {
+            accumulatedPath /= component;
+
+            ImGui::SameLine();
+            ImGui::TextUnformatted("/");
+            ImGui::SameLine();
+
+            if (componentIndex + 1 < componentCount)
+            {
+                if (ImGui::Button(component.string().c_str()))
+                {
+                    NavigateTo(accumulatedPath);
+                }
+            }
+            else
+            {
+                ImGui::TextUnformatted(component.string().c_str());
+            }
+
+            ++componentIndex;
+        }
+    }
+
     void ContentBrowserPanel::Draw(EditorLayer* owner, EditorContext& context)
     {
         ImGui::Begin("Content Browser");
@@ -23,89 +138,89 @@ namespace HachimiEngine
             m_CurrentDirectory = assetsDirectory;
         }
 
-        if (ImGui::Button("Import Texture"))
+        if (!FileSystem::IsDirectory(m_CurrentDirectory))
         {
-            FileDialogs::OpenTextureImportDialog(assetsDirectory);
+            m_CurrentDirectory = assetsDirectory;
+            m_BackHistory.clear();
+            m_ForwardHistory.clear();
+            m_SelectedPath.clear();
         }
 
-        std::string textureSourcePath;
-        if (FileDialogs::DrawTextureImportDialog(textureSourcePath))
+        const ImGuiStyle& style = ImGui::GetStyle();
+        const float importButtonWidth = ImGui::CalcTextSize("Import Texture").x + style.FramePadding.x * 2.0f;
+
+        if (DrawToolbarButton(BackGlyph, "Back", !m_BackHistory.empty()))
         {
-            if (!textureSourcePath.empty())
+            NavigateBack();
+        }
+        ImGui::SameLine();
+        if (DrawToolbarButton(ForwardGlyph, "Forward", !m_ForwardHistory.empty()))
+        {
+            NavigateForward();
+        }
+        ImGui::SameLine();
+        if (DrawToolbarButton(UpGlyph, "Up", m_CurrentDirectory != assetsDirectory))
+        {
+            NavigateUp(assetsDirectory);
+        }
+
+        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - importButtonWidth - style.WindowPadding.x);
+        if (ImGui::Button("Import Texture", ImVec2(importButtonWidth, 0.0f)))
+        {
+            const std::filesystem::path selectedTexturePath =
+                FileDialogs::OpenTextureImportDialog(assetsDirectory);
+            if (!selectedTexturePath.empty())
             {
-                AssetManager::ImportTexture(textureSourcePath);
+                AssetManager::ImportTexture(selectedTexturePath);
             }
         }
+
+        DrawBreadcrumb(assetsDirectory);
 
         ImGui::Separator();
 
-        if (m_CurrentDirectory != assetsDirectory)
+        const std::vector<std::filesystem::path> directories = FileSystem::GetDirectories(m_CurrentDirectory);
+        const std::vector<std::filesystem::path> files = FileSystem::GetFiles(m_CurrentDirectory);
+        std::filesystem::path activatedPath;
+        AssetBrowserGrid::Draw(directories, files, m_SelectedPath, activatedPath);
+
+        if (activatedPath.empty())
         {
-            if (ImGui::Button("<-"))
-            {
-                m_CurrentDirectory = m_CurrentDirectory.parent_path();
-            }
+            ImGui::End();
+            return;
         }
 
-        ImGui::Text("%s", m_CurrentDirectory.string().c_str());
-        ImGui::Separator();
-
-        ImGui::Columns(2, "ContentBrowserColumns", false);
-        ImGui::SetColumnWidth(0, 180.0f);
-        ImGui::TextUnformatted("Name");
-        ImGui::NextColumn();
-        ImGui::TextUnformatted("Type");
-        ImGui::NextColumn();
-        ImGui::Separator();
-
-        for (const auto& directory : FileSystem::GetDirectories(m_CurrentDirectory))
+        if (FileSystem::IsDirectory(activatedPath))
         {
-            ImGui::Text("%s", FileSystem::GetFileName(directory).c_str());
-            ImGui::NextColumn();
-            ImGui::TextUnformatted("Folder");
-            ImGui::NextColumn();
-
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-            {
-                m_CurrentDirectory = directory;
-            }
+            NavigateTo(activatedPath);
+            ImGui::End();
+            return;
         }
 
-        for (const auto& file : FileSystem::GetFiles(m_CurrentDirectory))
+        const std::string extension = FileSystem::GetExtension(activatedPath);
+        if (extension == ".hscene")
         {
-            ImGui::Text("%s", FileSystem::GetFileName(file).c_str());
-            ImGui::NextColumn();
-            ImGui::Text("%s", FileSystem::GetExtension(file).c_str());
-            ImGui::NextColumn();
-
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            if (context.PlayState != EditorPlayState::Stopped)
             {
-                if (FileSystem::GetExtension(file) == ".hscene")
-                {
-                    if (context.PlayState != EditorPlayState::Stopped)
-                    {
-                        owner->OnStop();
-                    }
+                owner->OnStop();
+            }
 
-                    const Ref<Project> project = ProjectManager::GetActiveProject();
-                    if (project != nullptr && project->OpenScene(file))
-                    {
-                        context.ActiveScene = project->GetActiveScene();
-                        context.EditorScene = nullptr;
-                        context.SelectedEntity = {};
-                        context.PlayState = EditorPlayState::Stopped;
-                        HE_CLIENT_INFO("Opened scene {}", file.string());
-                    }
-                }
-                else if (FileSystem::GetExtension(file) == ".lua")
-                {
-                    // Scripts are plain text assets; hand them to the system editor.
-                    PlatformUtils::OpenPathInExplorer(file);
-                }
+            const Ref<Project> project = ProjectManager::GetActiveProject();
+            if (project != nullptr && project->OpenScene(activatedPath))
+            {
+                context.ActiveScene = project->GetActiveScene();
+                context.EditorScene = nullptr;
+                context.SelectedEntity = {};
+                context.PlayState = EditorPlayState::Stopped;
+                HE_CLIENT_INFO("Opened scene {}", activatedPath.string());
             }
         }
+        else
+        {
+            // Scripts and unknown asset files are handed to the system editor.
+            PlatformUtils::OpenPathInExplorer(activatedPath);
+        }
 
-        ImGui::Columns(1);
         ImGui::End();
     }
 }

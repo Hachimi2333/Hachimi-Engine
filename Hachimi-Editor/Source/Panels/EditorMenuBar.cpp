@@ -11,6 +11,8 @@
 
 #include <imgui.h>
 
+#include <filesystem>
+
 namespace HachimiEngine
 {
     void EditorMenuBar::Draw(EditorLayer* owner, EditorContext& context)
@@ -28,7 +30,7 @@ namespace HachimiEngine
             }
             if (ImGui::MenuItem("Open Scene..."))
             {
-                OpenScene();
+                OpenScene(owner, context);
             }
             if (ImGui::MenuItem("Import Texture..."))
             {
@@ -64,40 +66,9 @@ namespace HachimiEngine
         }
 
         ImGui::EndMainMenuBar();
-
-        std::string selectedScenePath;
-        if (FileDialogs::DrawSceneFileDialog(selectedScenePath))
-        {
-            if (!selectedScenePath.empty())
-            {
-                const Ref<Project> project = ProjectManager::GetActiveProject();
-                if (context.PlayState != EditorPlayState::Stopped)
-                {
-                    owner->OnStop();
-                }
-
-                if (project != nullptr && project->OpenScene(selectedScenePath))
-                {
-                    context.ActiveScene = project->GetActiveScene();
-                    context.EditorScene = nullptr;
-                    context.SelectedEntity = {};
-                    context.PlayState = EditorPlayState::Stopped;
-                    HE_CLIENT_INFO("Opened scene {}", selectedScenePath);
-                }
-            }
-        }
-
-        std::string selectedTexturePath;
-        if (FileDialogs::DrawTextureImportDialog(selectedTexturePath))
-        {
-            if (!selectedTexturePath.empty())
-            {
-                AssetManager::ImportTexture(selectedTexturePath);
-            }
-        }
     }
 
-    void EditorMenuBar::OpenScene()
+    void EditorMenuBar::OpenScene(EditorLayer* owner, EditorContext& context)
     {
         const Ref<Project> project = ProjectManager::GetActiveProject();
         if (project == nullptr)
@@ -105,7 +76,26 @@ namespace HachimiEngine
             return;
         }
 
-        FileDialogs::OpenSceneFileDialog(project->GetAssetsDirectory() / "Scenes");
+        const std::filesystem::path selectedScenePath =
+            FileDialogs::OpenSceneFileDialog(project->GetAssetsDirectory() / "Scenes");
+        if (selectedScenePath.empty())
+        {
+            return;
+        }
+
+        if (context.PlayState != EditorPlayState::Stopped)
+        {
+            owner->OnStop();
+        }
+
+        if (project->OpenScene(selectedScenePath))
+        {
+            context.ActiveScene = project->GetActiveScene();
+            context.EditorScene = nullptr;
+            context.SelectedEntity = {};
+            context.PlayState = EditorPlayState::Stopped;
+            HE_CLIENT_INFO("Opened scene {}", selectedScenePath.string());
+        }
     }
 
     void EditorMenuBar::SaveScene()
@@ -120,6 +110,11 @@ namespace HachimiEngine
 
     void EditorMenuBar::ImportTexture()
     {
-        FileDialogs::OpenTextureImportDialog(AssetManager::GetAssetsDirectory());
+        const std::filesystem::path selectedTexturePath =
+            FileDialogs::OpenTextureImportDialog(AssetManager::GetAssetsDirectory());
+        if (!selectedTexturePath.empty())
+        {
+            AssetManager::ImportTexture(selectedTexturePath);
+        }
     }
 }

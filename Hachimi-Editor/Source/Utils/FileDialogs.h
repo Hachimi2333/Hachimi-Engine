@@ -3,27 +3,17 @@
 #include "Core/Base.h"
 
 #include <filesystem>
-#include <string>
 
 namespace HachimiEngine
 {
-    // Small ImGuiFileDialog wrapper used by the editor panels.
+    // Thin wrapper around Native File Dialog Extended, which opens the Windows native file dialogs.
+    // Every function blocks until the user confirms or cancels and returns an empty path on cancel.
     class FileDialogs
     {
     public:
-        static void OpenProjectFileDialog(const std::filesystem::path& startPath);
-        static bool DrawProjectFileDialog(std::string& selectedPath);
-
-        static void OpenDirectoryDialog(const std::filesystem::path& startPath);
-        static bool DrawDirectoryDialog(std::string& selectedPath);
-
-        static void OpenTextureImportDialog(const std::filesystem::path& startPath);
-        static bool DrawTextureImportDialog(std::string& selectedPath);
-
-        static void OpenSceneFileDialog(const std::filesystem::path& startPath);
-        static bool DrawSceneFileDialog(std::string& selectedPath);
-
-        static void OpenScriptFileDialog(const std::filesystem::path& startPath);
-        static bool DrawScriptFileDialog(std::string& selectedPath);
+        static std::filesystem::path OpenProjectFileDialog(const std::filesystem::path& startPath);
+        static std::filesystem::path OpenDirectoryDialog(const std::filesystem::path& startPath);
+        static std::filesystem::path OpenTextureImportDialog(const std::filesystem::path& startPath);
+        static std::filesystem::path OpenSceneFileDialog(const std::filesystem::path& startPath);
     };
 }

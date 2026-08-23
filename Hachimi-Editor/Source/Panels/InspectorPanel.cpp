@@ -5,12 +5,14 @@
 #include "Renderer/MeshFactory.h"
 #include "Scene/Components.h"
 #include "Scene/Scene.h"
-#include "Utils/FileDialogs.h"
+#include "UI/AssetBrowserGrid.h"
+#include "Utils/FileSystem.h"
 #include "Math/Math.h"
 
 #include <imgui.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cfloat>
 #include <cstdio>
 #include <filesystem>
@@ -148,6 +150,14 @@ namespace HachimiEngine
 
             reference.Path = relativePath.generic_string();
         }
+
+        bool IsLuaScriptPath(const std::string& path)
+        {
+            std::string extension = std::filesystem::path(path).extension().string();
+            std::transform(extension.begin(), extension.end(), extension.begin(),
+                [](unsigned char character) { return static_cast<char>(std::tolower(character)); });
+            return extension == ".lua";
+        }
     }
 
     void InspectorPanel::Draw(EditorContext& context)
@@ -156,6 +166,7 @@ namespace HachimiEngine
 
         if (!context.SelectedEntity || context.ActiveScene == nullptr)
         {
+            m_ScriptPicker.Close();
             ImGui::TextDisabled("No entity selected");
             ImGui::End();
             return;
@@ -576,6 +587,7 @@ namespace HachimiEngine
         const bool open = DrawComponentHeader<ScriptComponent>(entity, "Script", true, removed);
         if (removed || !open)
         {
+            m_ScriptPicker.Close();
             return;
         }
 
@@ -605,11 +617,30 @@ namespace HachimiEngine
                     reference.Path = pathBuffer;
                 }
 
+                if (ImGui::IsItemHovered())
+                {
+                    ImGui::SetTooltip("Drag a Lua script here from the Content Browser");
+                }
+
+                // Accept script files dragged from the Content Browser grid.
+                if (ImGui::BeginDragDropTarget())
+                {
+                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(AssetBrowserGrid::FilePayload))
+                    {
+                        const std::string droppedPath(static_cast<const char*>(payload->Data));
+                        if (IsLuaScriptPath(droppedPath))
+                        {
+                            MakeScriptPathRelative(droppedPath, reference);
+                        }
+                    }
+                    ImGui::EndDragDropTarget();
+                }
+
                 ImGui::SameLine();
                 if (ImGui::Button("...", ImVec2{ buttonWidth, buttonWidth }))
                 {
-                    m_PendingScriptFileDialogSlot = slotIndex;
-                    FileDialogs::OpenScriptFileDialog(AssetManager::GetAssetsDirectory() / "Scripts");
+                    m_PendingScriptPickerSlot = slotIndex;
+                    m_ScriptPicker.Open("Select Script", AssetManager::GetAssetsDirectory() / "Scripts", { ".lua" });
                 }
                 if (ImGui::IsItemHovered())
                 {
@@ -634,14 +665,14 @@ namespace HachimiEngine
             script.Scripts.emplace_back();
         }
 
-        std::string selectedPath;
-        if (FileDialogs::DrawScriptFileDialog(selectedPath))
+        std::filesystem::path selectedPath;
+        if (m_ScriptPicker.Draw(selectedPath))
         {
-            if (!selectedPath.empty() && m_PendingScriptFileDialogSlot >= 0 && m_PendingScriptFileDialogSlot < static_cast<int>(script.Scripts.size()))
+            if (m_PendingScriptPickerSlot >= 0 && m_PendingScriptPickerSlot < static_cast<int>(script.Scripts.size()))
             {
-                MakeScriptPathRelative(selectedPath, script.Scripts[m_PendingScriptFileDialogSlot]);
+                MakeScriptPathRelative(selectedPath.string(), script.Scripts[m_PendingScriptPickerSlot]);
             }
-            m_PendingScriptFileDialogSlot = -1;
+            m_PendingScriptPickerSlot = -1;
         }
 
         if (removeSlot >= 0)

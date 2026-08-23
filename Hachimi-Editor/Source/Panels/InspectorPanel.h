@@ -2,6 +2,7 @@
 
 #include "Core/Base.h"
 #include "Scene/Entity.h"
+#include "UI/AssetPickerPopup.h"
 
 namespace HachimiEngine
 {
@@ -24,6 +25,7 @@ namespace HachimiEngine
         void DrawScript(Entity entity);
 
     private:
-        int m_PendingScriptFileDialogSlot = -1;
+        int m_PendingScriptPickerSlot = -1;
+        AssetPickerPopup m_ScriptPicker;
     };
 }

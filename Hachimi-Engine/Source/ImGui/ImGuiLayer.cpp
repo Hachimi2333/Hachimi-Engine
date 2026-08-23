@@ -28,6 +28,35 @@ namespace HachimiEngine
             return PlatformUtils::GetExecutableDirectory() / "Assets" / "Fonts" / InterFontFileName;
         }
 
+        std::filesystem::path GetIconFontPath()
+        {
+            return "C:/Windows/Fonts/segmdl2.ttf";
+        }
+
+        // Loads the Windows icon font into the default font so editor panels can use Segoe MDL2
+        // glyphs (private use area) without shipping an extra icon font.
+        void MergeIconFont(ImGuiIO& io, float pixelSize)
+        {
+            const std::filesystem::path iconFontPath = GetIconFontPath();
+            if (!FileSystem::Exists(iconFontPath))
+            {
+                HE_CORE_WARN("ImGui icon font not found at {}, icon glyphs will fall back to text", iconFontPath.string());
+                return;
+            }
+
+            constexpr ImWchar IconFontRanges[] = { 0xE700, 0xF000, 0 };
+
+            ImFontConfig iconConfig;
+            iconConfig.MergeMode = true;
+            iconConfig.PixelSnapH = true;
+            iconConfig.GlyphMinAdvanceX = pixelSize;
+
+            if (io.Fonts->AddFontFromFileTTF(iconFontPath.string().c_str(), pixelSize, &iconConfig, IconFontRanges) == nullptr)
+            {
+                HE_CORE_WARN("Failed to parse ImGui icon font {}", iconFontPath.string());
+            }
+        }
+
         void LoadUiFont(ImGuiIO& io, GLFWwindow* window)
         {
             float contentScaleX = 1.0f;
@@ -45,6 +74,7 @@ namespace HachimiEngine
                 if (interFont != nullptr)
                 {
                     io.FontDefault = interFont;
+                    MergeIconFont(io, BaseFontSize * uiScale);
                     HE_CORE_INFO("Loaded ImGui font {} rasterized at {} px (UI scale {:.2f})", fontPath.string(), BaseFontSize * uiScale, uiScale);
                     return;
                 }
@@ -60,6 +90,7 @@ namespace HachimiEngine
             ImFontConfig fallbackConfig;
             fallbackConfig.SizePixels = BaseFontSize * uiScale;
             io.FontDefault = io.Fonts->AddFontDefault(&fallbackConfig);
+            MergeIconFont(io, BaseFontSize * uiScale);
         }
     }
 
