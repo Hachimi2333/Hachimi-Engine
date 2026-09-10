@@ -3,13 +3,12 @@
 #include "Core/Assert.h"
 #include "Core/Log.h"
 #include "Math/Math.h"
+#include "Utils/VirtualFileSystem.h"
 
 #include <glad/gl.h>
 
 #include <array>
 #include <cstring>
-#include <fstream>
-#include <sstream>
 #include <vector>
 
 namespace HachimiEngine
@@ -109,17 +108,17 @@ namespace HachimiEngine
 
     std::string OpenGLShader::ReadFile(const std::string& filepath)
     {
-        std::ifstream file(filepath, std::ios::in | std::ios::binary);
-        if (!file.is_open())
+        // Goes through the virtual file system so packaged games read shaders
+        // straight out of the game package.
+        std::string source;
+        if (!VirtualFileSystem::ReadTextFile(filepath, source))
         {
             HE_CORE_CRITICAL("Failed to open shader file: {}", filepath);
             HE_CORE_ASSERT(false);
             return {};
         }
 
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        return buffer.str();
+        return source;
     }
 
     std::unordered_map<uint32_t, std::string> OpenGLShader::PreProcess(const std::string& source)

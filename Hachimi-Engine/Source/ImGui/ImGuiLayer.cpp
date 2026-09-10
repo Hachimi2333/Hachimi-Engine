@@ -3,8 +3,7 @@
 
 #include "Core/Application.h"
 #include "Core/Log.h"
-#include "Utils/FileSystem.h"
-#include "Utils/PlatformUtils.h"
+#include "Utils/VirtualFileSystem.h"
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -12,7 +11,9 @@
 #include <backends/imgui_impl_opengl3.h>
 
 #include <algorithm>
+#include <cstring>
 #include <filesystem>
+#include <vector>
 
 namespace HachimiEngine
 {
@@ -25,7 +26,9 @@ namespace HachimiEngine
 
         std::filesystem::path GetInterFontPath()
         {
-            return PlatformUtils::GetExecutableDirectory() / "Assets" / "Fonts" / InterFontFileName;
+            // The packaged game keeps its UI font inside Data.hpak; the editor
+            // reads it next to its executable.
+            return VirtualFileSystem::GetDataRoot() / "Assets" / "Fonts" / InterFontFileName;
         }
 
         std::filesystem::path GetIconFontPath()
@@ -33,12 +36,38 @@ namespace HachimiEngine
             return "C:/Windows/Fonts/segmdl2.ttf";
         }
 
+        // Copies font bytes into memory owned by the ImGui atlas. ImGui frees the
+        // allocation together with the atlas, so no buffer has to outlive this
+        // call. Returns nullptr when the font is not available.
+        void* LoadFontData(const std::filesystem::path& path, int& outSize)
+        {
+            outSize = 0;
+
+            std::vector<uint8_t> bytes;
+            if (!VirtualFileSystem::ReadBinaryFile(path, bytes) || bytes.empty())
+            {
+                return nullptr;
+            }
+
+            void* owned = IM_ALLOC(bytes.size());
+            if (owned == nullptr)
+            {
+                return nullptr;
+            }
+
+            memcpy(owned, bytes.data(), bytes.size());
+            outSize = static_cast<int>(bytes.size());
+            return owned;
+        }
+
         // Loads the Windows icon font into the default font so editor panels can use Segoe MDL2
         // glyphs (private use area) without shipping an extra icon font.
         void MergeIconFont(ImGuiIO& io, float pixelSize)
         {
             const std::filesystem::path iconFontPath = GetIconFontPath();
-            if (!FileSystem::Exists(iconFontPath))
+            int fontSize = 0;
+            void* fontData = LoadFontData(iconFontPath, fontSize);
+            if (fontData == nullptr)
             {
                 HE_CORE_WARN("ImGui icon font not found at {}, icon glyphs will fall back to text", iconFontPath.string());
                 return;
@@ -50,8 +79,9 @@ namespace HachimiEngine
             iconConfig.MergeMode = true;
             iconConfig.PixelSnapH = true;
             iconConfig.GlyphMinAdvanceX = pixelSize;
+            iconConfig.FontDataOwnedByAtlas = true;
 
-            if (io.Fonts->AddFontFromFileTTF(iconFontPath.string().c_str(), pixelSize, &iconConfig, IconFontRanges) == nullptr)
+            if (io.Fonts->AddFontFromMemoryTTF(fontData, fontSize, pixelSize, &iconConfig, IconFontRanges) == nullptr)
             {
                 HE_CORE_WARN("Failed to parse ImGui icon font {}", iconFontPath.string());
             }
@@ -68,9 +98,15 @@ namespace HachimiEngine
             ImGui::GetStyle().FontScaleMain = 1.0f / uiScale;
 
             const std::filesystem::path fontPath = GetInterFontPath();
-            if (FileSystem::Exists(fontPath))
+            int fontSize = 0;
+            void* fontData = LoadFontData(fontPath, fontSize);
+            if (fontData != nullptr)
             {
-                ImFont* interFont = io.Fonts->AddFontFromFileTTF(fontPath.string().c_str(), BaseFontSize * uiScale);
+                ImFontConfig fontConfig;
+                fontConfig.FontDataOwnedByAtlas = true;
+
+                ImFont* interFont = io.Fonts->AddFontFromMemoryTTF(
+                    fontData, fontSize, BaseFontSize * uiScale, &fontConfig);
                 if (interFont != nullptr)
                 {
                     io.FontDefault = interFont;

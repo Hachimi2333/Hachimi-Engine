@@ -2,6 +2,7 @@
 
 #include "Core/Base.h"
 #include "Core/Memory.h"
+#include "Renderer/ImageDecoder.h"
 
 #include <string>
 
@@ -35,6 +36,11 @@ namespace HachimiEngine
     {
     public:
         static Ref<Texture2D> Create(const TextureSpecification& specification);
+        // Uploads pre-decoded pixels. Always succeeds for a valid image, which is
+        // what the asynchronous loading path uses on the main thread.
+        static Ref<Texture2D> Create(const DecodedImage& image);
+        // Returns nullptr when the file is missing or cannot be decoded, so
+        // callers can fall back to an untextured material.
         static Ref<Texture2D> Create(const std::string& path);
     };
 }

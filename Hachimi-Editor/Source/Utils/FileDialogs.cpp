@@ -137,4 +137,44 @@ namespace HachimiEngine
         };
         return OpenFileDialog(startPath, filters);
     }
+
+    std::filesystem::path FileDialogs::OpenPackageFileDialog(const std::filesystem::path& startPath)
+    {
+        constexpr std::array filters = {
+            nfdu8filteritem_t{ "Hachimi Game Package", "hpak" }
+        };
+        return OpenFileDialog(startPath, filters);
+    }
+
+    std::filesystem::path FileDialogs::SaveFileDialog(const std::filesystem::path& startPath, const std::string& defaultName)
+    {
+        if (!IsNfdReady())
+        {
+            return {};
+        }
+
+        const std::string defaultPath = ToUtf8(startPath);
+        const char* defaultNameUtf8 = defaultName.empty() ? nullptr : defaultName.c_str();
+
+        nfdu8char_t* selectedPath = nullptr;
+        const nfdresult_t result = NFD_SaveDialogU8(
+            &selectedPath,
+            nullptr,
+            0,
+            defaultPath.empty() ? nullptr : defaultPath.c_str(),
+            defaultNameUtf8);
+
+        if (result != NFD_OKAY)
+        {
+            if (result == NFD_ERROR)
+            {
+                HE_CLIENT_ERROR("Native save dialog failed: {}", NFD_GetError());
+            }
+            return {};
+        }
+
+        const std::filesystem::path path = ToNativePath(selectedPath);
+        NFD_FreePathU8(selectedPath);
+        return path;
+    }
 }

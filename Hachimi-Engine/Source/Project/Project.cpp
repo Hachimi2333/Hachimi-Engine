@@ -4,6 +4,7 @@
 #include "Renderer/MeshFactory.h"
 #include "Serialization/SceneSerializer.h"
 #include "Utils/FileSystem.h"
+#include "Utils/VirtualFileSystem.h"
 #include "Math/Math.h"
 
 #include <fstream>
@@ -280,7 +281,7 @@ return Rotator
 
     bool Project::OpenScene(const std::filesystem::path& scenePath)
     {
-        if (!FileSystem::Exists(scenePath))
+        if (!VirtualFileSystem::Exists(scenePath))
         {
             HE_CORE_ERROR("Scene file does not exist: {}", scenePath.string());
             return false;
@@ -334,6 +335,14 @@ return Rotator
         project->m_StartScenePath = startScenePath;
         project->m_ProjectFilePath = projectDirectory / (name + ".hproj");
         project->m_ActiveScene = defaultScene;
+
+        PlatformBuildSettings& windowsSettings = project->m_BuildSettings.GetOrCreateWindowsSettings();
+        windowsSettings.ProductName = name;
+        windowsSettings.StartScene = "Assets" / std::filesystem::path("Scenes") / "Default.hscene";
+        windowsSettings.WindowWidth = 1600;
+        windowsSettings.WindowHeight = 900;
+        windowsSettings.VSync = true;
+
         return project;
     }
 }

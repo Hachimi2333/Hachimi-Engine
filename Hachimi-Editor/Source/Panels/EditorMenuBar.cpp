@@ -56,6 +56,16 @@ namespace HachimiEngine
             ImGui::EndMenu();
         }
 
+        if (ImGui::BeginMenu("Build"))
+        {
+            if (ImGui::MenuItem("Build Settings..."))
+            {
+                owner->OpenBuildSettings();
+            }
+
+            ImGui::EndMenu();
+        }
+
         if (context.ActiveScene != nullptr && ImGui::BeginMenu("Renderer"))
         {
             EnvironmentSettings& environment = context.ActiveScene->GetEnvironmentSettings();

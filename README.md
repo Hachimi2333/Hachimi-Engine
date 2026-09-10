@@ -33,6 +33,7 @@ A C++20 3D game engine and editor for Windows, built on OpenGL 4.6 Core and insp
 ### Editor
 
 - ImGui Docking-based editor: Project Hub, Viewport, Scene Hierarchy, Inspector, Content Browser, Console
+- Game export pipeline: Build Settings popup, Windows_x64 builds, packaged `Data.hpak` assets, and a standalone `Hachimi-Player` runtime
 - Large-icon Content Browser grid with texture thumbnails and drag-and-drop to Inspector asset fields
 - Native File Dialog Extended system file dialogs
 - Inter font and DPI-aware UI scaling
@@ -99,7 +100,9 @@ For example:
 
 ```
 Bin/Debug-windows-x86_64/Hachimi-Editor.exe
+Bin/Debug-windows-x86_64/Hachimi-Player.exe
 Bin/Release-windows-x86_64/Hachimi-Editor.exe
+Bin/Release-windows-x86_64/Hachimi-Player.exe
 ```
 
 ### Run
@@ -127,6 +130,52 @@ A new project is generated with:
 
 The default `Default.hscene` showcases rendering and physics features: PBR metal/roughness material balls and cubes, ground plane, directional light shadows (including inter-object shadows on the platform), two point lights, a parented object hierarchy, skybox and IBL. In Play mode, the scene's spheres, cubes and clustered child objects fall, collide and settle under Box3D physics simulation, while the `Scripted Spinner` entity rotates from the bundled `Rotator.lua` script. The Game panel uses the main camera view.
 
+### Exporting a Game
+
+Open `Build → Build Settings...` in the editor menu bar. The popup stores settings per target platform; only Windows is implemented in the current phase. Windows settings include:
+
+- Product Name (used for the exported executable name and window title)
+- Start Scene (`.hscene` files under `Assets/Scenes`)
+- Window width / height and VSync
+
+Click `Export` to create the build:
+
+```
+<ProjectName>/
+└── Build/
+    └── Windows_x64/
+        ├── <ProductName>.exe    # standalone Hachimi-Player runtime
+        └── Data.hpak            # packaged project file, Assets, shaders and fonts
+```
+
+The exported game runs the start scene immediately with physics and Lua scripting. The Player mounts `Data.hpak` in place and reads every asset straight out of it: nothing is ever extracted, so no cache directory is created, the game runs from read-only media, and only the assets actually loaded are decompressed.
+
+The Player also exposes headless modes, which makes an exported build verifiable without a GPU:
+
+```
+<ProductName>.exe [<package>] [--content=<dir>] [--verify] [--list] [--stats]
+```
+
+| Option | Effect |
+| --- | --- |
+| `<package>` | Package to run. Defaults to `Data.hpak` next to the executable |
+| `--content=<dir>` | Mount a directory of loose files over the package, for iterating on content without re-exporting |
+| `--verify` | Check every entry against its content hash, then exit with 0 or 1 |
+| `--list` | Print the package table of contents (path, raw size, packed size, method, blocks) |
+| `--stats` | Print package header information |
+
+### Game Package Format
+
+`Data.hpak` is a custom container built on [Zstandard](https://github.com/facebook/zstd), not a ZIP:
+
+- A header with magic, format version, package id and dictionary information, plus a footer that mirrors the table of contents location so the directory is reachable from either end.
+- A table of contents with per-entry path hash, offsets, sizes, a content hash and a per-entry block table.
+- Each entry is split into independently decompressible blocks, which is what enables partial and streaming reads.
+- An optional shared zstd dictionary is trained from the package contents, a large win for projects made of many small text assets.
+- Already-compressed payloads (PNG, TTF, ...) are stored rather than deflated again.
+- Packages are memory mapped read-only, so stored entries are served with zero copies.
+- The writing phase compresses entries in parallel across the engine job system, and identical inputs produce byte-identical packages.
+
 ### Viewport Controls
 
 | Action | Input |
@@ -146,18 +195,30 @@ The default `Default.hscene` showcases rendering and physics features: PBR metal
 Hachimi-Engine/          # Engine core (static library)
   Resources/Shaders/     # Engine-owned GLSL shaders
   Source/                # Engine source
+  Source/Packaging/      # Game build settings, .hpak format, reader/writer
   Source/Scripting/      # Language-agnostic scripting core + Lua backend
   Vendor/                # Third-party libraries used by the engine
   Vendor/Lua/            # Lua 5.4 runtime
   Vendor/sol2/           # C++ Lua bindings (header-only)
+  Vendor/zstd/           # Zstandard: package compression and xxHash
 Hachimi-Editor/          # Editor client (executable)
   Source/                # Editor source
   Vendor/                # Third-party libraries used by the editor
+Hachimi-Player/          # Standalone game runtime used by exported builds
+  Source/                # Player source
+Hachimi-Tests/           # Headless verification target (package round trip, VFS)
+  Source/                # Test source
 Vendor/Premake/          # Premake5 toolchain
 Bin/                     # Build output (gitignored)
 Vendor/Downloads/        # Third-party library download staging area (gitignored)
 Utils/                   # Ad-hoc debugging tools (FramebufferTest, UIAutomation)
 ```
+
+Runtime asset access goes through `HachimiEngine::VirtualFileSystem`, a read-only
+mount table. Paths below a mount point are served from the mounted package (or
+loose-content overlay) and everything else falls back to the operating system, so
+the editor needs no special casing and packaged games get the package
+transparently.
 
 ## Current Scope
 
@@ -165,6 +226,7 @@ The following have reserved architecture slots but are not yet implemented:
 
 - Audio system
 - Additional scripting languages beyond Lua (the backend abstraction is in place)
+- Export targets beyond Windows (the Build Settings platform layout is reserved; Windows_x64 is implemented)
 - Rendering backends other than OpenGL 4.6 Core
 - External 3D model import (built-in meshes are used)
 - Log file output (console only)
@@ -192,6 +254,7 @@ Hachimi-Engine builds upon the following open-source projects. Special thanks to
 - [GLM](https://github.com/g-truc/glm) — math library (wrapped internally by `HachimiEngine::Math`)
 - [Lua](https://www.lua.org/) — Lua 5.4 scripting language runtime
 - [sol2](https://github.com/ThePhD/sol2) — modern C++ Lua bindings
+- [zstd](https://github.com/facebook/zstd) — Zstandard compression for the game package container, plus its bundled xxHash for path and content hashing
 - [Dear ImGui](https://github.com/ocornut/imgui) — editor user interface
 - [Native File Dialog Extended](https://github.com/btzy/nativefiledialog-extended) — system native file dialogs
 - [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo) — transform gizmos

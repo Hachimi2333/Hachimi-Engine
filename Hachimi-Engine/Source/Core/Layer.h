@@ -22,6 +22,9 @@ namespace HachimiEngine
         virtual void OnAttach() {}
         virtual void OnDetach() {}
         virtual void OnUpdate(Timestep timestep) {}
+        // Called after the default framebuffer is cleared and before ImGui is
+        // rendered; intended for layers that draw directly to the window.
+        virtual void OnRender() {}
         virtual void OnImGuiRender() {}
         virtual void OnEvent(Event& event) {}
 

@@ -13,6 +13,7 @@ namespace HachimiEngine
     public:
         static std::filesystem::path GetUserDocumentsDirectory();
         static std::filesystem::path GetApplicationDataDirectory();
+        static std::filesystem::path GetLocalAppDataDirectory();
         static std::filesystem::path GetDefaultProjectsDirectory();
         static std::filesystem::path GetExecutableDirectory();
         static void OpenPathInExplorer(const std::filesystem::path& path);

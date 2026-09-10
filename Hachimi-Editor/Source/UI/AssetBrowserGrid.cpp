@@ -10,7 +10,9 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdint>
 #include <string>
+#include <unordered_set>
 
 namespace HachimiEngine
 {
@@ -110,6 +112,14 @@ namespace HachimiEngine
                 IM_COL32_WHITE);
         }
 
+        // Tracks in-flight thumbnail decodes so a texture is requested once while
+        // the grid keeps drawing a placeholder glyph for it.
+        std::unordered_set<std::string>& GetPendingThumbnails()
+        {
+            static std::unordered_set<std::string> pending;
+            return pending;
+        }
+
         Ref<Texture2D> GetTextureThumbnail(const std::filesystem::path& path)
         {
             if (!IsImageExtension(GetLowerExtension(path)))
@@ -125,7 +135,33 @@ namespace HachimiEngine
                 return nullptr;
             }
 
-            return AssetManager::GetTexture(relativePath);
+            if (Ref<Texture2D> cached = AssetManager::GetCachedTexture(relativePath))
+            {
+                return cached;
+            }
+
+            // Decoding runs on a worker thread; the texture appears through the
+            // cache once AssetManager::PumpCompletedRequests() has uploaded it.
+            const std::string key = relativePath.generic_string();
+            std::unordered_set<std::string>& pending = GetPendingThumbnails();
+            if (!pending.contains(key))
+            {
+                const uint64_t requestId = AssetManager::RequestTexture(relativePath,
+                    [key](const std::filesystem::path&, const Ref<Texture2D>& texture)
+                    {
+                        if (texture != nullptr)
+                        {
+                            GetPendingThumbnails().erase(key);
+                        }
+                    });
+
+                if (requestId != 0)
+                {
+                    pending.insert(key);
+                }
+            }
+
+            return nullptr;
         }
 
         void DrawItemIcon(ImDrawList* drawList, const std::filesystem::path& path, bool isDirectory, const ImVec2& itemMin)

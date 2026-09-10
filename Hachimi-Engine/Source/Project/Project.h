@@ -2,6 +2,7 @@
 
 #include "Core/Base.h"
 #include "Core/Memory.h"
+#include "Packaging/GameBuildSettings.h"
 #include "Scene/Scene.h"
 
 #include <filesystem>
@@ -33,6 +34,9 @@ namespace HachimiEngine
         Ref<Scene> GetActiveScene() const { return m_ActiveScene; }
         void SetActiveScene(const Ref<Scene>& scene) { m_ActiveScene = scene; }
 
+        GameBuildSettings& GetBuildSettings() { return m_BuildSettings; }
+        const GameBuildSettings& GetBuildSettings() const { return m_BuildSettings; }
+
         bool OpenScene(const std::filesystem::path& scenePath);
         void SaveActiveScene();
 
@@ -44,6 +48,7 @@ namespace HachimiEngine
         std::filesystem::path m_AssetsDirectory;
         std::filesystem::path m_StartScenePath;
         std::filesystem::path m_ProjectFilePath;
+        GameBuildSettings m_BuildSettings;
         Ref<Scene> m_ActiveScene;
     };
 }

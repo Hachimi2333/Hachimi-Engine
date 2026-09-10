@@ -108,6 +108,21 @@ namespace HachimiEngine
         }
     }
 
+    void LayerStack::Render() const
+    {
+        const std::vector<Ref<Layer>> layers = m_Layers;
+        for (const auto& layer : layers)
+        {
+            layer->OnRender();
+        }
+
+        const std::vector<Ref<Layer>> overlays = m_Overlays;
+        for (const auto& overlay : overlays)
+        {
+            overlay->OnRender();
+        }
+    }
+
     void LayerStack::RenderImGui() const
     {
         // Iterate over a snapshot so layers can safely push/pop mid-frame.

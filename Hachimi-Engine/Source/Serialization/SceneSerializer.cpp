@@ -7,6 +7,7 @@
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
 #include "Math/Math.h"
+#include "Utils/VirtualFileSystem.h"
 
 #include <fstream>
 
@@ -87,7 +88,26 @@ namespace HachimiEngine
 
     bool SceneSerializer::Deserialize(const std::string& filepath)
     {
-        const YAML::Node data = YAML::LoadFile(filepath);
+        // Read through the virtual file system so packaged scenes load straight
+        // out of the game package.
+        std::string sceneText;
+        if (!VirtualFileSystem::ReadTextFile(filepath, sceneText))
+        {
+            HE_CORE_ERROR("Failed to read scene file: {}", filepath);
+            return false;
+        }
+
+        YAML::Node data;
+        try
+        {
+            data = YAML::Load(sceneText);
+        }
+        catch (const YAML::Exception& exception)
+        {
+            HE_CORE_ERROR("Failed to parse scene file '{}': {}", filepath, exception.what());
+            return false;
+        }
+
         if (!data || !data["Scene"])
         {
             HE_CORE_ERROR("Failed to load scene file: {}", filepath);

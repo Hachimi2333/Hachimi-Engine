@@ -52,6 +52,16 @@ namespace HachimiEngine
         return std::filesystem::current_path() / "HachimiEngine";
     }
 
+    std::filesystem::path PlatformUtils::GetLocalAppDataDirectory()
+    {
+        const std::string localAppData = GetEnvironmentVariableString("LOCALAPPDATA");
+        if (!localAppData.empty())
+        {
+            return std::filesystem::path(localAppData) / "HachimiEngine";
+        }
+        return std::filesystem::current_path() / "HachimiEngine";
+    }
+
     std::filesystem::path PlatformUtils::GetDefaultProjectsDirectory()
     {
         return GetUserDocumentsDirectory() / "HachimiProjects";

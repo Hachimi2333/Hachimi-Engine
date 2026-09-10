@@ -18,7 +18,8 @@ project "Hachimi-Engine"
         "%{prj.location}/Vendor/imgui/src",
         "%{prj.location}/Vendor/spdlog/include",
         "%{prj.location}/Vendor/yaml-cpp/include",
-        "%{prj.location}/Vendor/stb/src"
+        "%{prj.location}/Vendor/stb/src",
+        "%{prj.location}/Vendor/zstd/lib"
     }
 
     files
@@ -44,6 +45,7 @@ project "Hachimi-Engine"
         "ImGui",
         "spdlog",
         "yaml-cpp",
+        "zstd",
         "opengl32"
     }
 

@@ -44,6 +44,7 @@ namespace HachimiEngine
             ImGui::DockBuilderDockWindow("Inspector", dockRight);
             ImGui::DockBuilderDockWindow("Content Browser", dockBottom);
             ImGui::DockBuilderDockWindow("Console", dockConsole);
+            ImGui::DockBuilderDockWindow("Package Inspector", dockConsole);
             ImGui::DockBuilderFinish(dockspaceId);
         }
     }
@@ -191,6 +192,8 @@ namespace HachimiEngine
         m_InspectorPanel.Draw(m_Context);
         m_ContentBrowserPanel.Draw(this, m_Context);
         m_ConsolePanel.Draw();
+        m_PackageInspectorPanel.Draw(this, m_Context);
+        m_BuildSettingsPanel.Draw(this, m_Context);
 
         if (m_Context.FocusGamePanel)
         {
@@ -210,6 +213,11 @@ namespace HachimiEngine
     void EditorLayer::ResetLayout()
     {
         m_ResetLayoutRequested = true;
+    }
+
+    void EditorLayer::OpenBuildSettings()
+    {
+        m_BuildSettingsPanel.Open();
     }
 
     void EditorLayer::OnEvent(Event& event)

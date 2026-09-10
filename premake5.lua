@@ -49,9 +49,12 @@ includeIfPresent("Hachimi-Engine/Vendor/GLAD/premake5.lua")
 includeIfPresent("Hachimi-Engine/Vendor/imgui/premake5.lua")
 includeIfPresent("Hachimi-Engine/Vendor/spdlog/premake5.lua")
 includeIfPresent("Hachimi-Engine/Vendor/yaml-cpp/premake5.lua")
+includeIfPresent("Hachimi-Engine/Vendor/zstd/premake5.lua")
 includeIfPresent("Hachimi-Editor/Vendor/NativeFileDialogExtended/premake5.lua")
 includeIfPresent("Hachimi-Editor/Vendor/ImGuizmo/premake5.lua")
 
 group ""
 includeIfPresent("Hachimi-Engine/premake5.lua")
 includeIfPresent("Hachimi-Editor/premake5.lua")
+includeIfPresent("Hachimi-Player/premake5.lua")
+includeIfPresent("Hachimi-Tests/premake5.lua")

@@ -2,7 +2,7 @@
 
 #include "Core/Assert.h"
 #include "Platform/OpenGL/OpenGLShader.h"
-#include "Utils/PlatformUtils.h"
+#include "Utils/VirtualFileSystem.h"
 
 #include <filesystem>
 
@@ -20,7 +20,9 @@ namespace HachimiEngine
 
     Ref<Shader> Shader::CreateEngineShader(const std::string& fileName)
     {
-        const std::filesystem::path shaderPath = PlatformUtils::GetExecutableDirectory() / "Shaders" / fileName;
+        // A packaged game serves engine shaders from inside Data.hpak, while the
+        // editor reads them next to its executable because nothing is mounted.
+        const std::filesystem::path shaderPath = VirtualFileSystem::GetDataRoot() / "Shaders" / fileName;
         return Create(shaderPath.string());
     }
 

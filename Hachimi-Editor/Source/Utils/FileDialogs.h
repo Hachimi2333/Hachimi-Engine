@@ -3,6 +3,7 @@
 #include "Core/Base.h"
 
 #include <filesystem>
+#include <string>
 
 namespace HachimiEngine
 {
@@ -15,5 +16,7 @@ namespace HachimiEngine
         static std::filesystem::path OpenDirectoryDialog(const std::filesystem::path& startPath);
         static std::filesystem::path OpenTextureImportDialog(const std::filesystem::path& startPath);
         static std::filesystem::path OpenSceneFileDialog(const std::filesystem::path& startPath);
+        static std::filesystem::path OpenPackageFileDialog(const std::filesystem::path& startPath);
+        static std::filesystem::path SaveFileDialog(const std::filesystem::path& startPath, const std::string& defaultName);
     };
 }

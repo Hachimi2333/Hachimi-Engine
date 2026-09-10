@@ -1,6 +1,8 @@
 #include "Core/Application.h"
 
+#include "Asset/AssetManager.h"
 #include "Core/Assert.h"
+#include "Core/JobSystem.h"
 #include "Core/Log.h"
 #include "Core/Timestep.h"
 #include "Events/ApplicationEvent.h"
@@ -11,6 +13,7 @@
 #include "Renderer/RenderCommand.h"
 #include "Renderer/SceneRenderer.h"
 #include "Scripting/ScriptManager.h"
+#include "Utils/VirtualFileSystem.h"
 
 #include <chrono>
 
@@ -22,6 +25,10 @@ namespace HachimiEngine
     {
         HE_CORE_ASSERT(s_Instance == nullptr);
         s_Instance = this;
+
+        // Workers must exist before any layer or renderer asks for asynchronous
+        // asset loading.
+        JobSystem::Init();
 
         m_Window = Window::Create(props);
         m_Window->SetEventCallback([this](Event& event) { OnEvent(event); });
@@ -45,6 +52,13 @@ namespace HachimiEngine
         SceneRenderer::Shutdown();
         RenderCommand::SetDepthTest(false);
         Renderer::Shutdown();
+
+        // Stop workers before dropping the mounts so no read is in flight while
+        // packages are released, and no deferred callback can fire afterwards.
+        AssetManager::Shutdown();
+        JobSystem::Shutdown();
+        VirtualFileSystem::UnmountAll();
+
         s_Instance = nullptr;
     }
 
@@ -61,6 +75,11 @@ namespace HachimiEngine
             lastFrameTime = now;
             const Timestep timestep(deltaTime);
 
+            // Deliver completed background reads and GPU-upload finished texture
+            // decodes on the main thread, where OpenGL calls are legal.
+            VirtualFileSystem::PumpCompletedRequests();
+            AssetManager::PumpCompletedRequests();
+
             m_Window->OnUpdate();
 
             AppUpdateEvent updateEvent;
@@ -73,6 +92,10 @@ namespace HachimiEngine
                 OnEvent(renderEvent);
 
                 RenderCommand::Clear();
+
+                // Draw layer-owned framebuffers into the default framebuffer
+                // before ImGui renders on top.
+                m_LayerStack.Render();
 
                 m_ImGuiLayer->Begin();
                 m_LayerStack.RenderImGui();

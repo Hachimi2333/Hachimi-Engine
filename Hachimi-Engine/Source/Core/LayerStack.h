@@ -28,6 +28,7 @@ namespace HachimiEngine
         const std::vector<Ref<Layer>>& GetOverlays() const { return m_Overlays; }
 
         void Update(Timestep timestep) const;
+        void Render() const;
         void RenderImGui() const;
         void DispatchEvent(Event& event) const;
 

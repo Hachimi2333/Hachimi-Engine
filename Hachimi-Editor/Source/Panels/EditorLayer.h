@@ -2,12 +2,14 @@
 
 #include "Core/Layer.h"
 #include "Core/Memory.h"
+#include "Panels/BuildSettingsPanel.h"
 #include "Panels/ConsolePanel.h"
 #include "Panels/ContentBrowserPanel.h"
 #include "Panels/EditorContext.h"
 #include "Panels/EditorMenuBar.h"
 #include "Panels/GamePanel.h"
 #include "Panels/InspectorPanel.h"
+#include "Panels/PackageInspectorPanel.h"
 #include "Panels/SceneHierarchyPanel.h"
 #include "Panels/ToolbarPanel.h"
 #include "Panels/ViewportPanel.h"
@@ -38,6 +40,9 @@ namespace HachimiEngine
         // Rebuilds the default docking layout at the start of the next frame.
         void ResetLayout();
 
+        // Opens the Build Settings export configuration popup.
+        void OpenBuildSettings();
+
     private:
         void DrawDockSpace();
 
@@ -49,7 +54,9 @@ namespace HachimiEngine
         InspectorPanel m_InspectorPanel;
         ContentBrowserPanel m_ContentBrowserPanel;
         ConsolePanel m_ConsolePanel;
+        PackageInspectorPanel m_PackageInspectorPanel;
         EditorMenuBar m_MenuBar;
+        BuildSettingsPanel m_BuildSettingsPanel;
         ToolbarPanel m_ToolbarPanel;
         bool m_ResetLayoutRequested = false;
     };

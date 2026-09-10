@@ -45,6 +45,7 @@ project "Hachimi-Editor"
         "ImGui",
         "spdlog",
         "yaml-cpp",
+        "zstd",
         "Box3D",
         "Lua",
         "GLAD",

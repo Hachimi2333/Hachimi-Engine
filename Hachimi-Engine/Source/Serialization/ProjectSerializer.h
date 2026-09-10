@@ -16,6 +16,11 @@ namespace HachimiEngine
         explicit ProjectSerializer(const Ref<Project>& project);
 
         void Serialize(const std::string& filepath);
+        // Writes a project descriptor intended for a packaged game build. All
+        // paths are stored relative to the file location so the package can be
+        // extracted and run from any directory.
+        void SerializeForBuild(const std::string& filepath);
+        std::string SerializeForBuildToString();
         bool Deserialize(const std::string& filepath);
 
     private:

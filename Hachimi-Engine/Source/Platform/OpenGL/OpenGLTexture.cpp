@@ -2,9 +2,11 @@
 
 #include "Core/Assert.h"
 #include "Core/Log.h"
+#include "Renderer/ImageDecoder.h"
+#include "Utils/FileMapping.h"
+#include "Utils/VirtualFileSystem.h"
 
 #include <glad/gl.h>
-#include <stb_image.h>
 
 #include <algorithm>
 #include <cmath>
@@ -54,16 +56,43 @@ namespace HachimiEngine
 
     OpenGLTexture2D::OpenGLTexture2D(const std::string& path)
     {
-        int width = 0;
-        int height = 0;
-        int channels = 0;
-        stbi_set_flip_vertically_on_load(1);
+        // Stored textures are mapped zero copy straight out of the game package;
+        // compressed ones are inflated once. Either way decoding is CPU only.
+        FileMapping encoded;
+        if (!VirtualFileSystem::MapFile(path, encoded))
+        {
+            HE_CORE_ERROR("Failed to read texture file: {}", path);
+            HE_CORE_ASSERT(false);
+            return;
+        }
 
-        stbi_uc* data = stbi_load(path.c_str(), &width, &height, &channels, 4);
-        HE_CORE_ASSERT(data != nullptr);
+        DecodedImage image;
+        if (!ImageDecoder::DecodeFromMemory(encoded.Data(), encoded.Size(), image))
+        {
+            HE_CORE_ERROR("Failed to decode texture file: {}", path);
+            HE_CORE_ASSERT(false);
+            return;
+        }
 
-        m_Specification.Width = static_cast<uint32_t>(width);
-        m_Specification.Height = static_cast<uint32_t>(height);
+        InitializeFromImage(image);
+    }
+
+    OpenGLTexture2D::OpenGLTexture2D(const DecodedImage& image)
+    {
+        if (!image.IsValid())
+        {
+            HE_CORE_ERROR("Cannot create a texture from an empty decoded image");
+            HE_CORE_ASSERT(false);
+            return;
+        }
+
+        InitializeFromImage(image);
+    }
+
+    void OpenGLTexture2D::InitializeFromImage(const DecodedImage& image)
+    {
+        m_Specification.Width = image.Width;
+        m_Specification.Height = image.Height;
         m_Specification.Channels = 4;
         m_Specification.SRGB = true;
         m_Specification.GenerateMips = true;
@@ -75,14 +104,12 @@ namespace HachimiEngine
             m_RendererID,
             static_cast<GLsizei>(mipLevelCount),
             GL_SRGB8_ALPHA8,
-            width,
-            height);
+            static_cast<GLsizei>(image.Width),
+            static_cast<GLsizei>(image.Height));
 
         ApplyTextureParameters(m_RendererID, true);
 
-        SetData(data, static_cast<uint32_t>(width * height * 4));
-
-        stbi_image_free(data);
+        SetData(const_cast<uint8_t*>(image.Pixels.data()), static_cast<uint32_t>(image.Pixels.size()));
     }
 
     OpenGLTexture2D::~OpenGLTexture2D()

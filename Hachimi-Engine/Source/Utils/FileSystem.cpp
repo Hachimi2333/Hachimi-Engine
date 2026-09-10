@@ -1,6 +1,7 @@
 #include "Utils/FileSystem.h"
 
 #include <algorithm>
+#include <fstream>
 
 namespace HachimiEngine
 {
@@ -59,6 +60,31 @@ namespace HachimiEngine
         return files;
     }
 
+    std::vector<std::filesystem::path> FileSystem::GetFilesRecursive(const std::filesystem::path& directory)
+    {
+        std::vector<std::filesystem::path> files;
+        std::error_code errorCode;
+        std::filesystem::recursive_directory_iterator iterator(directory, std::filesystem::directory_options::skip_permission_denied, errorCode);
+        const std::filesystem::recursive_directory_iterator end;
+        for (; iterator != end; iterator.increment(errorCode))
+        {
+            if (errorCode)
+            {
+                errorCode.clear();
+                continue;
+            }
+
+            if (iterator->is_regular_file(errorCode))
+            {
+                files.push_back(iterator->path());
+                errorCode.clear();
+            }
+        }
+
+        std::sort(files.begin(), files.end());
+        return files;
+    }
+
     std::vector<std::filesystem::path> FileSystem::GetDirectories(const std::filesystem::path& directory)
     {
         std::vector<std::filesystem::path> directories;
@@ -80,5 +106,54 @@ namespace HachimiEngine
         std::error_code errorCode;
         std::filesystem::copy_file(source, destination, std::filesystem::copy_options::overwrite_existing, errorCode);
         return !errorCode;
+    }
+
+    bool FileSystem::WriteTextFile(const std::filesystem::path& path, std::string_view content)
+    {
+        CreateDirectories(path.parent_path());
+
+        std::ofstream file(path, std::ios::out | std::ios::binary | std::ios::trunc);
+        if (!file)
+        {
+            return false;
+        }
+
+        file.write(content.data(), static_cast<std::streamsize>(content.size()));
+        return file.good();
+    }
+
+    bool FileSystem::WriteBinaryFile(const std::filesystem::path& path, const void* data, size_t size)
+    {
+        CreateDirectories(path.parent_path());
+
+        std::ofstream file(path, std::ios::out | std::ios::binary | std::ios::trunc);
+        if (!file)
+        {
+            return false;
+        }
+
+        file.write(static_cast<const char*>(data), static_cast<std::streamsize>(size));
+        return file.good();
+    }
+
+    bool FileSystem::RemoveAll(const std::filesystem::path& path)
+    {
+        std::error_code errorCode;
+        std::filesystem::remove_all(path, errorCode);
+        return !errorCode;
+    }
+
+    uintmax_t FileSystem::GetFileSize(const std::filesystem::path& path)
+    {
+        std::error_code errorCode;
+        const uintmax_t size = std::filesystem::file_size(path, errorCode);
+        return errorCode ? 0 : size;
+    }
+
+    std::filesystem::file_time_type FileSystem::GetLastWriteTime(const std::filesystem::path& path)
+    {
+        std::error_code errorCode;
+        const std::filesystem::file_time_type time = std::filesystem::last_write_time(path, errorCode);
+        return errorCode ? std::filesystem::file_time_type{} : time;
     }
 }

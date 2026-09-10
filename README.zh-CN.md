@@ -33,6 +33,7 @@
 ### 编辑器
 
 - ImGui Docking 编辑器：Project Hub、Viewport、Scene Hierarchy、Inspector、Content Browser、Console
+- 游戏导出管线：Build Settings 弹窗、Windows_x64 导出、`Data.hpak` 资源打包，以及独立的 `Hachimi-Player` 运行时
 - 大图标 Content Browser 网格，支持纹理缩略图，可将文件拖拽到 Inspector 资产字段
 - Native File Dialog Extended 系统原生文件对话框
 - Inter 字体与显示器 DPI 自适应 UI 缩放
@@ -99,7 +100,9 @@ Vendor\Premake\Bin\premake5.exe vs2026 --file=premake5.lua
 
 ```
 Bin/Debug-windows-x86_64/Hachimi-Editor.exe
+Bin/Debug-windows-x86_64/Hachimi-Player.exe
 Bin/Release-windows-x86_64/Hachimi-Editor.exe
+Bin/Release-windows-x86_64/Hachimi-Player.exe
 ```
 
 ### 运行
@@ -131,6 +134,53 @@ Bin/Release-windows-x86_64/Hachimi-Editor.exe
 同时 `Scripted Spinner` 实体会由内置的 `Rotator.lua` 脚本持续旋转。
 Game 面板使用主相机视角。
 
+### 导出游戏
+
+在编辑器菜单栏打开 `Build → Build Settings...`。弹窗按目标平台保存配置，当前阶段仅实现 Windows。Windows 配置包括：
+
+- Product Name（导出的可执行文件名与窗口标题）
+- Start Scene（`Assets/Scenes` 下的 `.hscene` 文件）
+- 窗口宽高与 VSync
+
+点击 `Export` 生成构建：
+
+```
+<ProjectName>/
+└── Build/
+    └── Windows_x64/
+        ├── <ProductName>.exe    # 独立 Hachimi-Player 运行时
+        └── Data.hpak            # 打包的项目文件、Assets、着色器与字体
+```
+
+导出的游戏启动后立即运行 Start Scene（含物理与 Lua 脚本）。Player 就地把 `Data.hpak` 挂载为虚拟文件系统，
+所有资源直接从包内读取：**不做任何解压**，不产生缓存目录，可从只读介质运行，且只解压真正被加载的资源。
+
+Player 同时提供无窗口模式，让导出构建在没有 GPU 的情况下也能被验证：
+
+```
+<ProductName>.exe [<package>] [--content=<dir>] [--verify] [--list] [--stats]
+```
+
+| 参数 | 作用 |
+| --- | --- |
+| `<package>` | 要运行的资源包，默认为可执行文件同目录下的 `Data.hpak` |
+| `--content=<dir>` | 以更高优先级挂载一个松散文件目录，改资源后无需重新导出 |
+| `--verify` | 校验全部 entry 的内容哈希后退出，成功返回 0，失败返回 1 |
+| `--list` | 打印资源包目录表（路径、原始大小、压缩后大小、方式、块数） |
+| `--stats` | 打印包头信息 |
+
+### 资源包格式
+
+`Data.hpak` 是基于 [Zstandard](https://github.com/facebook/zstd) 的自定义容器，不再是 ZIP：
+
+- 头部包含 magic、格式版本、包 ID 与字典信息；尾部镜像目录表位置，因此从文件两端都能定位目录。
+- 目录表记录每个 entry 的路径哈希、偏移、大小、内容哈希与分块表。
+- 每个 entry 被切分为可独立解压的块，这是支持区间读取与流式读取的基础。
+- 可选共享 zstd 字典由包内容训练得到，对「大量小文本资源」的工程收益明显。
+- 本身就压缩过的资源（PNG、TTF 等）直接 store，不做二次压缩。
+- 资源包以只读方式内存映射，store 的 entry 可以零拷贝直接交付。
+- 打包阶段通过引擎任务系统并行压缩，且相同输入会产生逐字节一致的资源包。
+
 ### 视口操作
 
 | 操作 | 按键 |
@@ -150,13 +200,19 @@ Game 面板使用主相机视角。
 Hachimi-Engine/          # 引擎核心（静态库）
   Resources/Shaders/     # 引擎内置 GLSL 着色器
   Source/                # 引擎源码
+  Source/Packaging/      # 游戏导出配置、.hpak 格式与读写实现
   Source/Scripting/      # 语言无关脚本核心与 Lua 后端
   Vendor/                # 引擎使用的第三方库
   Vendor/Lua/            # Lua 5.4 运行时
   Vendor/sol2/           # C++ Lua 绑定（header-only）
+  Vendor/zstd/           # Zstandard：资源包压缩与 xxHash
 Hachimi-Editor/          # 编辑器客户端（可执行文件）
   Source/                # 编辑器源码
   Vendor/                # 编辑器使用的第三方库
+Hachimi-Player/          # 导出构建使用的独立游戏运行时
+  Source/                # Player 源码
+Hachimi-Tests/           # 无窗口验证目标（资源包往返、虚拟文件系统）
+  Source/                # 测试源码
 Vendor/Premake/          # Premake5 工具链
 Bin/                     # 构建产物（gitignore）
 Vendor/Downloads/        # 第三方库下载暂存区（gitignore）
@@ -169,6 +225,7 @@ Utils/                   # 临时调试工具（FramebufferTest 帧缓冲测试�
 
 - 音频系统
 - 除 Lua 外的更多脚本语言（后端抽象已预留）
+- Windows 以外的导出平台（Build Settings 的平台布局已预留，当前实现 Windows_x64）
 - 除 OpenGL 4.6 Core 外的渲染后端
 - 外部 3D 模型导入（当前使用内置网格）
 - 日志文件输出（当前仅控制台）
@@ -196,6 +253,7 @@ Hachimi-Engine 建立在以下开源项目之上，感谢所有作者与贡献�
 - [GLM](https://github.com/g-truc/glm) — 数学库（内部封装为 `HachimiEngine::Math`）
 - [Lua](https://www.lua.org/) — Lua 5.4 脚本语言运行时
 - [sol2](https://github.com/ThePhD/sol2) — 现代 C++ Lua 绑定库
+- [zstd](https://github.com/facebook/zstd) — 资源包容器使用的 Zstandard 压缩，以及其内置 xxHash（路径与内容哈希）
 - [Dear ImGui](https://github.com/ocornut/imgui) — 编辑器用户界面
 - [Native File Dialog Extended](https://github.com/btzy/nativefiledialog-extended) — 系统原生文件对话框
 - [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo) — 变换 Gizmo

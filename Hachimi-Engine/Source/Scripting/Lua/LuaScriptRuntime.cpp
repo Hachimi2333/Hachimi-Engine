@@ -4,9 +4,10 @@
 #include "Scene/Scene.h"
 #include "Scripting/Lua/LuaScriptBindings.h"
 #include "Scripting/ScriptManager.h"
-#include "Utils/FileSystem.h"
+#include "Utils/VirtualFileSystem.h"
 
 #include <optional>
+#include <string>
 
 namespace HachimiEngine
 {
@@ -112,9 +113,19 @@ namespace HachimiEngine
         }
 
         const std::filesystem::path fullPath = ScriptManager::ResolveScriptPath(relativePath);
-        if (!FileSystem::Exists(fullPath))
+        if (!VirtualFileSystem::Exists(fullPath))
         {
             HE_CORE_ERROR("Lua script file does not exist: {} (entity '{}')", fullPath.string(), entity.HasComponent<TagComponent>() ? entity.GetComponent<TagComponent>().Tag : "Unknown Entity");
+            return;
+        }
+
+        // Lua cannot open a file inside a package itself, so the source is read
+        // through the virtual file system and loaded from memory. The chunk keeps
+        // the virtual path so runtime errors still point at the right script.
+        std::string source;
+        if (!VirtualFileSystem::ReadTextFile(fullPath, source))
+        {
+            HE_CORE_ERROR("Failed to read Lua script '{}' (entity '{}')", relativePath, entity.HasComponent<TagComponent>() ? entity.GetComponent<TagComponent>().Tag : "Unknown Entity");
             return;
         }
 
@@ -126,7 +137,8 @@ namespace HachimiEngine
         try
         {
             const sol::environment environment(m_Impl->State, sol::create, m_Impl->State.globals());
-            const sol::protected_function_result loadResult = m_Impl->State.safe_script_file(fullPath.string(), environment, sol::script_pass_on_error);
+            const sol::protected_function_result loadResult = m_Impl->State.safe_script(
+                source, environment, sol::script_pass_on_error, fullPath.string());
 
             if (!loadResult.valid())
             {
