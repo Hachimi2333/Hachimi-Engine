@@ -84,13 +84,15 @@ Build-system notes:
 - Automated agents must verify changes by configuring with CMake and building both Debug
   and Release, then running `Tests.exe` and confirming it exits with code 0.
 - Test suites live in `Tests/`, one directory per subsystem (`Core/`, `Math/`, `Packaging/`,
-  `Serialization/`, `Utils/`), and are written with doctest (see `Vendor/doctest`). Shared
-  fixtures live in `Tests/Support/`. Use `-ts=<suite>` to run one category, `-tc=<pattern>`
-  for single cases and `--list-test-cases` to list them.
-- Every suite must stay headless: no window and no OpenGL context, because constructing a
-  `Scene` builds a mesh through `VertexArray::Create`. Engine behaviour that needs a GL
-  context is verified manually, not here. New engine code that can be exercised without a
-  window should come with a suite under `Tests/`.
+  `Renderer/`, `Scene/`, `Serialization/`, `Utils/`), and are written with doctest (see
+  `Vendor/doctest`). Shared fixtures live in `Tests/Support/`. Use `-ts=<suite>` to run one
+  category, `-tc=<pattern>` for single cases and `--list-test-cases` to list them.
+- Every suite must stay headless: no window and no OpenGL context. Geometry lives in the
+  CPU-side `MeshData`, so constructing a `Scene` needs no context and the ECS, the scene
+  serializer and the runtime are all testable here. What stays interactive is only the code
+  that creates a GPU resource (`MeshLibrary::GetOrCreate`, `VertexArray::Create`,
+  `Texture2D::Create`, `Shader::Create`, a `Framebuffer`). New engine code that can be
+  exercised without a window should come with a suite under `Tests/`.
 - A test case owns the state it touches: mount and unmount the virtual file system itself
   (see `ScopedArchiveMount`) and never call `JobSystem::Shutdown()`, which `Tests/Main.cpp`
   owns.
@@ -120,6 +122,10 @@ Build-system notes:
 - The renderer abstraction uses a simple OpenGL-like API style, not a Vulkan-style complex abstraction.
 - ImGui must use the docking branch. Editor UI styling must be defined only in `Hachimi-Engine/Source/ImGui/ThemeConfig.*` and applied once through `ThemeConfig::Apply` in `ImGuiLayer::OnAttach`; do not scatter hardcoded style or color tweaks across panels.
 - Engine-owned shaders must live in `Hachimi-Engine/Resources/Shaders/*.glsl` and be loaded with `Shader::CreateEngineShader`; do not embed GLSL source in `.cpp` or `.h` files.
+- Mesh geometry is split in two: `MeshData` holds the CPU vertices, indices and bounds, and
+  `Mesh` holds the uploaded GPU vertex array, obtained through `MeshLibrary`. Scene, physics,
+  scripting and serialization code only ever touches `MeshData`; never create a GPU resource
+  (a `Mesh`, `VertexArray`, `Texture2D`, `Shader` or `Framebuffer`) from those subsystems.
 
 ## Project Scope
 

@@ -5,7 +5,7 @@
 #include "Renderer/EditorCamera.h"
 #include "Renderer/EnvironmentSettings.h"
 #include "Renderer/Material.h"
-#include "Renderer/Mesh.h"
+#include "Renderer/MeshData.h"
 #include "Math/Math.h"
 
 #include <array>
@@ -13,6 +13,7 @@
 namespace HachimiEngine
 {
     class EnvironmentMap;
+    class MeshLibrary;
     class ShadowMap;
 
     struct DirectionalLight
@@ -50,13 +51,15 @@ namespace HachimiEngine
 
         static void BeginScene(const EditorCamera& camera);
         static void BeginScene(const Math::Mat4& view, const Math::Mat4& projection, const Math::Vec3& cameraPosition);
-        static void SubmitMesh(const Ref<Mesh>& mesh, const Math::Mat4& transform, const Ref<Material>& material);
+        // Geometry is submitted as CPU MeshData; the GPU mesh is uploaded and cached
+        // by the MeshLibrary on first use.
+        static void SubmitMesh(const Ref<MeshData>& mesh, const Math::Mat4& transform, const Ref<Material>& material);
         static void DrawGrid(float size = 20.0f, uint32_t divisions = 20);
         static void DrawSkybox();
         static void EndScene();
 
         static void BeginDirectionalShadowPass(const Math::Mat4& lightViewProjection);
-        static void SubmitShadowMesh(const Ref<Mesh>& mesh, const Math::Mat4& transform);
+        static void SubmitShadowMesh(const Ref<MeshData>& mesh, const Math::Mat4& transform);
         static void EndDirectionalShadowPass();
 
         static Math::Mat4 CalculateDirectionalLightViewProjection(const Math::Vec3& cameraPosition);
@@ -64,6 +67,7 @@ namespace HachimiEngine
         static LightingEnvironment& GetLightingEnvironment() { return s_Lighting; }
         static EnvironmentSettings& GetEnvironmentSettings() { return s_Environment; }
         static Ref<Material> GetDefaultMaterial() { return s_DefaultMaterial; }
+        static MeshLibrary& GetMeshLibrary() { return *s_MeshLibrary; }
 
     private:
         static void UploadLighting(const Ref<Shader>& shader, const Math::Vec3& cameraPosition);
@@ -74,8 +78,9 @@ namespace HachimiEngine
         static Ref<Shader> s_DirectionalShadowShader;
         static Ref<Shader> s_SkyboxShader;
         static Ref<Material> s_DefaultMaterial;
-        static Ref<Mesh> s_GridMesh;
-        static Ref<Mesh> s_SkyboxMesh;
+        static Scope<MeshLibrary> s_MeshLibrary;
+        static Ref<MeshData> s_GridMesh;
+        static Ref<MeshData> s_SkyboxMesh;
         static Ref<ShadowMap> s_DirectionalShadowMap;
         static Ref<EnvironmentMap> s_EnvironmentMap;
         static LightingEnvironment s_Lighting;

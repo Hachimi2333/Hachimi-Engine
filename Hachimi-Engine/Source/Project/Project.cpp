@@ -62,7 +62,7 @@ return Rotator
         Entity CreateMeshEntity(
             Scene& scene,
             const std::string& name,
-            const Ref<Mesh>& mesh,
+            const Ref<MeshData>& mesh,
             PrimitiveMeshType primitiveType,
             const Math::Vec3& position,
             const Math::Vec3& rotation,

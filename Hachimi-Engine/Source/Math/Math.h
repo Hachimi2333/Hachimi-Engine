@@ -26,6 +26,27 @@ namespace HachimiEngine
         using Mat4 = glm::mat4;
         using Quat = glm::quat;
 
+        // Axis aligned bounding box. A default constructed box is degenerate at the origin.
+        struct AABB
+        {
+            Vec3 Min { 0.0f };
+            Vec3 Max { 0.0f };
+
+            bool IsValid() const
+            {
+                return Min.x <= Max.x && Min.y <= Max.y && Min.z <= Max.z;
+            }
+
+            Vec3 GetCenter() const { return (Min + Max) * 0.5f; }
+            Vec3 GetExtents() const { return (Max - Min) * 0.5f; }
+
+            void Encapsulate(const Vec3& point)
+            {
+                Min = (glm::min)(Min, point);
+                Max = (glm::max)(Max, point);
+            }
+        };
+
         template<typename T>
         inline T Pi()
         {

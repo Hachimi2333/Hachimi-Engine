@@ -2,7 +2,7 @@
 
 #include "Core/UUID.h"
 #include "Renderer/Material.h"
-#include "Renderer/Mesh.h"
+#include "Renderer/MeshData.h"
 #include "Renderer/MeshFactory.h"
 #include "Math/Math.h"
 
@@ -90,7 +90,8 @@ namespace HachimiEngine
 
     struct MeshComponent
     {
-        Ref<Mesh> Mesh;
+        // CPU geometry. The GPU mesh is uploaded on first draw by the MeshLibrary.
+        Ref<MeshData> Mesh;
         PrimitiveMeshType PrimitiveType = PrimitiveMeshType::Cube;
         Ref<Material> MaterialOverride;
         Math::Vec4 MaterialColor { 0.8f, 0.8f, 0.82f, 1.0f };

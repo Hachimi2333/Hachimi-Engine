@@ -1,50 +1,44 @@
 #include "Renderer/Mesh.h"
 
+#include "Core/Assert.h"
+
 namespace HachimiEngine
 {
-    BufferLayout MeshVertex::GetLayout()
+    Mesh::Mesh(const Ref<MeshData>& meshData)
+        : m_MeshData(meshData)
     {
-        return {
-            { ShaderDataType::Float3, "a_Position" },
-            { ShaderDataType::Float3, "a_Normal" },
-            { ShaderDataType::Float2, "a_TexCoord" },
-            { ShaderDataType::Float4, "a_Color" }
-        };
+        BuildVertexArray();
     }
 
-    Mesh::Mesh(std::vector<MeshVertex> vertices, std::vector<uint32_t> indices, MeshDrawMode drawMode)
-        : m_Vertices(std::move(vertices)), m_Indices(std::move(indices)), m_DrawMode(drawMode)
+    void Mesh::BuildVertexArray()
     {
-        Build();
-    }
+        HE_CORE_ASSERT(m_MeshData != nullptr);
+        HE_CORE_ASSERT(!m_MeshData->IsEmpty());
 
-    void Mesh::Bind() const
-    {
-        m_VertexArray->Bind();
-    }
-
-    void Mesh::Unbind() const
-    {
-        m_VertexArray->Unbind();
-    }
-
-    void Mesh::Build()
-    {
         m_VertexArray = VertexArray::Create();
 
-        const uint32_t vertexDataSize = static_cast<uint32_t>(m_Vertices.size() * sizeof(MeshVertex));
+        const std::vector<MeshVertex>& vertices = m_MeshData->GetVertices();
+        const std::vector<uint32_t>& indices = m_MeshData->GetIndices();
+
+        const uint32_t vertexDataSize = static_cast<uint32_t>(vertices.size() * sizeof(MeshVertex));
         const Ref<VertexBuffer> vertexBuffer = VertexBuffer::Create(
-            reinterpret_cast<const float*>(m_Vertices.data()),
+            reinterpret_cast<const float*>(vertices.data()),
             vertexDataSize);
         vertexBuffer->SetLayout(MeshVertex::GetLayout());
         m_VertexArray->AddVertexBuffer(vertexBuffer);
 
-        const Ref<IndexBuffer> indexBuffer = IndexBuffer::Create(m_Indices.data(), static_cast<uint32_t>(m_Indices.size()));
+        const Ref<IndexBuffer> indexBuffer = IndexBuffer::Create(indices.data(), static_cast<uint32_t>(indices.size()));
         m_VertexArray->SetIndexBuffer(indexBuffer);
     }
 
-    Ref<Mesh> Mesh::Create(std::vector<MeshVertex> vertices, std::vector<uint32_t> indices, MeshDrawMode drawMode)
+    Ref<Mesh> Mesh::Create(const Ref<MeshData>& meshData)
     {
-        return CreateRef<Mesh>(std::move(vertices), std::move(indices), drawMode);
+        if (meshData == nullptr || meshData->IsEmpty())
+        {
+            return nullptr;
+        }
+
+        // The constructor is private, so CreateRef cannot be used here.
+        return Ref<Mesh>(new Mesh(meshData));
     }
 }

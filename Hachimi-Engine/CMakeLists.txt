@@ -97,8 +97,12 @@ set(ENGINE_SOURCES
     Source/Renderer/Material.h
     Source/Renderer/Mesh.cpp
     Source/Renderer/Mesh.h
+    Source/Renderer/MeshData.cpp
+    Source/Renderer/MeshData.h
     Source/Renderer/MeshFactory.cpp
     Source/Renderer/MeshFactory.h
+    Source/Renderer/MeshLibrary.cpp
+    Source/Renderer/MeshLibrary.h
     Source/Renderer/PostProcessPass.cpp
     Source/Renderer/PostProcessPass.h
     Source/Renderer/RenderCommand.h

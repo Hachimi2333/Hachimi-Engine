@@ -2,7 +2,7 @@
 
 #include "Core/Base.h"
 #include "Core/Memory.h"
-#include "Renderer/Mesh.h"
+#include "Renderer/MeshData.h"
 
 namespace HachimiEngine
 {
@@ -15,15 +15,16 @@ namespace HachimiEngine
         Grid = 4
     };
 
-    // Creates built-in primitive meshes used before external model import is implemented.
+    // Creates the built-in primitive geometry used before external model import is
+    // implemented. The result is CPU-only, so this never needs an OpenGL context.
     class MeshFactory
     {
     public:
-        static Ref<Mesh> CreateCube(float size = 1.0f);
-        static Ref<Mesh> CreateSphere(float radius = 0.5f, uint32_t sectorCount = 32, uint32_t stackCount = 16);
-        static Ref<Mesh> CreatePlane(float width = 10.0f, float height = 10.0f);
-        static Ref<Mesh> CreateGrid(float size = 20.0f, uint32_t divisions = 20);
+        static Ref<MeshData> CreateCube(float size = 1.0f);
+        static Ref<MeshData> CreateSphere(float radius = 0.5f, uint32_t sectorCount = 32, uint32_t stackCount = 16);
+        static Ref<MeshData> CreatePlane(float width = 10.0f, float height = 10.0f);
+        static Ref<MeshData> CreateGrid(float size = 20.0f, uint32_t divisions = 20);
 
-        static Ref<Mesh> CreatePrimitive(PrimitiveMeshType type);
+        static Ref<MeshData> CreatePrimitive(PrimitiveMeshType type);
     };
 }

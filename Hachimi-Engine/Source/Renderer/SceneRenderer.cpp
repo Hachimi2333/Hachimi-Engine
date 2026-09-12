@@ -2,7 +2,9 @@
 
 #include "Core/Assert.h"
 #include "Renderer/EnvironmentMap.h"
+#include "Renderer/Mesh.h"
 #include "Renderer/MeshFactory.h"
+#include "Renderer/MeshLibrary.h"
 #include "Renderer/PostProcessPass.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/ShadowMap.h"
@@ -21,8 +23,9 @@ namespace HachimiEngine
     Ref<Shader> SceneRenderer::s_DirectionalShadowShader;
     Ref<Shader> SceneRenderer::s_SkyboxShader;
     Ref<Material> SceneRenderer::s_DefaultMaterial;
-    Ref<Mesh> SceneRenderer::s_GridMesh;
-    Ref<Mesh> SceneRenderer::s_SkyboxMesh;
+    Scope<MeshLibrary> SceneRenderer::s_MeshLibrary;
+    Ref<MeshData> SceneRenderer::s_GridMesh;
+    Ref<MeshData> SceneRenderer::s_SkyboxMesh;
     Ref<ShadowMap> SceneRenderer::s_DirectionalShadowMap;
     Ref<EnvironmentMap> SceneRenderer::s_EnvironmentMap;
     LightingEnvironment SceneRenderer::s_Lighting;
@@ -43,6 +46,7 @@ namespace HachimiEngine
         s_DirectionalShadowShader = Shader::CreateEngineShader("DirectionalShadow.glsl");
         s_SkyboxShader = Shader::CreateEngineShader("Skybox.glsl");
         s_DefaultMaterial = Material::Create(s_DefaultShader);
+        s_MeshLibrary = CreateScope<MeshLibrary>();
         s_GridMesh = MeshFactory::CreateGrid();
         s_SkyboxMesh = MeshFactory::CreateCube(2.0f);
         s_DirectionalShadowMap = ShadowMap::Create(2048, 2048);
@@ -55,6 +59,7 @@ namespace HachimiEngine
         s_DirectionalShadowMap.reset();
         s_SkyboxMesh.reset();
         s_GridMesh.reset();
+        s_MeshLibrary.reset();
         s_DefaultMaterial.reset();
         s_DefaultShader.reset();
         s_GridShader.reset();
@@ -91,8 +96,14 @@ namespace HachimiEngine
         PostProcessPass::SetExposure(s_Environment.Exposure);
     }
 
-    void SceneRenderer::SubmitMesh(const Ref<Mesh>& mesh, const Math::Mat4& transform, const Ref<Material>& material)
+    void SceneRenderer::SubmitMesh(const Ref<MeshData>& mesh, const Math::Mat4& transform, const Ref<Material>& material)
     {
+        const Ref<Mesh> gpuMesh = s_MeshLibrary->GetOrCreate(mesh);
+        if (gpuMesh == nullptr)
+        {
+            return;
+        }
+
         const Ref<Material>& drawMaterial = material != nullptr ? material : s_DefaultMaterial;
         drawMaterial->Bind();
 
@@ -125,8 +136,8 @@ namespace HachimiEngine
             shader->SetFloat("u_EnvironmentIntensity", 0.0f);
         }
 
-        const DrawMode drawMode = mesh->GetDrawMode() == MeshDrawMode::Lines ? DrawMode::Lines : DrawMode::Triangles;
-        Renderer::DrawIndexed(mesh->GetVertexArray(), 0, drawMode);
+        const DrawMode drawMode = gpuMesh->GetDrawMode() == MeshDrawMode::Lines ? DrawMode::Lines : DrawMode::Triangles;
+        Renderer::DrawIndexed(gpuMesh->GetVertexArray(), 0, drawMode);
     }
 
     void SceneRenderer::DrawGrid(float size, uint32_t divisions)
@@ -138,14 +149,26 @@ namespace HachimiEngine
             s_GridMesh = MeshFactory::CreateGrid(size, divisions);
         }
 
+        const Ref<Mesh> gpuMesh = s_MeshLibrary->GetOrCreate(s_GridMesh);
+        if (gpuMesh == nullptr)
+        {
+            return;
+        }
+
         s_GridShader->Bind();
         s_GridShader->SetMat4("u_ViewProjection", s_ViewProjection);
-        Renderer::DrawIndexed(s_GridMesh->GetVertexArray(), 0, DrawMode::Lines);
+        Renderer::DrawIndexed(gpuMesh->GetVertexArray(), 0, DrawMode::Lines);
     }
 
     void SceneRenderer::DrawSkybox()
     {
-        if (!s_Environment.ShowSkybox || s_EnvironmentMap == nullptr || s_SkyboxMesh == nullptr)
+        if (!s_Environment.ShowSkybox || s_EnvironmentMap == nullptr)
+        {
+            return;
+        }
+
+        const Ref<Mesh> gpuMesh = s_MeshLibrary->GetOrCreate(s_SkyboxMesh);
+        if (gpuMesh == nullptr)
         {
             return;
         }
@@ -160,7 +183,7 @@ namespace HachimiEngine
         s_SkyboxShader->SetFloat("u_SkyboxIntensity", s_Environment.EnvironmentIntensity);
         s_EnvironmentMap->BindSkybox(0);
 
-        Renderer::DrawIndexed(s_SkyboxMesh->GetVertexArray(), 0, DrawMode::Triangles);
+        Renderer::DrawIndexed(gpuMesh->GetVertexArray(), 0, DrawMode::Triangles);
         Renderer::SetDepthTest(true);
     }
 
@@ -183,7 +206,7 @@ namespace HachimiEngine
         Renderer::SetPolygonOffset(true, 1.0f, 1.0f);
     }
 
-    void SceneRenderer::SubmitShadowMesh(const Ref<Mesh>& mesh, const Math::Mat4& transform)
+    void SceneRenderer::SubmitShadowMesh(const Ref<MeshData>& mesh, const Math::Mat4& transform)
     {
         HE_CORE_ASSERT(s_DirectionalShadowPassActive);
 
@@ -192,8 +215,14 @@ namespace HachimiEngine
             return;
         }
 
+        const Ref<Mesh> gpuMesh = s_MeshLibrary->GetOrCreate(mesh);
+        if (gpuMesh == nullptr)
+        {
+            return;
+        }
+
         s_DirectionalShadowShader->SetMat4("u_Model", transform);
-        Renderer::DrawIndexed(mesh->GetVertexArray(), 0, DrawMode::Triangles);
+        Renderer::DrawIndexed(gpuMesh->GetVertexArray(), 0, DrawMode::Triangles);
     }
 
     void SceneRenderer::EndDirectionalShadowPass()

@@ -1,10 +1,12 @@
 # Tests: headless verification suite built on doctest.
 #
 # Every suite here runs without a window and without an OpenGL context: package round
-# trips, the virtual file system, the project/export pipeline and the pure engine
-# utilities. Anything that constructs a Scene needs a GL context (Scene's constructor
-# builds a mesh through VertexArray::Create), so it stays out of this target and is left
-# to interactive verification.
+# trips, the virtual file system, the project/export pipeline, the scene model and its
+# serialization, and the pure engine utilities. Geometry lives in CPU-side MeshData, so
+# constructing a Scene no longer needs a GL context and the ECS is covered headlessly.
+# The one rule that stays: nothing here may create a window or upload a GPU resource
+# (MeshLibrary::GetOrCreate, Texture2D::Create, Shader::Create ...), because that is
+# what needs a context.
 #
 # Shared fixtures live in Support/. Run the result with Build/<preset>/bin/Tests.exe,
 # optionally filtered with -ts=<suite> or -tc=<pattern>.
@@ -22,7 +24,10 @@ set(TEST_SOURCES
     Packaging/PackageReaderTests.cpp
     Packaging/PackageWriterTests.cpp
     Packaging/ProjectPackagerTests.cpp
+    Renderer/MeshFactoryTests.cpp
+    Scene/SceneTests.cpp
     Serialization/ProjectSerializerTests.cpp
+    Serialization/SceneSerializerTests.cpp
     Utils/AsyncFileReadTests.cpp
     Utils/FileSystemTests.cpp
     Utils/VirtualFileSystemTests.cpp

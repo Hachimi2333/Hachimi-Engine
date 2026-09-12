@@ -6,7 +6,7 @@
 
 namespace HachimiEngine
 {
-    Ref<Mesh> MeshFactory::CreateCube(float size)
+    Ref<MeshData> MeshFactory::CreateCube(float size)
     {
         const float half = size * 0.5f;
         const Math::Vec4 color(0.82f, 0.82f, 0.86f, 1.0f);
@@ -45,20 +45,23 @@ namespace HachimiEngine
             { { half,  half, -half }, { 0, 0,-1 }, { 0, 1 }, color }
         };
 
+        // Counter-clockwise seen from outside, which is the front face the renderer
+        // culls against. The +X and -X faces are listed in the opposite order of the
+        // other four because their quad corners run the other way round.
         const std::vector<uint32_t> indices =
         {
-             0,  1,  2,  0,  2,  3,
-             4,  5,  6,  4,  6,  7,
-             8,  9, 10,  8, 10, 11,
-            12, 13, 14, 12, 14, 15,
-            16, 17, 18, 16, 18, 19,
-            20, 21, 22, 20, 22, 23
+             0,  2,  1,  0,  3,  2, // +X
+             4,  6,  5,  4,  7,  6, // -X
+             8,  9, 10,  8, 10, 11, // +Y
+            12, 13, 14, 12, 14, 15, // -Y
+            16, 17, 18, 16, 18, 19, // +Z
+            20, 21, 22, 20, 22, 23  // -Z
         };
 
-        return Mesh::Create(std::move(vertices), std::move(indices));
+        return MeshData::Create(std::move(vertices), std::move(indices));
     }
 
-    Ref<Mesh> MeshFactory::CreateSphere(float radius, uint32_t sectorCount, uint32_t stackCount)
+    Ref<MeshData> MeshFactory::CreateSphere(float radius, uint32_t sectorCount, uint32_t stackCount)
     {
         std::vector<MeshVertex> vertices;
         std::vector<uint32_t> indices;
@@ -95,20 +98,21 @@ namespace HachimiEngine
                 const uint32_t first = y * (sectorCount + 1) + x;
                 const uint32_t second = first + sectorCount + 1;
 
+                // Counter-clockwise seen from outside the sphere.
                 indices.push_back(first);
-                indices.push_back(second);
                 indices.push_back(first + 1);
+                indices.push_back(second);
 
                 indices.push_back(first + 1);
-                indices.push_back(second);
                 indices.push_back(second + 1);
+                indices.push_back(second);
             }
         }
 
-        return Mesh::Create(std::move(vertices), std::move(indices));
+        return MeshData::Create(std::move(vertices), std::move(indices));
     }
 
-    Ref<Mesh> MeshFactory::CreatePlane(float width, float height)
+    Ref<MeshData> MeshFactory::CreatePlane(float width, float height)
     {
         const float halfWidth = width * 0.5f;
         const float halfHeight = height * 0.5f;
@@ -123,11 +127,12 @@ namespace HachimiEngine
             { { -halfWidth, 0.0f,  halfHeight }, normal, { 0.0f, 1.0f }, color }
         };
 
-        const std::vector<uint32_t> indices = { 0, 1, 2, 0, 2, 3 };
-        return Mesh::Create(std::move(vertices), std::move(indices));
+        // Counter-clockwise seen from above, matching the upward face normal.
+        const std::vector<uint32_t> indices = { 0, 2, 1, 0, 3, 2 };
+        return MeshData::Create(std::move(vertices), std::move(indices));
     }
 
-    Ref<Mesh> MeshFactory::CreateGrid(float size, uint32_t divisions)
+    Ref<MeshData> MeshFactory::CreateGrid(float size, uint32_t divisions)
     {
         const float halfSize = size * 0.5f;
         const float step = size / static_cast<float>(divisions);
@@ -152,10 +157,10 @@ namespace HachimiEngine
             indices.push_back(vertexIndex++);
         }
 
-        return Mesh::Create(std::move(vertices), std::move(indices), MeshDrawMode::Lines);
+        return MeshData::Create(std::move(vertices), std::move(indices), MeshDrawMode::Lines);
     }
 
-    Ref<Mesh> MeshFactory::CreatePrimitive(PrimitiveMeshType type)
+    Ref<MeshData> MeshFactory::CreatePrimitive(PrimitiveMeshType type)
     {
         switch (type)
         {
