@@ -3,6 +3,7 @@
 #include "Core/Base.h"
 #include "Core/Memory.h"
 #include "Core/Timestep.h"
+#include "Physics/PhysicsSettings.h"
 #include "Math/Math.h"
 
 #include <cstdint>
@@ -10,17 +11,6 @@
 namespace HachimiEngine
 {
     class Scene;
-
-    // Scene-level physics configuration. Box3D defaults use meters/kilograms/seconds
-    // and a +Y up gravity vector.
-    struct PhysicsSettings
-    {
-        Math::Vec3 Gravity { 0.0f, -10.0f, 0.0f };
-        float FixedTimeStep = 1.0f / 60.0f;
-        int SubStepCount = 4;
-        bool EnableSleep = true;
-        bool EnableContinuous = true;
-    };
 
     // Wraps a Box3D world and keeps the EnTT entity -> b3BodyId mapping.
     // Box3D is a C17 library, so its types are hidden behind an Impl to keep

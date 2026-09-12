@@ -51,6 +51,7 @@ set(ENGINE_SOURCES
     Source/Packaging/ProjectPackager.cpp
     Source/Packaging/ProjectPackager.h
     Source/Physics/PhysicsMath.h
+    Source/Physics/PhysicsSettings.h
     Source/Physics/PhysicsWorld.cpp
     Source/Physics/PhysicsWorld.h
     Source/Platform/GLFW/GLFWWindow.cpp

@@ -127,6 +127,30 @@ Build-system notes:
   scripting and serialization code only ever touches `MeshData`; never create a GPU resource
   (a `Mesh`, `VertexArray`, `Texture2D`, `Shader` or `Framebuffer`) from those subsystems.
 
+## Scene, Simulation and Assets
+
+- Every component is registered exactly once, in `ComponentRegistry::RegisterBuiltinComponents`.
+  That table drives entity creation, duplication, cloning, `.hscene` serialization and the
+  editor's component list, so a new component is added by writing its descriptor - never by
+  adding another branch to `Scene`, `SceneSerializer` or `InspectorPanel`. The coverage test in
+  `Tests/Scene/ComponentRegistryTests.cpp` walks the table, so a half-integrated component fails
+  the suite instead of disappearing at runtime.
+- A component keeps its own persistence: its header declares the struct and its source file
+  defines the descriptor (default construction, removal, clone, serialize, deserialize).
+  Enumerators are stored by name through `Serialization/EnumNames.h`, never as integers.
+- `RelationshipComponent` holds only `Parent`. Children are derived by `Scene`; reparent through
+  `Scene::SetParent` / `Scene::ClearParent` rather than by editing the component.
+- Simulation runs as `SceneSystem`s attached to a `Scene`, ordered by `ScenePhase`. Add work as a
+  system instead of extending `Scene::OnUpdate`, which only drives the phases.
+- Rendering is an ordered `RenderPipeline` of `RenderPass`es owned by a `SceneRenderer`. Add an
+  effect as a pass instead of extending the draw sequence; passes read per-view data from
+  `RenderView` and never reach into a scene.
+- Per-view constants travel in the `FrameUniforms` block. Its members must stay `mat4`/`vec4`,
+  because only those have the same size and alignment under std140 as in C++; the header pins the
+  offsets with `static_assert` and `Tests/Renderer/FrameUniformsTests.cpp`.
+- Changing the `.hscene` layout means bumping `SceneSerializer::CurrentFormatVersion`. The loader
+  refuses every other version instead of parsing it as if it had this layout.
+
 ## Project Scope
 
 - Audio is not implemented in the current phase.

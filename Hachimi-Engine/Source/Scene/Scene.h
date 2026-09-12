@@ -4,13 +4,12 @@
 #include "Core/Memory.h"
 #include "Core/Timestep.h"
 #include "Core/UUID.h"
-#include "Physics/PhysicsWorld.h"
+#include "Physics/PhysicsSettings.h"
 #include "Renderer/EditorCamera.h"
 #include "Renderer/EnvironmentSettings.h"
 #include "Renderer/RenderView.h"
 #include "Scene/Entity.h"
 #include "Scene/SceneSystem.h"
-#include "Scripting/ScriptWorld.h"
 #include "Math/Math.h"
 
 #include <entt/entt.hpp>

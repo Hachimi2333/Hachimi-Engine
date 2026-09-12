@@ -12,18 +12,31 @@ A C++20 3D game engine and editor for Windows, built on OpenGL 4.6 Core and insp
 - CMake build driven by `CMakePresets.json`, with Visual Studio 2026 and Ninja presets
 - Application / Entry Point / Layer / LayerStack / Event system
 - Custom math library `HachimiEngine::Math` (internally wraps GLM; game code does not depend on GLM directly)
-- Scene / ECS based on EnTT
-- yaml-cpp scene (`.hscene`) and project (`.hproj`) serialization
+- Scene / ECS based on EnTT with a component registry: a component is declared, persisted and
+  edited in the inspector from one descriptor instead of five if-chains
+- Scene systems with explicit phases (`PreUpdate` / `FixedUpdate` / `Update` / `LateUpdate`),
+  so physics and scripting are attached independently
+- Derived entity hierarchy (parent link only) with cycle-safe reparenting and subtree destruction
+- yaml-cpp scene (`.hscene`, versioned) and project (`.hproj`) serialization, with enumerators
+  stored by name
 - Console logging with dual loggers (engine and client)
 - Lua 5.4 scripting with a language-agnostic backend abstraction, ready for future script languages
 
 ### Rendering
 
-- OpenGL 4.6 Core backend with an OpenGL-style rendering abstraction: VertexArray, VertexBuffer, IndexBuffer, Shader, Texture2D, TextureCube, Framebuffer
-- Built-in meshes: Cube, Sphere, Plane, Grid
+- OpenGL 4.6 Core backend with an OpenGL-style rendering abstraction: VertexArray, VertexBuffer, IndexBuffer, Shader, Texture2D, TextureCube, Framebuffer, UniformBuffer
+- CPU geometry (`MeshData`) split from GPU geometry (`Mesh`), so scenes, serialization and the
+  test suite need no OpenGL context
+- `RendererContext` owns every GPU resource; `SceneRenderer` instances own only per-frame state,
+  so the editor viewport, the game panel and the Player cannot disturb each other
+- Ordered `RenderPass` pipeline (directional shadow, skybox, grid, opaque) over a shared
+  `SceneRenderTarget`, with the per-view constants in one std140 uniform buffer
+- Backface culling with counter-clockwise front faces; the built-in primitives are wound to match
+- Built-in meshes: Cube, Sphere, Plane (double-sided, as the floor primitive), Grid
 - HDR rendering pipeline: ACES tone mapping + gamma post-processing
 - Cook-Torrance PBR direct lighting with directional light shadow mapping (3×3 PCF)
 - Procedural skybox and image-based lighting from environment maps (irradiance + prefiltered specular)
+
 
 ### Physics
 
@@ -33,6 +46,8 @@ A C++20 3D game engine and editor for Windows, built on OpenGL 4.6 Core and insp
 ### Editor
 
 - ImGui Docking-based editor: Project Hub, Viewport, Scene Hierarchy, Inspector, Content Browser, Console
+- Scene Save / Save As writes back to the scene being edited, and the Inspector's component list
+  is generated from the engine's component registry
 - Game export pipeline: Build Settings popup, Windows_x64 builds, packaged `Data.hpak` assets, and a standalone `Hachimi-Player` runtime
 - Large-icon Content Browser grid with texture thumbnails and drag-and-drop to Inspector asset fields
 - Native File Dialog Extended system file dialogs
@@ -133,9 +148,10 @@ Build/x64-debug/bin/Tests.exe
 
 `Tests` is the headless verification suite, built on [doctest](https://github.com/doctest/doctest).
 It covers the package round trip, range and streaming reads, corruption handling, the virtual
-file system, the project/export pipeline and the pure engine utilities, and exits with code 0
-when every case passes. The suites live in `Tests/`, one directory per subsystem, and doctest's
-own options select what runs:
+file system, the project/export pipeline, the scene model and its serialization, the component
+registry, the render pipeline and the pure engine utilities, and exits with code 0 when every
+case passes. The suites live in `Tests/`, one directory per subsystem, and doctest's own options
+select what runs:
 
 ```
 Build/x64-debug/bin/Tests.exe -ts=Packaging        # one suite
@@ -250,10 +266,13 @@ Hachimi-Engine/          # Engine core (static library)
   Resources/Fonts/       # Editor UI font (Inter) and its license
   Source/                # Engine source
   Source/Packaging/      # Game build settings, .hpak format, reader/writer
+  Source/Renderer/       # Renderer context, pipeline, passes, views and resources
+  Source/Scene/          # Component registry, components, entities, scene, systems
   Source/Scripting/      # Language-agnostic scripting core + Lua backend
 Hachimi-Editor/          # Editor client (executable)
   CMakeLists.txt
   Source/                # Editor source
+  Source/Components/     # Inspector widgets, drawer registry and per-component drawers
 Hachimi-Player/          # Standalone game runtime used by exported builds
   CMakeLists.txt
   Source/                # Player source
@@ -281,6 +300,23 @@ mount table. Paths below a mount point are served from the mounted package (or
 loose-content overlay) and everything else falls back to the operating system, so
 the editor needs no special casing and packaged games get the package
 transparently.
+
+## Extending the engine
+
+Three tables decide where new functionality goes, and all three are covered by tests that walk
+them rather than by a hand-written list:
+
+- **A component** is one header and one source under `Hachimi-Engine/Source/Scene/Components/`,
+  plus a line in `ComponentRegistry::RegisterBuiltinComponents` and a drawer registered in
+  `Hachimi-Editor/Source/Components/InspectorRegistry.cpp`. Entity creation, duplication, cloning,
+  `.hscene` persistence and the inspector's component list all follow from the descriptor.
+- **A simulation step** is a `SceneSystem` with a `ScenePhase`, attached with `Scene::AddSystem`.
+  `Scene::OnUpdate` only drives the phases, so systems do not have to know about each other.
+- **A rendering effect** is a `RenderPass` added to the `SceneRenderer` pipeline, reading per-view
+  data from a `RenderView` and per-view constants from the `FrameUniforms` block.
+
+`AGENTS.md` states the same rules as contributor constraints, together with the build system,
+vendor library and verification requirements.
 
 ## Current Scope
 

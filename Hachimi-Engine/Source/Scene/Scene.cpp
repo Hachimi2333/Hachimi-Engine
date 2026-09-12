@@ -1,6 +1,7 @@
 #include "Scene/Scene.h"
 
 #include "Core/Log.h"
+#include "Physics/PhysicsWorld.h"
 #include "Renderer/Lighting.h"
 #include "Renderer/MeshFactory.h"
 #include "Scene/ComponentRegistry.h"

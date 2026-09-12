@@ -12,15 +12,21 @@
 - 由 `CMakePresets.json` 驱动的 CMake 构建，提供 Visual Studio 2026 与 Ninja 预设
 - Application / Entry Point / Layer / LayerStack / Event 系统
 - 自有数学库 `HachimiEngine::Math`（内部封装 GLM，业务代码不直接依赖 GLM）
-- 基于 EnTT 的 Scene / ECS
-- yaml-cpp 场景（`.hscene`）与项目（`.hproj`）序列化
+- 基于 EnTT 的 Scene / ECS，附组件注册表：组件在一处描述符里声明、持久化并在 Inspector 中编辑，而不是散落在五段 if 链里
+- 带显式阶段的场景系统（PreUpdate / FixedUpdate / Update / LateUpdate），物理与脚本独立挂载
+- 派生式实体层级（只存父节点），重父级带环检测，删除父节点销毁整棵子树
+- yaml-cpp 场景（`.hscene`，带格式版本）与项目（`.hproj`）序列化，枚举按名字存储
 - 控制台日志（引擎与客户端双 logger，暂不输出日志文件）
 - Lua 5.4 脚本系统，底层采用语言无关的后端抽象，为后续支持更多脚本语言预留
 
 ### 渲染
 
 - OpenGL 4.6 Core 渲染后端，OpenGL 风格渲染抽象：VertexArray、VertexBuffer、IndexBuffer、Shader、Texture2D、TextureCube、Framebuffer
-- 内置网格：Cube、Sphere、Plane、Grid
+- CPU 几何（`MeshData`）与 GPU 几何（`Mesh`）分离，场景、序列化与测试套件都不需要 GL 上下文
+- `RendererContext` 持有全部 GPU 资源，`SceneRenderer` 实例只持有每帧状态，编辑器视口 / Game 面板 / Player 互不干扰
+- 有序 `RenderPass` 管线（方向光阴影、天空盒、网格地面、不透明）共用 `SceneRenderTarget`，每视图常量走一个 std140 uniform buffer
+- 开启背面剔除，正面为逆时针；内置图元绕序已对齐
+- 内置网格：Cube、Sphere、Plane（双面，作为地面图元）、Grid
 - HDR 渲染管线：ACES Tone Mapping + Gamma 后处理
 - Cook-Torrance PBR 直接光照、方向光阴影映射（3×3 PCF）
 - 程序化天空盒与基于环境贴图的 IBL（irradiance + prefiltered specular）
@@ -131,7 +137,8 @@ Build/x64-debug/bin/Tests.exe
 ```
 
 `Tests` 是基于 [doctest](https://github.com/doctest/doctest) 的无界面验证套件，覆盖资源包往返、
-分块与流式读取、损坏处理、虚拟文件系统、项目/导出流水线以及引擎的纯工具函数，全部通过时退出码为 0。
+分块与流式读取、损坏处理、虚拟文件系统、项目/导出流水线、场景模型与其序列化、组件注册表、
+渲染管线以及引擎的纯工具函数，全部通过时退出码为 0。
 用例按子系统分类放在 `Tests/` 下，可用 doctest 自带参数选择运行范围：
 
 ```
@@ -250,10 +257,13 @@ Hachimi-Engine/          # 引擎核心（静态库）
   Resources/Fonts/       # 编辑器 UI 字体（Inter）及其许可证
   Source/                # 引擎源码
   Source/Packaging/      # 游戏导出配置、.hpak 格式与读写实现
+  Source/Renderer/       # 渲染上下文、管线、通道、视图与资源
+  Source/Scene/          # 组件注册表、组件、实体、场景、系统
   Source/Scripting/      # 语言无关脚本核心与 Lua 后端
 Hachimi-Editor/          # 编辑器客户端（可执行文件）
   CMakeLists.txt
   Source/                # 编辑器源码
+  Source/Components/     # Inspector 控件、绘制注册表与各组件绘制器
 Hachimi-Player/          # 导出构建使用的独立游戏运行时
   CMakeLists.txt
   Source/                # Player 源码
