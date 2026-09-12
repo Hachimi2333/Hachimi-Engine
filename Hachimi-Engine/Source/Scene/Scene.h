@@ -8,7 +8,6 @@
 #include "Renderer/EditorCamera.h"
 #include "Renderer/EnvironmentSettings.h"
 #include "Renderer/RenderView.h"
-#include "Scene/Components.h"
 #include "Scene/Entity.h"
 #include "Scripting/ScriptWorld.h"
 #include "Math/Math.h"
@@ -32,6 +31,10 @@ namespace HachimiEngine
     };
 
     // Scene owns an EnTT registry and helpers for entity hierarchy and rendering.
+    //
+    // Components are handled generically through ComponentRegistry, so this class never has to
+    // list them: a component is created with an entity, duplicated, cloned and serialized
+    // because its descriptor says how, not because someone remembered to add a branch here.
     class Scene
     {
     public:
@@ -50,6 +53,14 @@ namespace HachimiEngine
 
         std::vector<Entity> GetAllEntities();
 
+        // Hierarchy. The parent link is the single source of truth; the child lookup is derived
+        // from it, so the two directions cannot disagree.
+        void SetParent(Entity child, Entity parent);
+        void ClearParent(Entity child);
+        std::vector<Entity> GetChildren(Entity parent);
+        bool IsAncestorOf(Entity ancestor, Entity candidate);
+
+        // World-space transform of an entity, composed through its parent chain.
         Math::Mat4 GetWorldTransform(entt::entity entity) const;
 
         void SetViewportSize(uint32_t width, uint32_t height);
@@ -57,9 +68,9 @@ namespace HachimiEngine
         void OnRuntimeStop();
         void OnUpdate(Timestep timestep);
 
-        // Extracts everything a renderer needs for one frame, as plain data. Rendering
-        // itself is the caller's job, which is why the editor viewport, the game panel
-        // and the Player can share this without sharing renderer state.
+        // Extracts everything a renderer needs for one frame, as plain data. Rendering itself is
+        // the caller's job, which is why the editor viewport, the game panel and the Player can
+        // share this without sharing renderer state.
         RenderView BuildRenderView(const SceneRenderDesc& desc) const;
         RenderView BuildRenderView(const EditorCamera& camera, bool drawGrid) const;
 
@@ -84,9 +95,20 @@ namespace HachimiEngine
         void DestroyChildren(entt::entity entity);
         void CollectLights(LightingEnvironment& outLighting) const;
 
+        // True when making parentUUID the parent of child would close a loop.
+        bool WouldCreateCycle(entt::entity child, UUID parentUUID) const;
+
+        void RebuildChildrenIndexIfDirty();
+        UUID GetEntityUUID(entt::entity entity) const;
+
     private:
         entt::registry m_Registry;
         std::unordered_map<UUID, entt::entity> m_EntityMap;
+
+        // Derived from RelationshipComponent::Parent. Rebuilt on demand after any hierarchy
+        // change rather than mirrored on every edit.
+        std::unordered_map<UUID, std::vector<UUID>> m_ChildrenIndex;
+        bool m_ChildrenIndexDirty = false;
 
         std::string m_Name = "Untitled Scene";
         uint32_t m_ViewportWidth = 1280;

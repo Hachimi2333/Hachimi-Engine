@@ -2,7 +2,12 @@
 
 #include "Panels/EditorContext.h"
 #include "Renderer/MeshFactory.h"
-#include "Scene/Components.h"
+#include "Scene/Components/CameraComponent.h"
+#include "Scene/Components/IDComponent.h"
+#include "Scene/Components/LightComponent.h"
+#include "Scene/Components/MeshComponent.h"
+#include "Scene/Components/RelationshipComponent.h"
+#include "Scene/Components/TransformComponent.h"
 #include "Scene/Scene.h"
 
 #include <imgui.h>
@@ -69,10 +74,9 @@ namespace HachimiEngine
 
         if (expanded)
         {
-            const auto& relationship = entity.GetComponent<RelationshipComponent>();
-            for (const UUID childUUID : relationship.Children)
+            for (const Entity child : context.ActiveScene->GetChildren(entity))
             {
-                DrawEntityNode(context, context.ActiveScene->GetEntityByUUID(childUUID));
+                DrawEntityNode(context, child);
             }
             ImGui::TreePop();
         }

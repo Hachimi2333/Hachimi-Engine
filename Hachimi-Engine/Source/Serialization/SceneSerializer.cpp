@@ -1,27 +1,40 @@
 #include "Serialization/SceneSerializer.h"
 
 #include "Core/Log.h"
-#include "Renderer/MeshFactory.h"
-#include "Scene/Components.h"
+#include "Scene/ComponentRegistry.h"
+#include "Scene/Components/IDComponent.h"
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
-#include "Math/Math.h"
 #include "Utils/VirtualFileSystem.h"
 
+#include <algorithm>
 #include <fstream>
+#include <unordered_set>
+#include <utility>
 
 namespace HachimiEngine
 {
     namespace
     {
+        constexpr const char* FormatVersionKey = "FormatVersion";
+        constexpr const char* SceneKey = "Scene";
+        constexpr const char* EnvironmentKey = "Environment";
+        constexpr const char* PhysicsKey = "Physics";
+        constexpr const char* EntitiesKey = "Entities";
+
+        // Component blocks this build does not know about, kept verbatim so that saving a scene
+        // written by a newer build does not silently delete data.
+        //
+        // The type is deliberately not registered: the generic machinery must not create,
+        // duplicate or clone it, because only the serializer can interpret the payload.
+        struct UnknownComponentBlocks
+        {
+            std::vector<std::pair<std::string, YAML::Node>> Blocks;
+        };
+
         void EmitVec3(YAML::Emitter& out, const Math::Vec3& value)
         {
             out << YAML::Flow << YAML::BeginSeq << value.x << value.y << value.z << YAML::EndSeq;
-        }
-
-        void EmitVec4(YAML::Emitter& out, const Math::Vec4& value)
-        {
-            out << YAML::Flow << YAML::BeginSeq << value.x << value.y << value.z << value.w << YAML::EndSeq;
         }
 
         Math::Vec3 ReadVec3(const YAML::Node& node, const Math::Vec3& fallback = Math::Vec3(0.0f))
@@ -33,13 +46,23 @@ namespace HachimiEngine
             return { node[0].as<float>(), node[1].as<float>(), node[2].as<float>() };
         }
 
-        Math::Vec4 ReadVec4(const YAML::Node& node, const Math::Vec4& fallback = Math::Vec4(1.0f))
+        // Keys that are structure rather than a component block.
+        const std::unordered_set<std::string>& ReservedKeys()
         {
-            if (!node || !node.IsSequence() || node.size() < 4)
+            static const std::unordered_set<std::string> keys { "Entity", EntitiesKey, "UnknownComponents" };
+            return keys;
+        }
+
+        const ComponentDescriptor* FindDescriptorByName(std::string_view name)
+        {
+            for (const ComponentDescriptor& descriptor : ComponentRegistry::GetDescriptors())
             {
-                return fallback;
+                if (descriptor.Name == name)
+                {
+                    return &descriptor;
+                }
             }
-            return { node[0].as<float>(), node[1].as<float>(), node[2].as<float>(), node[3].as<float>() };
+            return nullptr;
         }
     }
 
@@ -48,21 +71,22 @@ namespace HachimiEngine
     {
     }
 
-    void SceneSerializer::Serialize(const std::string& filepath)
+    bool SceneSerializer::Serialize(const std::string& filepath)
     {
         YAML::Emitter out;
         out << YAML::BeginMap;
-        out << YAML::Key << "Scene" << YAML::Value << m_Scene->GetName();
+        out << YAML::Key << FormatVersionKey << YAML::Value << CurrentFormatVersion;
+        out << YAML::Key << SceneKey << YAML::Value << m_Scene->GetName();
 
         const EnvironmentSettings& environment = m_Scene->GetEnvironmentSettings();
-        out << YAML::Key << "Environment" << YAML::Value << YAML::BeginMap;
+        out << YAML::Key << EnvironmentKey << YAML::Value << YAML::BeginMap;
         out << YAML::Key << "ShowSkybox" << YAML::Value << environment.ShowSkybox;
         out << YAML::Key << "Exposure" << YAML::Value << environment.Exposure;
         out << YAML::Key << "EnvironmentIntensity" << YAML::Value << environment.EnvironmentIntensity;
         out << YAML::EndMap;
 
         const PhysicsSettings& physics = m_Scene->GetPhysicsSettings();
-        out << YAML::Key << "Physics" << YAML::Value << YAML::BeginMap;
+        out << YAML::Key << PhysicsKey << YAML::Value << YAML::BeginMap;
         out << YAML::Key << "Gravity" << YAML::Value;
         EmitVec3(out, physics.Gravity);
         out << YAML::Key << "FixedTimeStep" << YAML::Value << physics.FixedTimeStep;
@@ -71,24 +95,35 @@ namespace HachimiEngine
         out << YAML::Key << "EnableContinuous" << YAML::Value << physics.EnableContinuous;
         out << YAML::EndMap;
 
-        out << YAML::Key << "Entities" << YAML::Value << YAML::BeginSeq;
-
+        out << YAML::Key << EntitiesKey << YAML::Value << YAML::BeginSeq;
         for (const Entity entity : m_Scene->GetAllEntities())
         {
             SerializeEntity(out, entity);
         }
-
         out << YAML::EndSeq;
         out << YAML::EndMap;
 
         std::ofstream file(filepath);
+        if (!file)
+        {
+            HE_CORE_ERROR("Cannot open scene file for writing: {}", filepath);
+            return false;
+        }
+
         file << out.c_str();
+        if (!file)
+        {
+            HE_CORE_ERROR("Failed to write scene file: {}", filepath);
+            return false;
+        }
+
+        return true;
     }
 
     bool SceneSerializer::Deserialize(const std::string& filepath)
     {
-        // Read through the virtual file system so packaged scenes load straight
-        // out of the game package.
+        // Read through the virtual file system so packaged scenes load straight out of the
+        // game package.
         std::string sceneText;
         if (!VirtualFileSystem::ReadTextFile(filepath, sceneText))
         {
@@ -107,18 +142,30 @@ namespace HachimiEngine
             return false;
         }
 
-        if (!data || !data["Scene"])
+        if (!data || !data[SceneKey])
         {
             HE_CORE_ERROR("Failed to load scene file: {}", filepath);
             return false;
         }
 
+        const int formatVersion = data[FormatVersionKey].as<int>(0);
+        if (formatVersion != CurrentFormatVersion)
+        {
+            HE_CORE_ERROR("Scene '{}' uses format version {}; this build reads version {}",
+                filepath,
+                formatVersion,
+                CurrentFormatVersion);
+            return false;
+        }
+
         m_Scene->OnRuntimeStop();
         m_Scene->m_EntityMap.clear();
+        m_Scene->m_ChildrenIndex.clear();
+        m_Scene->m_ChildrenIndexDirty = true;
         m_Scene->m_Registry.clear();
-        m_Scene->SetName(data["Scene"].as<std::string>());
+        m_Scene->SetName(data[SceneKey].as<std::string>());
 
-        if (const YAML::Node environmentNode = data["Environment"])
+        if (const YAML::Node environmentNode = data[EnvironmentKey])
         {
             EnvironmentSettings& environment = m_Scene->GetEnvironmentSettings();
             environment.ShowSkybox = environmentNode["ShowSkybox"].as<bool>(true);
@@ -126,7 +173,7 @@ namespace HachimiEngine
             environment.EnvironmentIntensity = environmentNode["EnvironmentIntensity"].as<float>(1.0f);
         }
 
-        if (const YAML::Node physicsNode = data["Physics"])
+        if (const YAML::Node physicsNode = data[PhysicsKey])
         {
             PhysicsSettings& physics = m_Scene->GetPhysicsSettings();
             physics.Gravity = ReadVec3(physicsNode["Gravity"], physics.Gravity);
@@ -136,7 +183,7 @@ namespace HachimiEngine
             physics.EnableContinuous = physicsNode["EnableContinuous"].as<bool>(physics.EnableContinuous);
         }
 
-        const YAML::Node entities = data["Entities"];
+        const YAML::Node entities = data[EntitiesKey];
         if (entities && entities.IsSequence())
         {
             for (const YAML::Node entityNode : entities)
@@ -151,259 +198,75 @@ namespace HachimiEngine
     void SceneSerializer::SerializeEntity(YAML::Emitter& out, Entity entity)
     {
         out << YAML::BeginMap;
-        out << YAML::Key << "Entity" << YAML::Value << entity.GetUUID().ToString();
 
-        if (entity.HasComponent<TagComponent>())
+        for (const ComponentDescriptor& descriptor : ComponentRegistry::GetDescriptors())
         {
-            out << YAML::Key << "TagComponent" << YAML::Value << YAML::BeginMap;
-            out << YAML::Key << "Tag" << YAML::Value << entity.GetComponent<TagComponent>().Tag;
-            out << YAML::EndMap;
+            descriptor.Serialize(out, m_Scene->GetRegistry(), entity.GetHandle());
         }
 
-        if (entity.HasComponent<TransformComponent>())
+        // Anything this build did not recognise is written back unchanged.
+        if (const auto* unknownBlocks = m_Scene->GetRegistry().try_get<UnknownComponentBlocks>(entity.GetHandle()))
         {
-            const auto& transform = entity.GetComponent<TransformComponent>();
-            out << YAML::Key << "TransformComponent" << YAML::Value << YAML::BeginMap;
-            out << YAML::Key << "Position" << YAML::Value;
-            EmitVec3(out, transform.Position);
-            out << YAML::Key << "Rotation" << YAML::Value;
-            EmitVec3(out, transform.Rotation);
-            out << YAML::Key << "Scale" << YAML::Value;
-            EmitVec3(out, transform.Scale);
-            out << YAML::EndMap;
-        }
-
-        if (entity.HasComponent<RelationshipComponent>())
-        {
-            const auto& relationship = entity.GetComponent<RelationshipComponent>();
-            out << YAML::Key << "RelationshipComponent" << YAML::Value << YAML::BeginMap;
-            out << YAML::Key << "Parent" << YAML::Value << relationship.Parent.ToString();
-
-            out << YAML::Key << "Children" << YAML::Value << YAML::BeginSeq;
-            for (const UUID child : relationship.Children)
+            for (const auto& [name, node] : unknownBlocks->Blocks)
             {
-                out << child.ToString();
+                out << YAML::Key << name << YAML::Value << node;
             }
-            out << YAML::EndSeq;
-            out << YAML::EndMap;
-        }
-
-        if (entity.HasComponent<RigidbodyComponent>())
-        {
-            const auto& rigidbody = entity.GetComponent<RigidbodyComponent>();
-            out << YAML::Key << "RigidbodyComponent" << YAML::Value << YAML::BeginMap;
-            out << YAML::Key << "Type" << YAML::Value << static_cast<int>(rigidbody.Type);
-            out << YAML::Key << "LinearVelocity" << YAML::Value;
-            EmitVec3(out, rigidbody.LinearVelocity);
-            out << YAML::Key << "AngularVelocity" << YAML::Value;
-            EmitVec3(out, rigidbody.AngularVelocity);
-            out << YAML::Key << "LinearDamping" << YAML::Value << rigidbody.LinearDamping;
-            out << YAML::Key << "AngularDamping" << YAML::Value << rigidbody.AngularDamping;
-            out << YAML::Key << "GravityScale" << YAML::Value << rigidbody.GravityScale;
-            out << YAML::Key << "EnableSleep" << YAML::Value << rigidbody.EnableSleep;
-            out << YAML::Key << "InitiallyAwake" << YAML::Value << rigidbody.InitiallyAwake;
-            out << YAML::Key << "IsBullet" << YAML::Value << rigidbody.IsBullet;
-            out << YAML::Key << "IsEnabled" << YAML::Value << rigidbody.IsEnabled;
-            out << YAML::EndMap;
-        }
-
-        if (entity.HasComponent<ColliderComponent>())
-        {
-            const auto& collider = entity.GetComponent<ColliderComponent>();
-            out << YAML::Key << "ColliderComponent" << YAML::Value << YAML::BeginMap;
-            out << YAML::Key << "ShapeType" << YAML::Value << static_cast<int>(collider.ShapeType);
-            out << YAML::Key << "HalfExtents" << YAML::Value;
-            EmitVec3(out, collider.HalfExtents);
-            out << YAML::Key << "Radius" << YAML::Value << collider.Radius;
-            out << YAML::Key << "Height" << YAML::Value << collider.Height;
-            out << YAML::Key << "Offset" << YAML::Value;
-            EmitVec3(out, collider.Offset);
-            out << YAML::Key << "Density" << YAML::Value << collider.Density;
-            out << YAML::Key << "Friction" << YAML::Value << collider.Friction;
-            out << YAML::Key << "Restitution" << YAML::Value << collider.Restitution;
-            out << YAML::Key << "RollingResistance" << YAML::Value << collider.RollingResistance;
-            out << YAML::Key << "IsTrigger" << YAML::Value << collider.IsTrigger;
-            out << YAML::Key << "CategoryBits" << YAML::Value << collider.CategoryBits;
-            out << YAML::Key << "MaskBits" << YAML::Value << collider.MaskBits;
-            out << YAML::EndMap;
-        }
-
-        if (entity.HasComponent<MeshComponent>())
-        {
-            const auto& mesh = entity.GetComponent<MeshComponent>();
-            out << YAML::Key << "MeshComponent" << YAML::Value << YAML::BeginMap;
-            out << YAML::Key << "PrimitiveType" << YAML::Value << static_cast<int>(mesh.PrimitiveType);
-            out << YAML::Key << "AlbedoColor" << YAML::Value;
-            EmitVec4(out, mesh.MaterialColor);
-            out << YAML::Key << "Roughness" << YAML::Value << mesh.Roughness;
-            out << YAML::Key << "Metallic" << YAML::Value << mesh.Metallic;
-            out << YAML::Key << "Visible" << YAML::Value << mesh.Visible;
-            out << YAML::EndMap;
-        }
-
-        if (entity.HasComponent<CameraComponent>())
-        {
-            const auto& camera = entity.GetComponent<CameraComponent>();
-            out << YAML::Key << "CameraComponent" << YAML::Value << YAML::BeginMap;
-            out << YAML::Key << "Primary" << YAML::Value << camera.Primary;
-            out << YAML::Key << "FieldOfView" << YAML::Value << camera.FieldOfView;
-            out << YAML::Key << "NearClip" << YAML::Value << camera.NearClip;
-            out << YAML::Key << "FarClip" << YAML::Value << camera.FarClip;
-            out << YAML::EndMap;
-        }
-
-        if (entity.HasComponent<LightComponent>())
-        {
-            const auto& light = entity.GetComponent<LightComponent>();
-            out << YAML::Key << "LightComponent" << YAML::Value << YAML::BeginMap;
-            out << YAML::Key << "Type" << YAML::Value << static_cast<int>(light.Type);
-            out << YAML::Key << "Color" << YAML::Value;
-            EmitVec3(out, light.Color);
-            out << YAML::Key << "Intensity" << YAML::Value << light.Intensity;
-            out << YAML::Key << "Range" << YAML::Value << light.Range;
-            out << YAML::Key << "CastsShadows" << YAML::Value << light.CastsShadows;
-            out << YAML::Key << "ShadowBias" << YAML::Value << light.ShadowBias;
-            out << YAML::EndMap;
-        }
-
-        if (entity.HasComponent<ScriptComponent>())
-        {
-            const auto& script = entity.GetComponent<ScriptComponent>();
-            out << YAML::Key << "ScriptComponent" << YAML::Value << YAML::BeginMap;
-            out << YAML::Key << "Scripts" << YAML::Value << YAML::BeginSeq;
-            for (const ScriptComponent::ScriptReference& reference : script.Scripts)
-            {
-                out << YAML::BeginMap;
-                out << YAML::Key << "Path" << YAML::Value << reference.Path;
-                out << YAML::Key << "Enabled" << YAML::Value << reference.Enabled;
-                out << YAML::EndMap;
-            }
-            out << YAML::EndSeq;
-            out << YAML::EndMap;
         }
 
         out << YAML::EndMap;
     }
 
-    void SceneSerializer::DeserializeEntity(YAML::Node entityNode, Scene& scene)
+    void SceneSerializer::DeserializeEntity(const YAML::Node& entityNode, Scene& scene)
     {
-        const uint64_t uuidValue = std::stoull(entityNode["Entity"].as<std::string>(), nullptr, 16);
-        Entity entity(scene.m_Registry.create(), &scene);
-        entity.AddComponent<IDComponent>().ID = UUID(uuidValue);
+        const entt::entity handle = scene.m_Registry.create();
 
-        if (const YAML::Node tagNode = entityNode["TagComponent"])
+        bool hasIdentity = false;
+        for (const ComponentDescriptor& descriptor : ComponentRegistry::GetDescriptors())
         {
-            entity.AddComponent<TagComponent>().Tag = tagNode["Tag"].as<std::string>("Entity");
-        }
-
-        entity.AddComponent<TransformComponent>();
-        if (const YAML::Node transformNode = entityNode["TransformComponent"])
-        {
-            auto& transform = entity.GetComponent<TransformComponent>();
-            transform.Position = ReadVec3(transformNode["Position"]);
-            transform.Rotation = ReadVec3(transformNode["Rotation"]);
-            transform.Scale = ReadVec3(transformNode["Scale"], Math::Vec3(1.0f));
-        }
-
-        entity.AddComponent<RelationshipComponent>();
-        if (const YAML::Node relationshipNode = entityNode["RelationshipComponent"])
-        {
-            auto& relationship = entity.GetComponent<RelationshipComponent>();
-            const uint64_t parentUUID = std::stoull(relationshipNode["Parent"].as<std::string>("0"), nullptr, 16);
-            relationship.Parent = UUID(parentUUID);
-
-            if (const YAML::Node childrenNode = relationshipNode["Children"])
+            const bool read = descriptor.Deserialize(entityNode, scene.m_Registry, handle);
+            if (read && descriptor.TypeID == entt::type_hash<IDComponent>::value())
             {
-                for (const YAML::Node childNode : childrenNode)
-                {
-                    const uint64_t childUUID = std::stoull(childNode.as<std::string>(), nullptr, 16);
-                    relationship.Children.push_back(UUID(childUUID));
-                }
+                hasIdentity = true;
+            }
+            else if (!read && descriptor.Required)
+            {
+                // A required component that is absent from the file still exists on the entity,
+                // so the rest of the engine can keep assuming it is there.
+                descriptor.AddDefault(scene.m_Registry, handle);
             }
         }
 
-        if (const YAML::Node rigidbodyNode = entityNode["RigidbodyComponent"])
+        if (!hasIdentity)
         {
-            auto& rigidbody = entity.AddComponent<RigidbodyComponent>();
-            rigidbody.Type = static_cast<RigidbodyComponent::RigidbodyType>(rigidbodyNode["Type"].as<int>(static_cast<int>(rigidbody.Type)));
-            rigidbody.LinearVelocity = ReadVec3(rigidbodyNode["LinearVelocity"]);
-            rigidbody.AngularVelocity = ReadVec3(rigidbodyNode["AngularVelocity"]);
-            rigidbody.LinearDamping = rigidbodyNode["LinearDamping"].as<float>(0.0f);
-            rigidbody.AngularDamping = rigidbodyNode["AngularDamping"].as<float>(0.0f);
-            rigidbody.GravityScale = rigidbodyNode["GravityScale"].as<float>(1.0f);
-            rigidbody.EnableSleep = rigidbodyNode["EnableSleep"].as<bool>(true);
-            rigidbody.InitiallyAwake = rigidbodyNode["InitiallyAwake"].as<bool>(true);
-            rigidbody.IsBullet = rigidbodyNode["IsBullet"].as<bool>(false);
-            rigidbody.IsEnabled = rigidbodyNode["IsEnabled"].as<bool>(true);
+            HE_CORE_ERROR("Entity without a readable UUID in the scene file is skipped");
+            scene.m_Registry.destroy(handle);
+            return;
         }
 
-        if (const YAML::Node colliderNode = entityNode["ColliderComponent"])
+        std::vector<std::pair<std::string, YAML::Node>> unknownBlocks;
+        for (const auto& entry : entityNode)
         {
-            auto& collider = entity.AddComponent<ColliderComponent>();
-            collider.ShapeType = static_cast<ColliderComponent::ColliderShapeType>(colliderNode["ShapeType"].as<int>(static_cast<int>(collider.ShapeType)));
-            collider.HalfExtents = ReadVec3(colliderNode["HalfExtents"], collider.HalfExtents);
-            collider.Radius = colliderNode["Radius"].as<float>(0.5f);
-            collider.Height = colliderNode["Height"].as<float>(1.0f);
-            collider.Offset = ReadVec3(colliderNode["Offset"]);
-            collider.Density = colliderNode["Density"].as<float>(1.0f);
-            collider.Friction = colliderNode["Friction"].as<float>(0.6f);
-            collider.Restitution = colliderNode["Restitution"].as<float>(0.0f);
-            collider.RollingResistance = colliderNode["RollingResistance"].as<float>(0.0f);
-            collider.IsTrigger = colliderNode["IsTrigger"].as<bool>(false);
-            collider.CategoryBits = colliderNode["CategoryBits"].as<uint64_t>(~0ull);
-            collider.MaskBits = colliderNode["MaskBits"].as<uint64_t>(~0ull);
-        }
-
-        if (const YAML::Node meshNode = entityNode["MeshComponent"])
-        {
-            auto& mesh = entity.AddComponent<MeshComponent>();
-            mesh.PrimitiveType = static_cast<PrimitiveMeshType>(meshNode["PrimitiveType"].as<int>(1));
-            mesh.Mesh = MeshFactory::CreatePrimitive(mesh.PrimitiveType);
-            mesh.MaterialColor = ReadVec4(meshNode["AlbedoColor"], mesh.MaterialColor);
-            mesh.Roughness = meshNode["Roughness"].as<float>(0.6f);
-            mesh.Metallic = meshNode["Metallic"].as<float>(0.05f);
-            mesh.Visible = meshNode["Visible"].as<bool>(true);
-
-            // No material instance is created here: the surface values above are what the
-            // renderer draws with, and MaterialOverride stays empty until a material asset
-            // is assigned. That also keeps serialization free of any renderer dependency.
-        }
-
-        if (const YAML::Node cameraNode = entityNode["CameraComponent"])
-        {
-            auto& camera = entity.AddComponent<CameraComponent>();
-            camera.Primary = cameraNode["Primary"].as<bool>(false);
-            camera.FieldOfView = cameraNode["FieldOfView"].as<float>(45.0f);
-            camera.NearClip = cameraNode["NearClip"].as<float>(0.1f);
-            camera.FarClip = cameraNode["FarClip"].as<float>(1000.0f);
-        }
-
-        if (const YAML::Node lightNode = entityNode["LightComponent"])
-        {
-            auto& light = entity.AddComponent<LightComponent>();
-            light.Type = static_cast<LightComponent::LightType>(lightNode["Type"].as<int>(1));
-            light.Color = ReadVec3(lightNode["Color"], Math::Vec3(1.0f));
-            light.Intensity = lightNode["Intensity"].as<float>(10.0f);
-            light.Range = lightNode["Range"].as<float>(12.0f);
-            light.CastsShadows = lightNode["CastsShadows"].as<bool>(true);
-            light.ShadowBias = lightNode["ShadowBias"].as<float>(0.0005f);
-        }
-
-        if (const YAML::Node scriptNode = entityNode["ScriptComponent"])
-        {
-            auto& script = entity.AddComponent<ScriptComponent>();
-            if (const YAML::Node scriptsNode = scriptNode["Scripts"]; scriptsNode && scriptsNode.IsSequence())
+            if (!entry.first.IsScalar())
             {
-                for (const YAML::Node referenceNode : scriptsNode)
-                {
-                    ScriptComponent::ScriptReference reference;
-                    reference.Path = referenceNode["Path"].as<std::string>("");
-                    reference.Enabled = referenceNode["Enabled"].as<bool>(true);
-                    script.Scripts.push_back(std::move(reference));
-                }
+                continue;
             }
+
+            const std::string name = entry.first.as<std::string>();
+            if (ReservedKeys().contains(name) || FindDescriptorByName(name) != nullptr)
+            {
+                continue;
+            }
+
+            HE_CORE_WARN("Scene contains a component block this build does not know: '{}'", name);
+            unknownBlocks.emplace_back(name, entry.second);
         }
 
-        scene.m_EntityMap[UUID(uuidValue)] = entity.GetHandle();
+        if (!unknownBlocks.empty())
+        {
+            scene.m_Registry.emplace<UnknownComponentBlocks>(handle, UnknownComponentBlocks { std::move(unknownBlocks) });
+        }
+
+        scene.m_EntityMap[scene.m_Registry.get<IDComponent>(handle).ID] = handle;
+        scene.m_ChildrenIndexDirty = true;
     }
 }

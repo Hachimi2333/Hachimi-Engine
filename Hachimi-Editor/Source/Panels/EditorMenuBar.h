@@ -16,6 +16,7 @@ namespace HachimiEngine
     private:
         void OpenScene(EditorLayer* owner, EditorContext& context);
         void SaveScene();
+        void SaveSceneAs();
         void ImportTexture();
     };
 }

@@ -3,7 +3,8 @@
 #include "Core/Base.h"
 #include "Core/Memory.h"
 #include "Core/Timestep.h"
-#include "Scene/Components.h"
+#include "Scene/Components/ScriptComponent.h"
+#include "Scene/Components/IDComponent.h"
 #include "Scene/Entity.h"
 #include "Scripting/ScriptRuntime.h"
 

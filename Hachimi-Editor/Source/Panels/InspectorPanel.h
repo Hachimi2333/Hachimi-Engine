@@ -9,23 +9,20 @@ namespace HachimiEngine
     struct EditorContext;
 
     // Property editor for the currently selected entity.
+    //
+    // The panel owns the frame and the generic parts - the entity tag, the component list, the
+    // add menu - and delegates each component's rows to its drawer, looked up through
+    // InspectorRegistry. It therefore has no branch per component type.
     class InspectorPanel
     {
     public:
         void Draw(EditorContext& context);
 
     private:
-        void DrawAddComponentMenu(EditorContext& context, Entity entity);
-        void DrawTransform(Entity entity);
-        void DrawRigidbody(Entity entity);
-        void DrawCollider(Entity entity);
-        void DrawMesh(Entity entity);
-        void DrawCamera(Entity entity);
-        void DrawLight(Entity entity);
-        void DrawScript(Entity entity);
+        void DrawAddComponentMenu(Entity entity);
 
     private:
-        int m_PendingScriptPickerSlot = -1;
-        AssetPickerPopup m_ScriptPicker;
+        int m_PendingAssetPickerSlot = -1;
+        AssetPickerPopup m_AssetPicker;
     };
 }

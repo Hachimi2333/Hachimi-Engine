@@ -12,7 +12,14 @@
 
 #include "Core/Memory.h"
 #include "Renderer/MeshData.h"
-#include "Scene/Components.h"
+#include "Scene/Components/CameraComponent.h"
+#include "Scene/Components/ColliderComponent.h"
+#include "Scene/Components/LightComponent.h"
+#include "Scene/Components/MeshComponent.h"
+#include "Scene/Components/RelationshipComponent.h"
+#include "Scene/Components/RigidbodyComponent.h"
+#include "Scene/Components/ScriptComponent.h"
+#include "Scene/Components/TransformComponent.h"
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
 #include "Serialization/SceneSerializer.h"
@@ -88,8 +95,7 @@ namespace
         child.Transform().Position = { -1.0f, 0.5f, 0.25f };
         child.Transform().Rotation = { 0.0f, 45.0f, 0.0f };
         child.Transform().Scale = { 2.0f, 2.0f, 2.0f };
-        child.GetComponent<RelationshipComponent>().Parent = parent.GetUUID();
-        parent.GetComponent<RelationshipComponent>().Children.push_back(child.GetUUID());
+        scene->SetParent(child, parent);
 
         auto& mesh = child.AddComponent<MeshComponent>();
         mesh.PrimitiveType = PrimitiveMeshType::Sphere;
@@ -174,7 +180,7 @@ TEST_SUITE("Serialization")
         const Entity parent = FindEntityByName(loaded, "Parent");
         REQUIRE(static_cast<bool>(parent));
         CHECK(Near(parent.Transform().Position.x, 1.0f));
-        CHECK(parent.GetComponent<RelationshipComponent>().Children.size() == 1);
+        CHECK(loaded->GetChildren(parent).size() == 1);
 
         const Entity child = FindEntityByName(loaded, "Child");
         REQUIRE(static_cast<bool>(child));

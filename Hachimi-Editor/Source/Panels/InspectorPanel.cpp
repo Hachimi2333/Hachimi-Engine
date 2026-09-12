@@ -1,73 +1,30 @@
 #include "Panels/InspectorPanel.h"
 
-#include "Asset/AssetManager.h"
+#include "Components/InspectorRegistry.h"
+#include "Components/InspectorWidgets.h"
+#include "Core/Log.h"
 #include "Panels/EditorContext.h"
-#include "Renderer/MeshFactory.h"
-#include "Scene/Components.h"
+#include "Scene/ComponentRegistry.h"
+#include "Scene/Components/IDComponent.h"
+#include "Scene/Components/TagComponent.h"
+#include "Scene/Components/TransformComponent.h"
 #include "Scene/Scene.h"
-#include "UI/AssetBrowserGrid.h"
-#include "Utils/FileSystem.h"
-#include "Math/Math.h"
 
 #include <imgui.h>
 
-#include <algorithm>
-#include <cctype>
-#include <cfloat>
 #include <cstdio>
-#include <filesystem>
+#include <string>
 
 namespace HachimiEngine
 {
     namespace
     {
-        // Column weights keep every property label left-aligned and every control starting at the same x.
+        // Column weights keep every property label left-aligned and every control starting at the
+        // same x.
         constexpr float InspectorLabelColumnWeight = 0.45f;
         constexpr float InspectorControlColumnWeight = 0.55f;
 
-        // Draws a small square remove button with a red hover state. Keep the ID stack owned by the caller.
-        bool DrawRemoveButton(const char* tooltip)
-        {
-            const ImVec2 buttonSize{ ImGui::GetFrameHeight(), ImGui::GetFrameHeight() };
-
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.0f, 0.0f, 0.0f, 0.0f });
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.78f, 0.20f, 0.20f, 0.35f });
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.90f, 0.25f, 0.25f, 0.55f });
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 0.72f, 0.75f, 0.79f, 1.0f });
-            const bool clicked = ImGui::Button("X", buttonSize);
-            ImGui::PopStyleColor(4);
-
-            if (ImGui::IsItemHovered())
-            {
-                ImGui::SetTooltip("%s", tooltip);
-            }
-
-            return clicked;
-        }
-
-        // Draws a collapsible component header with a right-aligned remove button.
-        template<typename T>
-        bool DrawComponentHeader(Entity entity, const char* label, bool defaultOpen, bool& removed)
-        {
-            const ImGuiTreeNodeFlags flags = defaultOpen ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None;
-            const bool open = ImGui::CollapsingHeader(label, flags);
-
-            const float buttonWidth = ImGui::GetFrameHeight();
-            ImGui::SameLine(std::max(ImGui::GetContentRegionAvail().x - buttonWidth, 0.0f));
-
-            ImGui::PushID(label);
-            if (DrawRemoveButton("Remove component"))
-            {
-                entity.RemoveComponent<T>();
-                removed = true;
-            }
-            ImGui::PopID();
-
-            return open;
-        }
-
-        // Creates a two-column table used by every inspector property section.
-        bool BeginInspectorTable(const char* id)
+        bool BeginEntityTable(const char* id)
         {
             if (!ImGui::BeginTable(id, 2, ImGuiTableFlags_SizingStretchProp))
             {
@@ -79,84 +36,12 @@ namespace HachimiEngine
             return true;
         }
 
-        // Moves to the next property row and makes the control fill the whole control column.
-        void BeginInspectorProperty(const char* label)
+        // Identity and name are drawn directly at the top of the panel rather than as a
+        // collapsible section, so the component list leaves them out.
+        bool IsDrawnByThePanelHeader(entt::id_type typeId)
         {
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(label);
-            ImGui::TableNextColumn();
-            ImGui::SetNextItemWidth(-FLT_MIN);
-        }
-
-        // Same as BeginInspectorProperty but lets the caller size the control manually (e.g. input + buttons).
-        void BeginInspectorPropertyLabel(const char* label)
-        {
-            ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(label);
-            ImGui::TableNextColumn();
-        }
-
-        // Makes a button span the full available inspector width.
-        ImVec2 GetFullWidthButtonSize()
-        {
-            return { ImGui::GetContentRegionAvail().x, 0.0f };
-        }
-
-        // Creates sensible collider dimensions for the built-in mesh primitives.
-        void ConfigureColliderForPrimitive(ColliderComponent& collider, PrimitiveMeshType primitiveType)
-        {
-            switch (primitiveType)
-            {
-                case PrimitiveMeshType::Sphere:
-                    collider.ShapeType = ColliderComponent::ColliderShapeType::Sphere;
-                    collider.Radius = 0.5f;
-                    break;
-                case PrimitiveMeshType::Plane:
-                    collider.ShapeType = ColliderComponent::ColliderShapeType::Plane;
-                    collider.HalfExtents = { 5.0f, 0.05f, 5.0f };
-                    break;
-                case PrimitiveMeshType::Cube:
-                case PrimitiveMeshType::Grid:
-                case PrimitiveMeshType::None:
-                default:
-                    collider.ShapeType = ColliderComponent::ColliderShapeType::Box;
-                    collider.HalfExtents = { 0.5f, 0.5f, 0.5f };
-                    break;
-            }
-        }
-
-        void AddDefaultCollider(Entity entity)
-        {
-            auto& collider = entity.AddComponent<ColliderComponent>();
-            if (entity.HasComponent<MeshComponent>())
-            {
-                ConfigureColliderForPrimitive(collider, entity.GetComponent<MeshComponent>().PrimitiveType);
-            }
-        }
-
-        void MakeScriptPathRelative(const std::string& selectedPath, ScriptComponent::ScriptReference& reference)
-        {
-            const std::filesystem::path scriptsDirectory = AssetManager::GetAssetsDirectory() / "Scripts";
-
-            std::error_code errorCode;
-            const std::filesystem::path relativePath = std::filesystem::relative(selectedPath, scriptsDirectory, errorCode);
-            if (errorCode)
-            {
-                reference.Path = std::filesystem::path(selectedPath).filename().string();
-                return;
-            }
-
-            reference.Path = relativePath.generic_string();
-        }
-
-        bool IsLuaScriptPath(const std::string& path)
-        {
-            std::string extension = std::filesystem::path(path).extension().string();
-            std::transform(extension.begin(), extension.end(), extension.begin(),
-                [](unsigned char character) { return static_cast<char>(std::tolower(character)); });
-            return extension == ".lua";
+            return typeId == entt::type_hash<IDComponent>::value()
+                || typeId == entt::type_hash<TagComponent>::value();
         }
     }
 
@@ -166,7 +51,8 @@ namespace HachimiEngine
 
         if (!context.SelectedEntity || context.ActiveScene == nullptr)
         {
-            m_ScriptPicker.Close();
+            m_AssetPicker.Close();
+            m_PendingAssetPickerSlot = -1;
             ImGui::TextDisabled("No entity selected");
             ImGui::End();
             return;
@@ -176,9 +62,14 @@ namespace HachimiEngine
         char tagBuffer[128] = {};
         std::snprintf(tagBuffer, sizeof(tagBuffer), "%s", entity.GetName().c_str());
 
-        if (BeginInspectorTable("InspectorEntityRows"))
+        if (BeginEntityTable("InspectorEntityRows"))
         {
-            BeginInspectorProperty("Tag");
+            ImGui::TableNextColumn();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted("Tag");
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(-FLT_MIN);
+
             if (ImGui::InputText("##Tag", tagBuffer, sizeof(tagBuffer)))
             {
                 entity.GetComponent<TagComponent>().Tag = tagBuffer;
@@ -189,35 +80,36 @@ namespace HachimiEngine
         ImGui::TextDisabled("UUID: %s", entity.GetUUID().ToString().c_str());
         ImGui::Separator();
 
-        DrawTransform(entity);
+        InspectorDrawContext drawContext { context, m_AssetPicker, m_PendingAssetPickerSlot };
 
-        if (entity.HasComponent<RigidbodyComponent>())
+        // The component list comes from the engine registry, in registration order, so a newly
+        // registered component appears here without touching this panel.
+        for (const ComponentDescriptor& descriptor : ComponentRegistry::GetDescriptors())
         {
-            DrawRigidbody(entity);
-        }
-        if (entity.HasComponent<ColliderComponent>())
-        {
-            DrawCollider(entity);
-        }
-        if (entity.HasComponent<MeshComponent>())
-        {
-            DrawMesh(entity);
-        }
-        if (entity.HasComponent<CameraComponent>())
-        {
-            DrawCamera(entity);
-        }
-        if (entity.HasComponent<LightComponent>())
-        {
-            DrawLight(entity);
-        }
-        if (entity.HasComponent<ScriptComponent>())
-        {
-            DrawScript(entity);
+            if (IsDrawnByThePanelHeader(descriptor.TypeID)
+                || !descriptor.Has(entity.GetRegistry(), entity.GetHandle()))
+            {
+                continue;
+            }
+
+            const ComponentDrawFn drawer = InspectorRegistry::Find(descriptor.TypeID);
+            if (drawer != nullptr)
+            {
+                drawer(entity, drawContext);
+                continue;
+            }
+
+            // Registered but not editable yet: still show the header, so a component the engine
+            // understands is never invisible in the editor.
+            bool removed = false;
+            if (DrawComponentHeader(entity, descriptor, false, removed))
+            {
+                ImGui::TextDisabled("No editor for this component yet");
+            }
         }
 
         ImGui::Separator();
-        DrawAddComponentMenu(context, entity);
+        DrawAddComponentMenu(entity);
 
         if (ImGui::Button("Delete Entity", GetFullWidthButtonSize()))
         {
@@ -228,449 +120,45 @@ namespace HachimiEngine
         ImGui::End();
     }
 
-    void InspectorPanel::DrawAddComponentMenu(EditorContext& context, Entity entity)
+    void InspectorPanel::DrawAddComponentMenu(Entity entity)
     {
-        if (ImGui::Button("Add Component", GetFullWidthButtonSize()))
+        if (!ImGui::Button("Add Component", GetFullWidthButtonSize()))
         {
-            ImGui::OpenPopup("AddComponentPopup");
+            return;
         }
 
-        if (ImGui::BeginPopup("AddComponentPopup"))
+        ImGui::OpenPopup("AddComponentPopup");
+        if (!ImGui::BeginPopup("AddComponentPopup"))
         {
-            if (!entity.HasComponent<TransformComponent>() && ImGui::MenuItem("Transform Component"))
+            return;
+        }
+
+        // One entry per registered component the entity does not have, plus the extra presets a
+        // descriptor offers (one collider shape per entry).
+        for (const ComponentDescriptor& descriptor : ComponentRegistry::GetDescriptors())
+        {
+            if (descriptor.Required || descriptor.Has(entity.GetRegistry(), entity.GetHandle()))
             {
-                entity.AddComponent<TransformComponent>();
+                continue;
             }
-            if (!entity.HasComponent<MeshComponent>() && ImGui::MenuItem("Mesh Component"))
+
+            const std::string label(descriptor.DisplayName);
+            const std::string itemId = label + " Component";
+            if (ImGui::MenuItem(itemId.c_str()))
             {
-                auto& mesh = entity.AddComponent<MeshComponent>();
-                mesh.PrimitiveType = PrimitiveMeshType::Cube;
-                mesh.Mesh = MeshFactory::CreateCube();
+                descriptor.AddDefault(entity.GetRegistry(), entity.GetHandle());
             }
-            if (!entity.HasComponent<RigidbodyComponent>() && ImGui::MenuItem("Rigidbody Component"))
+
+            for (const ComponentAddPreset& preset : descriptor.Presets)
             {
-                entity.AddComponent<RigidbodyComponent>();
-                if (!entity.HasComponent<ColliderComponent>())
+                const std::string presetLabel(preset.Label);
+                if (ImGui::MenuItem(presetLabel.c_str()))
                 {
-                    AddDefaultCollider(entity);
+                    preset.Add(entity.GetRegistry(), entity.GetHandle());
                 }
             }
-            if (!entity.HasComponent<ColliderComponent>() && ImGui::MenuItem("Box Collider"))
-            {
-                auto& collider = entity.AddComponent<ColliderComponent>();
-                collider.ShapeType = ColliderComponent::ColliderShapeType::Box;
-            }
-            if (!entity.HasComponent<ColliderComponent>() && ImGui::MenuItem("Sphere Collider"))
-            {
-                auto& collider = entity.AddComponent<ColliderComponent>();
-                collider.ShapeType = ColliderComponent::ColliderShapeType::Sphere;
-            }
-            if (!entity.HasComponent<ColliderComponent>() && ImGui::MenuItem("Capsule Collider"))
-            {
-                auto& collider = entity.AddComponent<ColliderComponent>();
-                collider.ShapeType = ColliderComponent::ColliderShapeType::Capsule;
-                collider.Radius = 0.25f;
-                collider.Height = 1.0f;
-            }
-            if (!entity.HasComponent<ColliderComponent>() && ImGui::MenuItem("Plane Collider"))
-            {
-                auto& collider = entity.AddComponent<ColliderComponent>();
-                collider.ShapeType = ColliderComponent::ColliderShapeType::Plane;
-                collider.HalfExtents = { 5.0f, 0.05f, 5.0f };
-            }
-            if (!entity.HasComponent<CameraComponent>() && ImGui::MenuItem("Camera Component"))
-            {
-                entity.AddComponent<CameraComponent>();
-            }
-            if (!entity.HasComponent<LightComponent>() && ImGui::MenuItem("Light Component"))
-            {
-                entity.AddComponent<LightComponent>();
-            }
-            if (!entity.HasComponent<ScriptComponent>() && ImGui::MenuItem("Script Component"))
-            {
-                entity.AddComponent<ScriptComponent>().Scripts.emplace_back();
-            }
-            ImGui::EndPopup();
-        }
-    }
-
-    void InspectorPanel::DrawTransform(Entity entity)
-    {
-        if (!entity.HasComponent<TransformComponent>())
-        {
-            return;
         }
 
-        bool removed = false;
-        const bool open = DrawComponentHeader<TransformComponent>(entity, "Transform", true, removed);
-        if (removed || !open)
-        {
-            return;
-        }
-
-        auto& transform = entity.Transform();
-        if (BeginInspectorTable("InspectorTransformRows"))
-        {
-            BeginInspectorProperty("Position");
-            ImGui::DragFloat3("##Position", Math::ValuePtr(transform.Position), 0.05f, 0.0f, 0.0f, "%.3f", ImGuiSliderFlags_ColorMarkers);
-
-            BeginInspectorProperty("Rotation");
-            ImGui::DragFloat3("##Rotation", Math::ValuePtr(transform.Rotation), 0.25f, 0.0f, 0.0f, "%.3f", ImGuiSliderFlags_ColorMarkers);
-
-            BeginInspectorProperty("Scale");
-            ImGui::DragFloat3("##Scale", Math::ValuePtr(transform.Scale), 0.05f, 0.01f, 100.0f, "%.3f", ImGuiSliderFlags_ColorMarkers);
-
-            ImGui::EndTable();
-        }
-    }
-
-    void InspectorPanel::DrawRigidbody(Entity entity)
-    {
-        bool removed = false;
-        const bool open = DrawComponentHeader<RigidbodyComponent>(entity, "Rigidbody", true, removed);
-        if (removed || !open)
-        {
-            return;
-        }
-
-        auto& rigidbody = entity.GetComponent<RigidbodyComponent>();
-
-        if (BeginInspectorTable("InspectorRigidbodyRows"))
-        {
-            const char* typeNames[] = { "Static", "Kinematic", "Dynamic" };
-            int type = static_cast<int>(rigidbody.Type);
-
-            BeginInspectorProperty("Type");
-            if (ImGui::Combo("##Type", &type, typeNames, IM_ARRAYSIZE(typeNames)))
-            {
-                rigidbody.Type = static_cast<RigidbodyComponent::RigidbodyType>(type);
-            }
-
-            if (rigidbody.Type != RigidbodyComponent::RigidbodyType::Static)
-            {
-                BeginInspectorProperty("Linear Velocity");
-                ImGui::DragFloat3("##Linear Velocity", Math::ValuePtr(rigidbody.LinearVelocity), 0.05f);
-
-                BeginInspectorProperty("Angular Velocity");
-                ImGui::DragFloat3("##Angular Velocity", Math::ValuePtr(rigidbody.AngularVelocity), 0.05f);
-            }
-
-            BeginInspectorProperty("Linear Damping");
-            ImGui::DragFloat("##Linear Damping", &rigidbody.LinearDamping, 0.01f, 0.0f, 10.0f);
-
-            BeginInspectorProperty("Angular Damping");
-            ImGui::DragFloat("##Angular Damping", &rigidbody.AngularDamping, 0.01f, 0.0f, 10.0f);
-
-            BeginInspectorProperty("Gravity Scale");
-            ImGui::DragFloat("##Gravity Scale", &rigidbody.GravityScale, 0.05f, 0.0f, 10.0f);
-
-            BeginInspectorProperty("Enable Sleep");
-            ImGui::Checkbox("##Enable Sleep", &rigidbody.EnableSleep);
-
-            BeginInspectorProperty("Initially Awake");
-            ImGui::Checkbox("##Initially Awake", &rigidbody.InitiallyAwake);
-
-            BeginInspectorProperty("Is Bullet");
-            ImGui::Checkbox("##Is Bullet", &rigidbody.IsBullet);
-
-            BeginInspectorProperty("Enabled");
-            ImGui::Checkbox("##Enabled", &rigidbody.IsEnabled);
-
-            ImGui::EndTable();
-        }
-    }
-
-    void InspectorPanel::DrawCollider(Entity entity)
-    {
-        bool removed = false;
-        const bool open = DrawComponentHeader<ColliderComponent>(entity, "Collider", true, removed);
-        if (removed || !open)
-        {
-            return;
-        }
-
-        auto& collider = entity.GetComponent<ColliderComponent>();
-
-        if (BeginInspectorTable("InspectorColliderRows"))
-        {
-            const char* shapeNames[] = { "Box", "Sphere", "Capsule", "Plane" };
-            int shapeType = static_cast<int>(collider.ShapeType);
-
-            BeginInspectorProperty("Shape");
-            if (ImGui::Combo("##Shape", &shapeType, shapeNames, IM_ARRAYSIZE(shapeNames)))
-            {
-                collider.ShapeType = static_cast<ColliderComponent::ColliderShapeType>(shapeType);
-            }
-
-            switch (collider.ShapeType)
-            {
-                case ColliderComponent::ColliderShapeType::Box:
-                    BeginInspectorProperty("Half Extents");
-                    ImGui::DragFloat3("##Half Extents", Math::ValuePtr(collider.HalfExtents), 0.05f, 0.01f, 100.0f);
-                    break;
-                case ColliderComponent::ColliderShapeType::Sphere:
-                    BeginInspectorProperty("Radius");
-                    ImGui::DragFloat("##Radius", &collider.Radius, 0.05f, 0.01f, 100.0f);
-                    break;
-                case ColliderComponent::ColliderShapeType::Capsule:
-                    BeginInspectorProperty("Radius");
-                    ImGui::DragFloat("##Radius", &collider.Radius, 0.05f, 0.01f, 100.0f);
-
-                    BeginInspectorProperty("Height");
-                    ImGui::DragFloat("##Height", &collider.Height, 0.05f, 0.01f, 100.0f);
-                    break;
-                case ColliderComponent::ColliderShapeType::Plane:
-                    BeginInspectorProperty("Half Width");
-                    ImGui::DragFloat("##Half Width", &collider.HalfExtents.x, 0.05f, 0.01f, 1000.0f);
-
-                    BeginInspectorProperty("Half Depth");
-                    ImGui::DragFloat("##Half Depth", &collider.HalfExtents.z, 0.05f, 0.01f, 1000.0f);
-                    break;
-            }
-
-            BeginInspectorProperty("Offset");
-            ImGui::DragFloat3("##Offset", Math::ValuePtr(collider.Offset), 0.05f);
-
-            BeginInspectorProperty("Density");
-            ImGui::DragFloat("##Density", &collider.Density, 0.05f, 0.0f, 100000.0f);
-
-            BeginInspectorProperty("Friction");
-            ImGui::SliderFloat("##Friction", &collider.Friction, 0.0f, 1.0f);
-
-            BeginInspectorProperty("Restitution");
-            ImGui::SliderFloat("##Restitution", &collider.Restitution, 0.0f, 1.0f);
-
-            BeginInspectorProperty("Rolling Resistance");
-            ImGui::SliderFloat("##Rolling Resistance", &collider.RollingResistance, 0.0f, 1.0f);
-
-            BeginInspectorProperty("Is Trigger");
-            ImGui::Checkbox("##Is Trigger", &collider.IsTrigger);
-
-            BeginInspectorProperty("Category Bits");
-            ImGui::InputScalar("##Category Bits", ImGuiDataType_U64, &collider.CategoryBits, nullptr, nullptr, "%llX", ImGuiInputTextFlags_CharsHexadecimal);
-
-            BeginInspectorProperty("Mask Bits");
-            ImGui::InputScalar("##Mask Bits", ImGuiDataType_U64, &collider.MaskBits, nullptr, nullptr, "%llX", ImGuiInputTextFlags_CharsHexadecimal);
-
-            ImGui::EndTable();
-        }
-    }
-
-    void InspectorPanel::DrawMesh(Entity entity)
-    {
-        bool removed = false;
-        const bool open = DrawComponentHeader<MeshComponent>(entity, "Mesh", true, removed);
-        if (removed || !open)
-        {
-            return;
-        }
-
-        auto& mesh = entity.GetComponent<MeshComponent>();
-
-        if (BeginInspectorTable("InspectorMeshRows"))
-        {
-            const char* primitiveNames[] = { "Cube", "Sphere", "Plane", "Grid" };
-            int primitiveType = static_cast<int>(mesh.PrimitiveType) - static_cast<int>(PrimitiveMeshType::Cube);
-            if (primitiveType < 0)
-            {
-                primitiveType = 0;
-            }
-
-            BeginInspectorProperty("Primitive");
-            if (ImGui::Combo("##Primitive", &primitiveType, primitiveNames, IM_ARRAYSIZE(primitiveNames)))
-            {
-                mesh.PrimitiveType = static_cast<PrimitiveMeshType>(primitiveType + static_cast<int>(PrimitiveMeshType::Cube));
-                mesh.Mesh = MeshFactory::CreatePrimitive(mesh.PrimitiveType);
-            }
-
-            BeginInspectorProperty("Albedo Color");
-            ImGui::ColorEdit4("##Albedo Color", Math::ValuePtr(mesh.MaterialColor));
-
-            BeginInspectorProperty("Roughness");
-            ImGui::SliderFloat("##Roughness", &mesh.Roughness, 0.01f, 1.0f);
-
-            BeginInspectorProperty("Metallic");
-            ImGui::SliderFloat("##Metallic", &mesh.Metallic, 0.0f, 1.0f);
-
-            BeginInspectorProperty("Visible");
-            ImGui::Checkbox("##Visible", &mesh.Visible);
-
-            ImGui::EndTable();
-        }
-    }
-
-    void InspectorPanel::DrawCamera(Entity entity)
-    {
-        bool removed = false;
-        const bool open = DrawComponentHeader<CameraComponent>(entity, "Camera", true, removed);
-        if (removed || !open)
-        {
-            return;
-        }
-
-        auto& camera = entity.GetComponent<CameraComponent>();
-
-        if (BeginInspectorTable("InspectorCameraRows"))
-        {
-            BeginInspectorProperty("Primary");
-            ImGui::Checkbox("##Primary", &camera.Primary);
-
-            BeginInspectorProperty("Field Of View");
-            ImGui::SliderFloat("##Field Of View", &camera.FieldOfView, 20.0f, 120.0f);
-
-            BeginInspectorProperty("Near Clip");
-            ImGui::DragFloat("##Near Clip", &camera.NearClip, 0.01f, 0.001f, 10.0f);
-
-            BeginInspectorProperty("Far Clip");
-            ImGui::DragFloat("##Far Clip", &camera.FarClip, 1.0f, 10.0f, 10000.0f);
-
-            ImGui::EndTable();
-        }
-    }
-
-    void InspectorPanel::DrawLight(Entity entity)
-    {
-        bool removed = false;
-        const bool open = DrawComponentHeader<LightComponent>(entity, "Light", true, removed);
-        if (removed || !open)
-        {
-            return;
-        }
-
-        auto& light = entity.GetComponent<LightComponent>();
-
-        if (BeginInspectorTable("InspectorLightRows"))
-        {
-            const char* lightTypeNames[] = { "Directional", "Point" };
-            int lightType = static_cast<int>(light.Type);
-
-            BeginInspectorProperty("Type");
-            if (ImGui::Combo("##Type", &lightType, lightTypeNames, IM_ARRAYSIZE(lightTypeNames)))
-            {
-                light.Type = static_cast<LightComponent::LightType>(lightType);
-            }
-
-            BeginInspectorProperty("Color");
-            ImGui::ColorEdit3("##Color", Math::ValuePtr(light.Color));
-
-            BeginInspectorProperty("Intensity");
-            ImGui::DragFloat("##Intensity", &light.Intensity, 0.1f, 0.0f, 1000.0f);
-
-            if (light.Type == LightComponent::LightType::Point)
-            {
-                BeginInspectorProperty("Range");
-                ImGui::DragFloat("##Range", &light.Range, 0.1f, 0.1f, 1000.0f);
-            }
-            else
-            {
-                BeginInspectorProperty("Casts Shadows");
-                ImGui::Checkbox("##Casts Shadows", &light.CastsShadows);
-
-                BeginInspectorProperty("Shadow Bias");
-                ImGui::DragFloat("##Shadow Bias", &light.ShadowBias, 0.0001f, 0.0f, 0.05f, "%.5f");
-            }
-
-            ImGui::EndTable();
-        }
-    }
-
-    void InspectorPanel::DrawScript(Entity entity)
-    {
-        bool removed = false;
-        const bool open = DrawComponentHeader<ScriptComponent>(entity, "Script", true, removed);
-        if (removed || !open)
-        {
-            m_ScriptPicker.Close();
-            return;
-        }
-
-        auto& script = entity.GetComponent<ScriptComponent>();
-
-        int removeSlot = -1;
-        for (int slotIndex = 0; slotIndex < static_cast<int>(script.Scripts.size()); ++slotIndex)
-        {
-            ScriptComponent::ScriptReference& reference = script.Scripts[slotIndex];
-
-            ImGui::PushID(slotIndex);
-            if (BeginInspectorTable("InspectorScriptRows"))
-            {
-                BeginInspectorProperty("Enabled");
-                ImGui::Checkbox("##Enabled", &reference.Enabled);
-
-                BeginInspectorPropertyLabel("Path");
-
-                const float buttonWidth = ImGui::GetFrameHeight();
-                const float inputWidth = std::max(ImGui::GetContentRegionAvail().x - buttonWidth * 2.0f - ImGui::GetStyle().ItemSpacing.x * 2.0f, 40.0f);
-                ImGui::SetNextItemWidth(inputWidth);
-
-                char pathBuffer[256] = {};
-                std::snprintf(pathBuffer, sizeof(pathBuffer), "%s", reference.Path.c_str());
-                if (ImGui::InputText("##Path", pathBuffer, sizeof(pathBuffer)))
-                {
-                    reference.Path = pathBuffer;
-                }
-
-                if (ImGui::IsItemHovered())
-                {
-                    ImGui::SetTooltip("Drag a Lua script here from the Content Browser");
-                }
-
-                // Accept script files dragged from the Content Browser grid.
-                if (ImGui::BeginDragDropTarget())
-                {
-                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(AssetBrowserGrid::FilePayload))
-                    {
-                        const std::string droppedPath(static_cast<const char*>(payload->Data));
-                        if (IsLuaScriptPath(droppedPath))
-                        {
-                            MakeScriptPathRelative(droppedPath, reference);
-                        }
-                    }
-                    ImGui::EndDragDropTarget();
-                }
-
-                ImGui::SameLine();
-                if (ImGui::Button("...", ImVec2{ buttonWidth, buttonWidth }))
-                {
-                    m_PendingScriptPickerSlot = slotIndex;
-                    m_ScriptPicker.Open("Select Script", AssetManager::GetAssetsDirectory() / "Scripts", { ".lua" });
-                }
-                if (ImGui::IsItemHovered())
-                {
-                    ImGui::SetTooltip("Browse script");
-                }
-
-                ImGui::SameLine();
-                if (DrawRemoveButton("Remove script"))
-                {
-                    removeSlot = slotIndex;
-                }
-
-                ImGui::EndTable();
-            }
-            ImGui::PopID();
-
-            ImGui::Separator();
-        }
-
-        if (ImGui::Button("Add Script", GetFullWidthButtonSize()))
-        {
-            script.Scripts.emplace_back();
-        }
-
-        std::filesystem::path selectedPath;
-        if (m_ScriptPicker.Draw(selectedPath))
-        {
-            if (m_PendingScriptPickerSlot >= 0 && m_PendingScriptPickerSlot < static_cast<int>(script.Scripts.size()))
-            {
-                MakeScriptPathRelative(selectedPath.string(), script.Scripts[m_PendingScriptPickerSlot]);
-            }
-            m_PendingScriptPickerSlot = -1;
-        }
-
-        if (removeSlot >= 0)
-        {
-            script.Scripts.erase(script.Scripts.begin() + removeSlot);
-        }
+        ImGui::EndPopup();
     }
 }

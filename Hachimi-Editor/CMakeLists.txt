@@ -1,6 +1,15 @@
 # Hachimi-Editor console application.
 
 set(EDITOR_SOURCES
+    Source/Components/ComponentDrawers.h
+    Source/Components/InspectorRegistry.cpp
+    Source/Components/InspectorRegistry.h
+    Source/Components/InspectorWidgets.cpp
+    Source/Components/InspectorWidgets.h
+    Source/Components/PhysicsDrawers.cpp
+    Source/Components/RenderingDrawers.cpp
+    Source/Components/ScriptDrawer.cpp
+    Source/Components/TransformDrawer.cpp
     Source/EditorApplication.cpp
     Source/EditorApplication.h
     Source/Panels/BuildSettingsPanel.cpp

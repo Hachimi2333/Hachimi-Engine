@@ -68,9 +68,12 @@ namespace HachimiEngine
             HE_CLIENT_WARN("Start scene is missing, creating a default scene");
             const Ref<Scene> defaultScene = CreateRef<Scene>();
             defaultScene->SetName("Default Scene");
-            SceneSerializer sceneSerializer(defaultScene);
-            sceneSerializer.Serialize(project->GetStartScenePath().string());
             project->SetActiveScene(defaultScene);
+
+            if (!project->SaveActiveSceneAs(project->GetStartScenePath()))
+            {
+                HE_CLIENT_ERROR("Could not write a default scene for project '{}'", project->GetName());
+            }
         }
         else
         {

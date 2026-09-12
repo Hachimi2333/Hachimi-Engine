@@ -15,7 +15,15 @@
 #include "Core/Timestep.h"
 #include "Renderer/MeshData.h"
 #include "Renderer/MeshFactory.h"
-#include "Scene/Components.h"
+#include "Scene/Components/CameraComponent.h"
+#include "Scene/Components/ColliderComponent.h"
+#include "Scene/Components/LightComponent.h"
+#include "Scene/Components/MeshComponent.h"
+#include "Scene/Components/RelationshipComponent.h"
+#include "Scene/Components/RigidbodyComponent.h"
+#include "Scene/Components/ScriptComponent.h"
+#include "Scene/Components/TagComponent.h"
+#include "Scene/Components/TransformComponent.h"
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
 #include "Math/Math.h"
@@ -143,8 +151,9 @@ TEST_SUITE("Scene")
 
         Entity parent = scene.CreateEntity("Parent");
         Entity child = scene.CreateEntity("Child");
-        child.GetComponent<RelationshipComponent>().Parent = parent.GetUUID();
-        parent.GetComponent<RelationshipComponent>().Children.push_back(child.GetUUID());
+        scene.SetParent(child, parent);
+
+        REQUIRE(scene.GetChildren(parent).size() == 1);
 
         scene.DestroyEntity(parent);
 
@@ -197,8 +206,7 @@ TEST_SUITE("Scene")
 
         Entity parent = scene.CreateEntity("Parent");
         Entity child = scene.CreateEntity("Child");
-        child.GetComponent<RelationshipComponent>().Parent = parent.GetUUID();
-        parent.GetComponent<RelationshipComponent>().Children.push_back(child.GetUUID());
+        scene.SetParent(child, parent);
         child.Transform().Position = { 0.0f, 5.0f, 0.0f };
         child.AddComponent<MeshComponent>().Mesh = MeshFactory::CreateCube();
 
@@ -234,11 +242,58 @@ TEST_SUITE("Scene")
 
         Entity child = scene.CreateEntity("Child");
         child.Transform().Position = { 0.0f, 2.0f, 0.0f };
-        child.GetComponent<RelationshipComponent>().Parent = parent.GetUUID();
+        scene.SetParent(child, parent);
 
         const Math::Mat4 world = scene.GetWorldTransform(child.GetHandle());
         CHECK(Near(world[3].x, 10.0f));
         CHECK(Near(world[3].y, 2.0f));
+    }
+
+    TEST_CASE("a hierarchy cannot be made into a cycle")
+    {
+        Scene scene;
+        ClearScene(scene);
+
+        Entity grandParent = scene.CreateEntity("Grand Parent");
+        Entity parent = scene.CreateEntity("Parent");
+        Entity child = scene.CreateEntity("Child");
+        scene.SetParent(parent, grandParent);
+        scene.SetParent(child, parent);
+
+        CHECK(scene.IsAncestorOf(grandParent, child));
+        CHECK_FALSE(scene.IsAncestorOf(child, grandParent));
+
+        // Making an ancestor a child of its own descendant must be refused outright.
+        scene.SetParent(grandParent, child);
+        CHECK(SameUUID(grandParent.GetComponent<RelationshipComponent>().Parent, UUID::Invalid()));
+        CHECK(scene.GetChildren(child).empty());
+        CHECK(scene.GetChildren(grandParent).size() == 1);
+
+        // Nor may an entity be its own parent.
+        scene.SetParent(parent, parent);
+        CHECK(SameUUID(parent.GetComponent<RelationshipComponent>().Parent, grandParent.GetUUID()));
+    }
+
+    TEST_CASE("reparenting moves an entity between parents")
+    {
+        Scene scene;
+        ClearScene(scene);
+
+        Entity first = scene.CreateEntity("First");
+        Entity second = scene.CreateEntity("Second");
+        Entity child = scene.CreateEntity("Child");
+
+        scene.SetParent(child, first);
+        CHECK(scene.GetChildren(first).size() == 1);
+
+        scene.SetParent(child, second);
+        CHECK(scene.GetChildren(first).empty());
+        REQUIRE(scene.GetChildren(second).size() == 1);
+        CHECK(SameEntity(scene.GetChildren(second)[0], child));
+
+        scene.ClearParent(child);
+        CHECK(scene.GetChildren(second).empty());
+        CHECK(SameUUID(child.GetComponent<RelationshipComponent>().Parent, UUID::Invalid()));
     }
 
     TEST_CASE("runtime start and stop stay headless")

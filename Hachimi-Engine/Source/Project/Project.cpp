@@ -2,6 +2,15 @@
 
 #include "Core/Log.h"
 #include "Renderer/MeshFactory.h"
+#include "Scene/Components/CameraComponent.h"
+#include "Scene/Components/ColliderComponent.h"
+#include "Scene/Components/LightComponent.h"
+#include "Scene/Components/MeshComponent.h"
+#include "Scene/Components/RigidbodyComponent.h"
+#include "Scene/Components/ScriptComponent.h"
+#include "Scene/Components/TagComponent.h"
+#include "Scene/Components/TransformComponent.h"
+#include "Scene/Scene.h"
 #include "Serialization/SceneSerializer.h"
 #include "Utils/FileSystem.h"
 #include "Utils/VirtualFileSystem.h"
@@ -251,23 +260,19 @@ return Rotator
             // A parent entity with child meshes demonstrates hierarchy and local transforms.
             Entity cluster = scene->CreateEntity("Crystal Cluster");
             cluster.Transform().Position = { 0.0f, 1.4f, -2.5f };
-            auto& clusterRelationship = cluster.GetComponent<RelationshipComponent>();
 
             Entity childA = CreateCubeEntity(*scene, "Cluster Cube A", { -1.2f, 0.0f, 0.0f }, Math::Vec3(0.7f), { 0.90f, 0.30f, 0.20f, 1.0f }, 0.3f, 0.6f);
-            childA.GetComponent<RelationshipComponent>().Parent = cluster.GetUUID();
-            clusterRelationship.Children.push_back(childA.GetUUID());
+            scene->SetParent(childA, cluster);
             AddRigidbody(childA, RigidbodyComponent::RigidbodyType::Dynamic);
             AddCollider(childA, ColliderComponent::ColliderShapeType::Box).Friction = 0.6f;
 
             Entity childB = CreateCubeEntity(*scene, "Cluster Cube B", { 1.2f, 0.0f, 0.0f }, Math::Vec3(0.7f), { 0.20f, 0.80f, 0.90f, 1.0f }, 0.2f, 1.0f);
-            childB.GetComponent<RelationshipComponent>().Parent = cluster.GetUUID();
-            clusterRelationship.Children.push_back(childB.GetUUID());
+            scene->SetParent(childB, cluster);
             AddRigidbody(childB, RigidbodyComponent::RigidbodyType::Dynamic);
             AddCollider(childB, ColliderComponent::ColliderShapeType::Box).Friction = 0.3f;
 
             Entity childC = CreateSphereEntity(*scene, "Cluster Sphere C", { 0.0f, 0.9f, 0.0f }, Math::Vec3(0.8f), { 0.30f, 0.90f, 0.35f, 1.0f }, 0.6f, 0.2f);
-            childC.GetComponent<RelationshipComponent>().Parent = cluster.GetUUID();
-            clusterRelationship.Children.push_back(childC.GetUUID());
+            scene->SetParent(childC, cluster);
             AddRigidbody(childC, RigidbodyComponent::RigidbodyType::Dynamic);
             AddCollider(childC, ColliderComponent::ColliderShapeType::Sphere).Friction = 0.6f;
 
@@ -295,19 +300,44 @@ return Rotator
         }
 
         m_ActiveScene = scene;
+        m_ActiveScenePath = scenePath;
         return true;
     }
 
-    void Project::SaveActiveScene()
+    bool Project::SaveActiveScene()
     {
         if (m_ActiveScene == nullptr)
         {
             HE_CORE_WARN("Cannot save scene: no active scene");
-            return;
+            return false;
+        }
+
+        if (m_ActiveScenePath.empty())
+        {
+            HE_CORE_WARN("Cannot save scene: it has never been written to a file");
+            return false;
         }
 
         SceneSerializer serializer(m_ActiveScene);
-        serializer.Serialize(m_StartScenePath.string());
+        return serializer.Serialize(m_ActiveScenePath.string());
+    }
+
+    bool Project::SaveActiveSceneAs(const std::filesystem::path& scenePath)
+    {
+        if (m_ActiveScene == nullptr)
+        {
+            HE_CORE_WARN("Cannot save scene: no active scene");
+            return false;
+        }
+
+        SceneSerializer serializer(m_ActiveScene);
+        if (!serializer.Serialize(scenePath.string()))
+        {
+            return false;
+        }
+
+        m_ActiveScenePath = scenePath;
+        return true;
     }
 
     Ref<Project> Project::CreateNew(const std::string& name, const std::filesystem::path& directory)
@@ -326,15 +356,21 @@ return Rotator
 
         const std::filesystem::path startScenePath = projectDirectory / "Assets" / "Scenes" / "Default.hscene";
         SceneSerializer serializer(defaultScene);
-        serializer.Serialize(startScenePath.string());
+        const bool sceneWritten = serializer.Serialize(startScenePath.string());
 
         const Ref<Project> project = CreateRef<Project>();
         project->m_Name = name;
         project->m_ProjectDirectory = projectDirectory;
         project->m_AssetsDirectory = projectDirectory / "Assets";
         project->m_StartScenePath = startScenePath;
+        project->m_ActiveScenePath = startScenePath;
         project->m_ProjectFilePath = projectDirectory / (name + ".hproj");
         project->m_ActiveScene = defaultScene;
+
+        if (!sceneWritten)
+        {
+            HE_CORE_ERROR("Created project '{}' but could not write its default scene", name);
+        }
 
         PlatformBuildSettings& windowsSettings = project->m_BuildSettings.GetOrCreateWindowsSettings();
         windowsSettings.ProductName = name;

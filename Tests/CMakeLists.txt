@@ -27,6 +27,7 @@ set(TEST_SOURCES
     Renderer/FrameUniformsTests.cpp
     Renderer/MeshFactoryTests.cpp
     Renderer/RenderPipelineTests.cpp
+    Scene/ComponentRegistryTests.cpp
     Scene/RenderViewTests.cpp
     Scene/SceneTests.cpp
     Serialization/ProjectSerializerTests.cpp

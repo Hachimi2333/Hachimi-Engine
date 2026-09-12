@@ -3,7 +3,9 @@
 #include "Core/Assert.h"
 #include "Core/Base.h"
 #include "Core/UUID.h"
-#include "Scene/Components.h"
+#include "Scene/Components/IDComponent.h"
+#include "Scene/Components/TagComponent.h"
+#include "Scene/Components/TransformComponent.h"
 
 #include <entt/entt.hpp>
 
@@ -70,6 +72,11 @@ namespace HachimiEngine
         operator uint32_t() const { return static_cast<uint32_t>(m_Handle.entity()); }
 
         entt::entity GetHandle() const { return m_Handle.entity(); }
+
+        // The registry this entity lives in, for code that walks ComponentRegistry by type id
+        // instead of naming each component type: the editor's component list and the scene
+        // serializer both work that way.
+        entt::registry& GetRegistry() const;
 
         bool operator==(const Entity& other) const { return m_Handle == other.m_Handle; }
         bool operator!=(const Entity& other) const { return !(*this == other); }

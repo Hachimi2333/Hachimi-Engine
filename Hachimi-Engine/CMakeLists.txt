@@ -146,7 +146,28 @@ set(ENGINE_SOURCES
     Source/Renderer/UniformBuffer.h
     Source/Renderer/VertexArray.cpp
     Source/Renderer/VertexArray.h
-    Source/Scene/Components.h
+    Source/Scene/ComponentRegistry.cpp
+    Source/Scene/ComponentRegistry.h
+    Source/Scene/Components/CameraComponent.cpp
+    Source/Scene/Components/CameraComponent.h
+    Source/Scene/Components/ColliderComponent.cpp
+    Source/Scene/Components/ColliderComponent.h
+    Source/Scene/Components/IDComponent.cpp
+    Source/Scene/Components/IDComponent.h
+    Source/Scene/Components/LightComponent.cpp
+    Source/Scene/Components/LightComponent.h
+    Source/Scene/Components/MeshComponent.cpp
+    Source/Scene/Components/MeshComponent.h
+    Source/Scene/Components/RelationshipComponent.cpp
+    Source/Scene/Components/RelationshipComponent.h
+    Source/Scene/Components/RigidbodyComponent.cpp
+    Source/Scene/Components/RigidbodyComponent.h
+    Source/Scene/Components/ScriptComponent.cpp
+    Source/Scene/Components/ScriptComponent.h
+    Source/Scene/Components/TagComponent.cpp
+    Source/Scene/Components/TagComponent.h
+    Source/Scene/Components/TransformComponent.cpp
+    Source/Scene/Components/TransformComponent.h
     Source/Scene/Entity.cpp
     Source/Scene/Entity.h
     Source/Scene/Scene.cpp
@@ -163,6 +184,7 @@ set(ENGINE_SOURCES
     Source/Scripting/ScriptRuntime.h
     Source/Scripting/ScriptWorld.cpp
     Source/Scripting/ScriptWorld.h
+    Source/Serialization/EnumNames.h
     Source/Serialization/ProjectSerializer.cpp
     Source/Serialization/ProjectSerializer.h
     Source/Serialization/SceneSerializer.cpp

@@ -5,7 +5,8 @@
 #include "Renderer/RenderCommand.h"
 #include "Renderer/RendererContext.h"
 #include "Renderer/SceneRenderer.h"
-#include "Scene/Components.h"
+#include "Scene/Components/CameraComponent.h"
+#include "Scene/Components/TransformComponent.h"
 #include "Scene/Scene.h"
 #include "Math/Math.h"
 

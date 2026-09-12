@@ -2,7 +2,9 @@
 
 #include "Panels/EditorContext.h"
 #include "Renderer/DebugDraw.h"
-#include "Scene/Components.h"
+#include "Scene/Components/CameraComponent.h"
+#include "Scene/Components/LightComponent.h"
+#include "Scene/Components/TransformComponent.h"
 #include "Scene/Scene.h"
 #include "Math/Math.h"
 

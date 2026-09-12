@@ -24,9 +24,13 @@ namespace HachimiEngine
 
         if (ImGui::BeginMenu("File"))
         {
-            if (ImGui::MenuItem("Save Scene"))
+            if (ImGui::MenuItem("Save Scene", "Ctrl+S"))
             {
                 SaveScene();
+            }
+            if (ImGui::MenuItem("Save Scene As..."))
+            {
+                SaveSceneAs();
             }
             if (ImGui::MenuItem("Open Scene..."))
             {
@@ -111,10 +115,45 @@ namespace HachimiEngine
     void EditorMenuBar::SaveScene()
     {
         const Ref<Project> project = ProjectManager::GetActiveProject();
-        if (project != nullptr)
+        if (project == nullptr)
         {
-            project->SaveActiveScene();
-            HE_CLIENT_INFO("Scene saved");
+            return;
+        }
+
+        // Writes back to the scene that is actually being edited, not to the start scene.
+        if (project->SaveActiveScene())
+        {
+            HE_CLIENT_INFO("Saved scene {}", project->GetActiveScenePath().string());
+        }
+        else
+        {
+            HE_CLIENT_ERROR("Failed to save the active scene");
+        }
+    }
+
+    void EditorMenuBar::SaveSceneAs()
+    {
+        const Ref<Project> project = ProjectManager::GetActiveProject();
+        if (project == nullptr)
+        {
+            return;
+        }
+
+        const std::filesystem::path selectedPath = FileDialogs::SaveFileDialog(
+            project->GetAssetsDirectory() / "Scenes",
+            project->GetActiveScenePath().filename().string());
+        if (selectedPath.empty())
+        {
+            return;
+        }
+
+        if (project->SaveActiveSceneAs(selectedPath))
+        {
+            HE_CLIENT_INFO("Saved scene as {}", selectedPath.string());
+        }
+        else
+        {
+            HE_CLIENT_ERROR("Failed to save the scene as {}", selectedPath.string());
         }
     }
 

@@ -28,6 +28,11 @@ namespace HachimiEngine
         const std::filesystem::path& GetStartScenePath() const { return m_StartScenePath; }
         void SetStartScenePath(const std::filesystem::path& path) { m_StartScenePath = path; }
 
+        // Scene the editor is currently working on. Saving writes here, not to the start scene:
+        // writing the start scene unconditionally used to overwrite Default.hscene when another
+        // scene had been opened.
+        const std::filesystem::path& GetActiveScenePath() const { return m_ActiveScenePath; }
+
         const std::filesystem::path& GetProjectFilePath() const { return m_ProjectFilePath; }
         void SetProjectFilePath(const std::filesystem::path& path) { m_ProjectFilePath = path; }
 
@@ -38,7 +43,11 @@ namespace HachimiEngine
         const GameBuildSettings& GetBuildSettings() const { return m_BuildSettings; }
 
         bool OpenScene(const std::filesystem::path& scenePath);
-        void SaveActiveScene();
+        // Writes the active scene back to where it was opened from. Returns false when there is
+        // no active scene or the file could not be written.
+        bool SaveActiveScene();
+        // Writes the active scene to a new path and makes that the active scene from then on.
+        bool SaveActiveSceneAs(const std::filesystem::path& scenePath);
 
         static Ref<Project> CreateNew(const std::string& name, const std::filesystem::path& directory);
 
@@ -47,6 +56,7 @@ namespace HachimiEngine
         std::filesystem::path m_ProjectDirectory;
         std::filesystem::path m_AssetsDirectory;
         std::filesystem::path m_StartScenePath;
+        std::filesystem::path m_ActiveScenePath;
         std::filesystem::path m_ProjectFilePath;
         GameBuildSettings m_BuildSettings;
         Ref<Scene> m_ActiveScene;

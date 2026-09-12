@@ -1,15 +1,32 @@
 #include "Scene/Scene.h"
 
 #include "Core/Log.h"
+#include "Renderer/Lighting.h"
 #include "Renderer/MeshFactory.h"
+#include "Scene/ComponentRegistry.h"
+#include "Scene/Components/CameraComponent.h"
+#include "Scene/Components/IDComponent.h"
+#include "Scene/Components/LightComponent.h"
+#include "Scene/Components/MeshComponent.h"
+#include "Scene/Components/RelationshipComponent.h"
+#include "Scene/Components/TagComponent.h"
+#include "Scene/Components/TransformComponent.h"
 #include "Math/Math.h"
 
 #include <utility>
 
 namespace HachimiEngine
 {
+    namespace
+    {
+        // Guards the parent walk against a malformed chain as well as an accidental loop.
+        constexpr size_t MaxHierarchyDepth = 256;
+    }
+
     Scene::Scene()
     {
+        ComponentRegistry::EnsureBuiltinComponentsRegistered();
+
         // A default scene contains a camera, a light, and one visible cube.
         Entity cameraEntity = CreateEntity("Camera");
         cameraEntity.AddComponent<CameraComponent>().Primary = true;
@@ -30,12 +47,22 @@ namespace HachimiEngine
 
     Entity Scene::CreateEntity(const std::string& name)
     {
-        Entity entity(m_Registry.create(), this);
-        entity.AddComponent<IDComponent>().ID = UUID();
-        entity.AddComponent<TagComponent>().Tag = name.empty() ? "Entity" : name;
-        entity.AddComponent<TransformComponent>();
-        entity.AddComponent<RelationshipComponent>();
-        m_EntityMap[entity.GetUUID()] = entity.GetHandle();
+        const entt::entity handle = m_Registry.create();
+
+        // Required components come from the registry, so "every entity has an ID, a tag, a
+        // transform and a place in the hierarchy" is stated once.
+        for (const ComponentDescriptor& descriptor : ComponentRegistry::GetDescriptors())
+        {
+            if (descriptor.Required)
+            {
+                descriptor.AddDefault(m_Registry, handle);
+            }
+        }
+
+        Entity entity(handle, this);
+        entity.GetComponent<TagComponent>().Tag = name.empty() ? "Entity" : name;
+        m_EntityMap[entity.GetUUID()] = handle;
+        m_ChildrenIndexDirty = true;
         return entity;
     }
 
@@ -54,6 +81,9 @@ namespace HachimiEngine
         }
 
         m_EntityMap.erase(entity.GetUUID());
+        // Anything that pointed at this entity now points at nothing, so the derived index has
+        // to be rebuilt before the next hierarchy query.
+        m_ChildrenIndexDirty = true;
         m_Registry.destroy(entity.GetHandle());
     }
 
@@ -64,45 +94,21 @@ namespace HachimiEngine
             return {};
         }
 
-        const std::string name = entity.GetName();
-        Entity duplicate = CreateEntity(name + " Copy");
+        Entity duplicate = CreateEntity(entity.GetName() + " Copy");
 
-        if (entity.HasComponent<TransformComponent>())
+        // Descriptors decide what a duplicate inherits: the UUID and the hierarchy placement
+        // belong to the source entity, everything else is copied.
+        for (const ComponentDescriptor& descriptor : ComponentRegistry::GetDescriptors())
         {
-            duplicate.GetComponent<TransformComponent>() = entity.GetComponent<TransformComponent>();
-        }
-        else
-        {
-            duplicate.RemoveComponent<TransformComponent>();
-        }
+            if (!descriptor.CopiedOnDuplicate)
+            {
+                continue;
+            }
 
-        if (entity.HasComponent<MeshComponent>())
-        {
-            duplicate.AddComponent<MeshComponent>() = entity.GetComponent<MeshComponent>();
-        }
-        if (entity.HasComponent<CameraComponent>())
-        {
-            auto& camera = duplicate.AddComponent<CameraComponent>();
-            camera = entity.GetComponent<CameraComponent>();
-            camera.Primary = false;
-        }
-        if (entity.HasComponent<LightComponent>())
-        {
-            duplicate.AddComponent<LightComponent>() = entity.GetComponent<LightComponent>();
-        }
-        if (entity.HasComponent<RigidbodyComponent>())
-        {
-            duplicate.AddComponent<RigidbodyComponent>() = entity.GetComponent<RigidbodyComponent>();
-        }
-        if (entity.HasComponent<ColliderComponent>())
-        {
-            duplicate.AddComponent<ColliderComponent>() = entity.GetComponent<ColliderComponent>();
-        }
-        if (entity.HasComponent<ScriptComponent>())
-        {
-            duplicate.AddComponent<ScriptComponent>() = entity.GetComponent<ScriptComponent>();
+            descriptor.Clone(m_Registry, entity.GetHandle(), m_Registry, duplicate.GetHandle());
         }
 
+        m_ChildrenIndexDirty = true;
         return duplicate;
     }
 
@@ -113,6 +119,8 @@ namespace HachimiEngine
         // The Scene constructor creates a default environment; discard it before copying.
         clone->m_Registry.clear();
         clone->m_EntityMap.clear();
+        clone->m_ChildrenIndex.clear();
+        clone->m_ChildrenIndexDirty = true;
 
         clone->m_Name = m_Name;
         clone->m_ViewportWidth = m_ViewportWidth;
@@ -120,71 +128,116 @@ namespace HachimiEngine
         clone->m_Environment = m_Environment;
         clone->m_PhysicsSettings = m_PhysicsSettings;
 
-        const auto entities = m_Registry.view<IDComponent>();
-        for (const entt::entity sourceHandle : entities)
+        auto idView = m_Registry.view<IDComponent>();
+        for (const entt::entity sourceHandle : idView)
         {
-            Entity targetEntity(clone->m_Registry.create(), clone.get());
-            targetEntity.AddComponent<IDComponent>() = m_Registry.get<IDComponent>(sourceHandle);
+            const entt::entity targetHandle = clone->m_Registry.create();
 
-            if (const auto* sourceTag = m_Registry.try_get<TagComponent>(sourceHandle))
+            for (const ComponentDescriptor& descriptor : ComponentRegistry::GetDescriptors())
             {
-                targetEntity.AddComponent<TagComponent>() = *sourceTag;
-            }
-            if (const auto* sourceTransform = m_Registry.try_get<TransformComponent>(sourceHandle))
-            {
-                targetEntity.AddComponent<TransformComponent>() = *sourceTransform;
-            }
-            if (const auto* sourceRelationship = m_Registry.try_get<RelationshipComponent>(sourceHandle))
-            {
-                targetEntity.AddComponent<RelationshipComponent>() = *sourceRelationship;
+                descriptor.Clone(m_Registry, sourceHandle, clone->m_Registry, targetHandle);
             }
 
-            if (const auto* sourceMesh = m_Registry.try_get<MeshComponent>(sourceHandle))
-            {
-                auto& targetMesh = targetEntity.AddComponent<MeshComponent>();
-                targetMesh = *sourceMesh;
-
-                // Clone the material override so runtime edits do not affect the editor scene.
-                if (sourceMesh->MaterialOverride != nullptr)
-                {
-                    const Ref<Material>& sourceMaterial = sourceMesh->MaterialOverride;
-                    targetMesh.MaterialOverride = Material::Create(sourceMaterial->GetShader());
-                    targetMesh.MaterialOverride->SetAlbedoTexture(sourceMaterial->GetAlbedoTexture());
-                    targetMesh.MaterialOverride->SetAlbedoColor(sourceMaterial->GetAlbedoColor());
-                    targetMesh.MaterialOverride->SetRoughness(sourceMaterial->GetRoughness());
-                    targetMesh.MaterialOverride->SetMetallic(sourceMaterial->GetMetallic());
-                }
-            }
-
-            if (const auto* sourceCamera = m_Registry.try_get<CameraComponent>(sourceHandle))
-            {
-                targetEntity.AddComponent<CameraComponent>() = *sourceCamera;
-            }
-
-            if (const auto* sourceLight = m_Registry.try_get<LightComponent>(sourceHandle))
-            {
-                targetEntity.AddComponent<LightComponent>() = *sourceLight;
-            }
-
-            if (const auto* sourceRigidbody = m_Registry.try_get<RigidbodyComponent>(sourceHandle))
-            {
-                targetEntity.AddComponent<RigidbodyComponent>() = *sourceRigidbody;
-            }
-
-            if (const auto* sourceCollider = m_Registry.try_get<ColliderComponent>(sourceHandle))
-            {
-                targetEntity.AddComponent<ColliderComponent>() = *sourceCollider;
-            }
-
-            if (const auto* sourceScript = m_Registry.try_get<ScriptComponent>(sourceHandle))
-            {
-                targetEntity.AddComponent<ScriptComponent>() = *sourceScript;
-            }
-
-            clone->m_EntityMap[targetEntity.GetUUID()] = targetEntity.GetHandle();
+            clone->m_EntityMap[clone->m_Registry.get<IDComponent>(targetHandle).ID] = targetHandle;
         }
 
         return clone;
+    }
+
+    void Scene::SetParent(Entity child, Entity parent)
+    {
+        if (!child || !parent)
+        {
+            return;
+        }
+
+        if (child == parent)
+        {
+            HE_CORE_WARN("An entity cannot be its own parent");
+            return;
+        }
+
+        if (WouldCreateCycle(child.GetHandle(), parent.GetUUID()))
+        {
+            HE_CORE_WARN("Reparenting '{}' under '{}' would create a cycle; the parent is unchanged",
+                child.GetName(),
+                parent.GetName());
+            return;
+        }
+
+        ClearParent(child);
+        child.GetComponent<RelationshipComponent>().Parent = parent.GetUUID();
+        m_ChildrenIndexDirty = true;
+    }
+
+    void Scene::ClearParent(Entity child)
+    {
+        if (!child || !child.HasComponent<RelationshipComponent>())
+        {
+            return;
+        }
+
+        child.GetComponent<RelationshipComponent>().Parent = UUID::Invalid();
+        m_ChildrenIndexDirty = true;
+    }
+
+    std::vector<Entity> Scene::GetChildren(Entity parent)
+    {
+        std::vector<Entity> children;
+        if (!parent)
+        {
+            return children;
+        }
+
+        RebuildChildrenIndexIfDirty();
+
+        const auto indexIt = m_ChildrenIndex.find(parent.GetUUID());
+        if (indexIt == m_ChildrenIndex.end())
+        {
+            return children;
+        }
+
+        children.reserve(indexIt->second.size());
+        for (const UUID childId : indexIt->second)
+        {
+            const auto childIt = m_EntityMap.find(childId);
+            if (childIt != m_EntityMap.end())
+            {
+                children.emplace_back(childIt->second, this);
+            }
+        }
+
+        return children;
+    }
+
+    bool Scene::IsAncestorOf(Entity ancestor, Entity candidate)
+    {
+        if (!ancestor || !candidate || ancestor == candidate)
+        {
+            return false;
+        }
+
+        const UUID ancestorId = ancestor.GetUUID();
+        UUID current = candidate.GetComponent<RelationshipComponent>().Parent;
+
+        for (size_t depth = 0; current != UUID::Invalid() && depth < MaxHierarchyDepth; ++depth)
+        {
+            if (current == ancestorId)
+            {
+                return true;
+            }
+
+            const auto parentIt = m_EntityMap.find(current);
+            if (parentIt == m_EntityMap.end())
+            {
+                return false;
+            }
+
+            const auto* relationship = m_Registry.try_get<RelationshipComponent>(parentIt->second);
+            current = relationship != nullptr ? relationship->Parent : UUID::Invalid();
+        }
+
+        return false;
     }
 
     Entity Scene::GetEntityByUUID(UUID uuid)
@@ -396,8 +449,8 @@ namespace HachimiEngine
 
         if (droppedPointLights > 0)
         {
-            // The shader declares a fixed point light array, so the extras cannot be lit.
-            // Say so instead of silently rendering a darker scene.
+            // The shader declares a fixed point light array, so the extras cannot be lit. Say so
+            // instead of silently rendering a darker scene.
             HE_CORE_WARN("Scene '{}' has {} point light(s) beyond the {} the renderer supports; the extras are not lit",
                 m_Name,
                 droppedPointLights,
@@ -406,8 +459,8 @@ namespace HachimiEngine
 
         if (!hasAnyLight)
         {
-            // A completely dark scene is not useful for editing; restore the default
-            // environment only when the user did not add any lights.
+            // A completely dark scene is not useful for editing; restore the default environment
+            // only when the user did not add any lights.
             lighting = LightingEnvironment();
         }
         else if (!hasDirectionalLight)
@@ -421,19 +474,78 @@ namespace HachimiEngine
 
     void Scene::DestroyChildren(entt::entity entity)
     {
-        auto* relationship = m_Registry.try_get<RelationshipComponent>(entity);
-        if (relationship == nullptr)
+        RebuildChildrenIndexIfDirty();
+
+        const auto indexIt = m_ChildrenIndex.find(GetEntityUUID(entity));
+        if (indexIt == m_ChildrenIndex.end())
         {
             return;
         }
 
-        for (const UUID childUUID : relationship->Children)
+        // Snapshot: destroying a child rebuilds the index underneath the loop.
+        const std::vector<UUID> childIds = indexIt->second;
+        for (const UUID childId : childIds)
         {
-            const auto childIt = m_EntityMap.find(childUUID);
+            const auto childIt = m_EntityMap.find(childId);
             if (childIt != m_EntityMap.end())
             {
                 DestroyEntity(Entity(childIt->second, this));
             }
         }
+    }
+
+    bool Scene::WouldCreateCycle(entt::entity child, UUID parentUUID) const
+    {
+        const UUID childId = GetEntityUUID(child);
+        UUID current = parentUUID;
+
+        for (size_t depth = 0; current != UUID::Invalid() && depth < MaxHierarchyDepth; ++depth)
+        {
+            if (current == childId)
+            {
+                return true;
+            }
+
+            const auto parentIt = m_EntityMap.find(current);
+            if (parentIt == m_EntityMap.end())
+            {
+                return false;
+            }
+
+            const auto* relationship = m_Registry.try_get<RelationshipComponent>(parentIt->second);
+            current = relationship != nullptr ? relationship->Parent : UUID::Invalid();
+        }
+
+        // Either the chain ended, or it is longer than any real hierarchy and is treated as
+        // broken rather than trusted.
+        return current != UUID::Invalid();
+    }
+
+    void Scene::RebuildChildrenIndexIfDirty()
+    {
+        if (!m_ChildrenIndexDirty)
+        {
+            return;
+        }
+
+        m_ChildrenIndex.clear();
+
+        auto view = m_Registry.view<RelationshipComponent, IDComponent>();
+        for (const entt::entity entity : view)
+        {
+            const UUID parent = view.get<RelationshipComponent>(entity).Parent;
+            if (parent != UUID::Invalid())
+            {
+                m_ChildrenIndex[parent].push_back(view.get<IDComponent>(entity).ID);
+            }
+        }
+
+        m_ChildrenIndexDirty = false;
+    }
+
+    UUID Scene::GetEntityUUID(entt::entity entity) const
+    {
+        const auto* identity = m_Registry.try_get<IDComponent>(entity);
+        return identity != nullptr ? identity->ID : UUID::Invalid();
     }
 }

@@ -2,7 +2,11 @@
 
 #include "Core/Log.h"
 #include "Physics/PhysicsMath.h"
-#include "Scene/Components.h"
+#include "Scene/Components/ColliderComponent.h"
+#include "Scene/Components/IDComponent.h"
+#include "Scene/Components/RelationshipComponent.h"
+#include "Scene/Components/RigidbodyComponent.h"
+#include "Scene/Components/TransformComponent.h"
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
 
