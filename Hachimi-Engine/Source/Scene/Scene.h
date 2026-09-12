@@ -9,6 +9,7 @@
 #include "Renderer/EnvironmentSettings.h"
 #include "Renderer/RenderView.h"
 #include "Scene/Entity.h"
+#include "Scene/SceneSystem.h"
 #include "Scripting/ScriptWorld.h"
 #include "Math/Math.h"
 
@@ -64,9 +65,30 @@ namespace HachimiEngine
         Math::Mat4 GetWorldTransform(entt::entity entity) const;
 
         void SetViewportSize(uint32_t width, uint32_t height);
+
+        // Attaches the systems a running scene needs - physics and scripting - and detaches them
+        // again on stop. Both are independent, so a scene without a physics world still runs its
+        // scripts.
         void OnRuntimeStart();
         void OnRuntimeStop();
+        bool IsRuntimeRunning() const { return m_RuntimeRunning; }
+        // Advances every attached system, phase by phase.
         void OnUpdate(Timestep timestep);
+
+        // Simulation steps. Presentation order is phase order; within a phase, insertion order.
+        // Systems are attached and detached outside OnUpdate.
+        template<typename T, typename... Args>
+        T& AddSystem(Args&&... args);
+        void RemoveSystem(SceneSystem& system);
+        // Returns nullptr when no system of that type is attached.
+        template<typename T>
+        T* FindSystem();
+        template<typename T>
+        const T* FindSystem() const;
+
+        // Convenience accessors for the two systems the runtime attaches.
+        bool IsPhysicsRunning() const;
+        bool IsScriptRunning() const;
 
         // Extracts everything a renderer needs for one frame, as plain data. Rendering itself is
         // the caller's job, which is why the editor viewport, the game panel and the Player can
@@ -85,8 +107,6 @@ namespace HachimiEngine
 
         PhysicsSettings& GetPhysicsSettings() { return m_PhysicsSettings; }
         const PhysicsSettings& GetPhysicsSettings() const { return m_PhysicsSettings; }
-        bool IsPhysicsRunning() const { return m_PhysicsWorld != nullptr && m_PhysicsWorld->IsRunning(); }
-        bool IsScriptRunning() const { return m_ScriptWorld != nullptr && m_ScriptWorld->IsRunning(); }
 
         entt::registry& GetRegistry() { return m_Registry; }
         const std::unordered_map<UUID, entt::entity>& GetEntityMap() const { return m_EntityMap; }
@@ -100,6 +120,9 @@ namespace HachimiEngine
 
         void RebuildChildrenIndexIfDirty();
         UUID GetEntityUUID(entt::entity entity) const;
+
+        // Inserts by phase, keeping insertion order inside a phase.
+        SceneSystem& AddSystemImpl(Scope<SceneSystem> system);
 
     private:
         entt::registry m_Registry;
@@ -115,10 +138,50 @@ namespace HachimiEngine
         uint32_t m_ViewportHeight = 720;
         EnvironmentSettings m_Environment;
         PhysicsSettings m_PhysicsSettings;
-        Scope<PhysicsWorld> m_PhysicsWorld;
-        Scope<ScriptWorld> m_ScriptWorld;
+
+        std::vector<Scope<SceneSystem>> m_Systems;
+        // The systems OnRuntimeStart attached, so stopping detaches exactly those.
+        std::vector<SceneSystem*> m_RuntimeSystems;
+        bool m_RuntimeRunning = false;
 
         friend class Entity;
         friend class SceneSerializer;
     };
+
+    template<typename T, typename... Args>
+    T& Scene::AddSystem(Args&&... args)
+    {
+        Scope<T> system = CreateScope<T>(std::forward<Args>(args)...);
+        T& reference = *system;
+        AddSystemImpl(std::move(system));
+        return reference;
+    }
+
+    template<typename T>
+    T* Scene::FindSystem()
+    {
+        for (const Scope<SceneSystem>& system : m_Systems)
+        {
+            // dynamic_cast rather than a name comparison: a system that lies about its name
+            // would otherwise be reinterpreted as the wrong type.
+            if (T* typed = dynamic_cast<T*>(system.get()))
+            {
+                return typed;
+            }
+        }
+        return nullptr;
+    }
+
+    template<typename T>
+    const T* Scene::FindSystem() const
+    {
+        for (const Scope<SceneSystem>& system : m_Systems)
+        {
+            if (const T* typed = dynamic_cast<const T*>(system.get()))
+            {
+                return typed;
+            }
+        }
+        return nullptr;
+    }
 }

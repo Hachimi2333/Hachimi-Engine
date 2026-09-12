@@ -11,8 +11,11 @@
 #include "Scene/Components/RelationshipComponent.h"
 #include "Scene/Components/TagComponent.h"
 #include "Scene/Components/TransformComponent.h"
+#include "Scene/Systems/PhysicsSystem.h"
+#include "Scene/Systems/ScriptSystem.h"
 #include "Math/Math.h"
 
+#include <algorithm>
 #include <utility>
 
 namespace HachimiEngine
@@ -75,9 +78,13 @@ namespace HachimiEngine
 
         DestroyChildren(entity.GetHandle());
 
-        if (m_PhysicsWorld != nullptr)
+        // The physics body lives with the system that owns the world.
+        if (PhysicsSystem* physics = FindSystem<PhysicsSystem>())
         {
-            m_PhysicsWorld->DestroyBody(static_cast<uint64_t>(entt::to_integral(entity.GetHandle())));
+            if (PhysicsWorld* world = physics->GetWorld())
+            {
+                world->DestroyBody(static_cast<uint64_t>(entt::to_integral(entity.GetHandle())));
+            }
         }
 
         m_EntityMap.erase(entity.GetUUID());
@@ -301,51 +308,95 @@ namespace HachimiEngine
 
     void Scene::OnRuntimeStart()
     {
-        if (m_PhysicsWorld != nullptr || m_ScriptWorld != nullptr)
+        if (m_RuntimeRunning)
         {
             HE_CORE_WARN("Scene runtime is already running");
             return;
         }
 
-        m_PhysicsWorld = CreateScope<PhysicsWorld>(m_PhysicsSettings);
-        if (!m_PhysicsWorld->IsRunning())
-        {
-            m_PhysicsWorld = nullptr;
-            return;
-        }
+        m_RuntimeRunning = true;
 
-        m_PhysicsWorld->CreateBodies(*this);
-
-        m_ScriptWorld = CreateScope<ScriptWorld>();
-        m_ScriptWorld->OnRuntimeStart(*this);
+        // Physics runs in the fixed update phase and scripts in the variable update phase, so the
+        // order between them comes from the phases rather than from the order of these two lines.
+        m_RuntimeSystems.push_back(&AddSystem<PhysicsSystem>());
+        m_RuntimeSystems.push_back(&AddSystem<ScriptSystem>());
     }
 
     void Scene::OnRuntimeStop()
     {
-        // Destroy scripts before physics so OnDestroy callbacks can still query
-        // the physics world during teardown.
-        if (m_ScriptWorld != nullptr)
+        // Detaching in reverse keeps teardown symmetric with startup, and scripts are torn down
+        // before physics so OnDestroy callbacks can still query the physics world.
+        for (auto it = m_RuntimeSystems.rbegin(); it != m_RuntimeSystems.rend(); ++it)
         {
-            m_ScriptWorld->OnRuntimeStop(*this);
-            m_ScriptWorld = nullptr;
+            RemoveSystem(**it);
         }
 
-        m_PhysicsWorld = nullptr;
+        m_RuntimeSystems.clear();
+        m_RuntimeRunning = false;
     }
 
     void Scene::OnUpdate(Timestep timestep)
     {
-        if (m_PhysicsWorld == nullptr)
+        for (const ScenePhase phase : { ScenePhase::PreUpdate, ScenePhase::FixedUpdate, ScenePhase::Update, ScenePhase::LateUpdate })
+        {
+            for (const Scope<SceneSystem>& system : m_Systems)
+            {
+                if (system != nullptr && system->GetPhase() == phase)
+                {
+                    system->OnUpdate(*this, timestep);
+                }
+            }
+        }
+    }
+
+    SceneSystem& Scene::AddSystemImpl(Scope<SceneSystem> system)
+    {
+        HE_CORE_ASSERT(system != nullptr);
+
+        SceneSystem& reference = *system;
+        reference.OnAttach(*this);
+
+        // Insert after every system of the same or an earlier phase, so phases stay ordered and
+        // insertion order is kept inside a phase.
+        const auto insertPosition = std::find_if(
+            m_Systems.begin(),
+            m_Systems.end(),
+            [&reference](const Scope<SceneSystem>& candidate)
+            {
+                return candidate == nullptr || candidate->GetPhase() > reference.GetPhase();
+            });
+
+        m_Systems.insert(insertPosition, std::move(system));
+        return reference;
+    }
+
+    void Scene::RemoveSystem(SceneSystem& system)
+    {
+        const auto position = std::find_if(
+            m_Systems.begin(),
+            m_Systems.end(),
+            [&system](const Scope<SceneSystem>& candidate) { return candidate.get() == &system; });
+
+        if (position == m_Systems.end())
         {
             return;
         }
 
-        m_PhysicsWorld->Update(*this, timestep);
+        // Detach before releasing, so the system can still reach the scene it was attached to.
+        (*position)->OnDetach(*this);
+        m_Systems.erase(position);
+    }
 
-        if (m_ScriptWorld != nullptr)
-        {
-            m_ScriptWorld->OnUpdate(timestep, *this);
-        }
+    bool Scene::IsPhysicsRunning() const
+    {
+        const PhysicsSystem* physics = FindSystem<PhysicsSystem>();
+        return physics != nullptr && physics->IsRunning();
+    }
+
+    bool Scene::IsScriptRunning() const
+    {
+        const ScriptSystem* scripts = FindSystem<ScriptSystem>();
+        return scripts != nullptr && scripts->IsRunning();
     }
 
     RenderView Scene::BuildRenderView(const EditorCamera& camera, bool drawGrid) const

@@ -172,6 +172,11 @@ set(ENGINE_SOURCES
     Source/Scene/Entity.h
     Source/Scene/Scene.cpp
     Source/Scene/Scene.h
+    Source/Scene/SceneSystem.h
+    Source/Scene/Systems/PhysicsSystem.cpp
+    Source/Scene/Systems/PhysicsSystem.h
+    Source/Scene/Systems/ScriptSystem.cpp
+    Source/Scene/Systems/ScriptSystem.h
     Source/Scripting/Lua/LuaScriptBindings.cpp
     Source/Scripting/Lua/LuaScriptBindings.h
     Source/Scripting/Lua/LuaScriptEngine.cpp

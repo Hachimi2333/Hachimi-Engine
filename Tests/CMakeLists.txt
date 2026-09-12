@@ -29,6 +29,7 @@ set(TEST_SOURCES
     Renderer/RenderPipelineTests.cpp
     Scene/ComponentRegistryTests.cpp
     Scene/RenderViewTests.cpp
+    Scene/SceneSystemTests.cpp
     Scene/SceneTests.cpp
     Serialization/ProjectSerializerTests.cpp
     Serialization/SceneSerializerTests.cpp
