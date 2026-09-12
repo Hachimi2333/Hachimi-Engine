@@ -128,11 +128,32 @@ Shaders and the UI font are copied next to each executable automatically after e
 ### Verify
 
 ```
-Build/x64-debug/bin/Hachimi-Tests.exe
+Build/x64-debug/bin/Tests.exe
 ```
 
-`Hachimi-Tests` runs the headless package round-trip and virtual file system checks; it
-exits with code 0 when every check passes.
+`Tests` is the headless verification suite, built on [doctest](https://github.com/doctest/doctest).
+It covers the package round trip, range and streaming reads, corruption handling, the virtual
+file system, the project/export pipeline and the pure engine utilities, and exits with code 0
+when every case passes. The suites live in `Tests/`, one directory per subsystem, and doctest's
+own options select what runs:
+
+```
+Build/x64-debug/bin/Tests.exe -ts=Packaging        # one suite
+Build/x64-debug/bin/Tests.exe -tc="*round trip*"   # matching cases
+Build/x64-debug/bin/Tests.exe --list-test-cases    # list everything
+```
+
+The same suite is registered with CTest, so `ctest --test-dir Build/x64-debug --output-on-failure`
+runs it as well. Nothing in there opens a window or an OpenGL context; anything that needs one
+stays interactive.
+
+`Build/x64-debug/bin/EmitPackage.exe <output.hpak>` writes a synthetic game package, which is
+what the Player's headless modes are checked against:
+
+```
+Build/x64-debug/bin/EmitPackage.exe Build/x64-debug/bin/SmokeTest.hpak
+Build/x64-debug/bin/Hachimi-Player.exe Build/x64-debug/bin/SmokeTest.hpak --verify --list --stats
+```
 
 ### Run
 
@@ -236,21 +257,24 @@ Hachimi-Editor/          # Editor client (executable)
 Hachimi-Player/          # Standalone game runtime used by exported builds
   CMakeLists.txt
   Source/                # Player source
-Hachimi-Tests/           # Headless verification target (package round trip, VFS)
+Tests/                   # Headless doctest suites, one directory per subsystem
   CMakeLists.txt
-  Source/                # Test source
+  Main.cpp               # doctest entry point and engine lifetime
+  Support/               # Shared fixtures (sample tree, test package)
 Vendor/                  # All third-party libraries, one directory each
   Box3D/ EnTT/ GLAD/ GLFW/ ImGuizmo/ Lua/
-  NativeFileDialogExtended/ glm/ imgui/ sol2/ spdlog/ stb/ yaml-cpp/ zstd/
+  NativeFileDialogExtended/ doctest/ glm/ imgui/ sol2/ spdlog/ stb/ yaml-cpp/ zstd/
 Build/                   # Build output, one directory per preset (gitignored)
 Utils/                   # Ad-hoc debugging tools (FramebufferTest, UIAutomation)
+  EmitPackage/           # Package emitter for the Player's headless modes (built by CMake)
 ```
 
 Each third-party library is added with `add_subdirectory` and exposes its own CMake target,
 so include directories travel with the target instead of being listed per project. GLAD,
 Lua, stb and imgui ship no usable `CMakeLists.txt`, so those four directories contain a thin
 project-owned one, and `Vendor/zstd/CMakeLists.txt` forwards to zstd's own project under
-`build/cmake/`.
+`build/cmake/`. doctest keeps its upstream CMake project, which the root `CMakeLists.txt`
+adds like every other library.
 
 Runtime asset access goes through `HachimiEngine::VirtualFileSystem`, a read-only
 mount table. Paths below a mount point are served from the mounted package (or
@@ -299,6 +323,7 @@ Hachimi-Engine builds upon the following open-source projects. Special thanks to
 - [spdlog](https://github.com/gabime/spdlog) — logging library
 - [stb](https://github.com/nothings/stb) — single-header image library
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp) — YAML serialization
+- [doctest](https://github.com/doctest/doctest) — test framework behind the headless `Tests` suite
 - [Inter](https://github.com/rsms/inter) — editor font, licensed under the SIL Open Font License 1.1
 - [CMake](https://cmake.org/) — build system
 

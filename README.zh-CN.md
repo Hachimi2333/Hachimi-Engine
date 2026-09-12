@@ -127,10 +127,28 @@ Build/x64-release/bin/Hachimi-Player.exe
 ### 验证
 
 ```
-Build/x64-debug/bin/Hachimi-Tests.exe
+Build/x64-debug/bin/Tests.exe
 ```
 
-`Hachimi-Tests` 执行无界面的包往返与虚拟文件系统校验，全部通过时退出码为 0。
+`Tests` 是基于 [doctest](https://github.com/doctest/doctest) 的无界面验证套件，覆盖资源包往返、
+分块与流式读取、损坏处理、虚拟文件系统、项目/导出流水线以及引擎的纯工具函数，全部通过时退出码为 0。
+用例按子系统分类放在 `Tests/` 下，可用 doctest 自带参数选择运行范围：
+
+```
+Build/x64-debug/bin/Tests.exe -ts=Packaging        # 单个套件
+Build/x64-debug/bin/Tests.exe -tc="*round trip*"   # 匹配的用例
+Build/x64-debug/bin/Tests.exe --list-test-cases    # 列出全部用例
+```
+
+同一套用例也注册到了 CTest，可用 `ctest --test-dir Build/x64-debug --output-on-failure` 运行。
+套件内不会创建窗口或 OpenGL 上下文；需要图形上下文的验证仍由人工在编辑器内完成。
+
+`Build/x64-debug/bin/EmitPackage.exe <输出.hpak>` 会写出一个用于验证 Player 无窗口模式的合成资源包：
+
+```
+Build/x64-debug/bin/EmitPackage.exe Build/x64-debug/bin/SmokeTest.hpak
+Build/x64-debug/bin/Hachimi-Player.exe Build/x64-debug/bin/SmokeTest.hpak --verify --list --stats
+```
 
 ### 运行
 
@@ -239,20 +257,23 @@ Hachimi-Editor/          # 编辑器客户端（可执行文件）
 Hachimi-Player/          # 导出构建使用的独立游戏运行时
   CMakeLists.txt
   Source/                # Player 源码
-Hachimi-Tests/           # 无窗口验证目标（资源包往返、虚拟文件系统）
+Tests/                   # 无窗口 doctest 用例，按子系统分类
   CMakeLists.txt
-  Source/                # 测试源码
+  Main.cpp               # doctest 入口与引擎生命周期
+  Support/               # 共享夹具（样例目录树、测试资源包）
 Vendor/                  # 全部第三方库，每个库一个目录
   Box3D/ EnTT/ GLAD/ GLFW/ ImGuizmo/ Lua/
-  NativeFileDialogExtended/ glm/ imgui/ sol2/ spdlog/ stb/ yaml-cpp/ zstd/
+  NativeFileDialogExtended/ doctest/ glm/ imgui/ sol2/ spdlog/ stb/ yaml-cpp/ zstd/
 Build/                   # 构建产物，每个预设一个目录（gitignore）
 Utils/                   # 临时调试工具（FramebufferTest 帧缓冲测试、UIAutomation UI 自动化）
+  EmitPackage/           # Player 无窗口模式使用的资源包生成工具（由 CMake 构建）
 ```
 
 每个第三方库都通过 `add_subdirectory` 引入并导出自己的 CMake target，因此 include
 路径随 target 传递，不再逐个工程手写。GLAD、Lua、stb 与 imgui 未提供可用的
 `CMakeLists.txt`，这四个目录下各有一个本项目自己维护的薄文件；`Vendor/zstd/CMakeLists.txt`
-则转发到 zstd 位于 `build/cmake/` 的自有工程。
+则转发到 zstd 位于 `build/cmake/` 的自有工程。doctest 保留上游 CMake 工程，由根
+`CMakeLists.txt` 与其它库一样引入。
 
 ## 当前范围说明
 
@@ -295,6 +316,7 @@ Hachimi-Engine 建立在以下开源项目之上，感谢所有作者与贡献�
 - [spdlog](https://github.com/gabime/spdlog) — 日志库
 - [stb](https://github.com/nothings/stb) — 单头文件图像库
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp) — YAML 序列化
+- [doctest](https://github.com/doctest/doctest) — 无窗口 `Tests` 套件使用的测试框架
 - [Inter](https://github.com/rsms/inter) — 编辑器字体，SIL Open Font License 1.1 许可
 - [CMake](https://cmake.org/) — 构建系统
 

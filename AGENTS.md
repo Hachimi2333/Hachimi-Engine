@@ -45,7 +45,7 @@ cmake --build --preset x64-release
 Run the headless verification target:
 
 ```
-Build/x64-debug/bin/Hachimi-Tests.exe
+Build/x64-debug/bin/Tests.exe
 ```
 
 The presets drive Ninja themselves: no Visual Studio solution and no MSBuild project is
@@ -82,7 +82,18 @@ Build-system notes:
 ## Testing and Verification
 
 - Automated agents must verify changes by configuring with CMake and building both Debug
-  and Release, then running `Hachimi-Tests.exe` and confirming it exits with code 0.
+  and Release, then running `Tests.exe` and confirming it exits with code 0.
+- Test suites live in `Tests/`, one directory per subsystem (`Core/`, `Math/`, `Packaging/`,
+  `Serialization/`, `Utils/`), and are written with doctest (see `Vendor/doctest`). Shared
+  fixtures live in `Tests/Support/`. Use `-ts=<suite>` to run one category, `-tc=<pattern>`
+  for single cases and `--list-test-cases` to list them.
+- Every suite must stay headless: no window and no OpenGL context, because constructing a
+  `Scene` builds a mesh through `VertexArray::Create`. Engine behaviour that needs a GL
+  context is verified manually, not here. New engine code that can be exercised without a
+  window should come with a suite under `Tests/`.
+- A test case owns the state it touches: mount and unmount the virtual file system itself
+  (see `ScopedArchiveMount`) and never call `JobSystem::Shutdown()`, which `Tests/Main.cpp`
+  owns.
 - Automated agents must not perform complex GUI tests such as image recognition, screenshot analysis, or pixel-based clicking.
 - Leave interactive editor behavior verification to the user; user testing is faster and more reliable.
 
@@ -129,6 +140,10 @@ Build-system notes:
   and the imgui link in `Vendor/ImGuizmo/CMakeLists.txt`.
 - Prefer each library's own `CMakeLists.txt`; it is added with `add_subdirectory` from the
   root `CMakeLists.txt`. Do not rewrite an upstream CMake project as a hand-written target.
+- `Vendor/doctest` is the test framework and keeps its upstream CMake project unchanged, so
+  it is added like every other library: with `add_subdirectory` above `Vendor/sol2`. The
+  upstream `doctest_with_main` static library is switched off because `Tests/Main.cpp`
+  defines `DOCTEST_CONFIG_IMPLEMENT` and owns `main()`.
 - Only when a library ships no usable `CMakeLists.txt` at the directory it is added from does
   the project own a thin one, placed inside that library's own directory: `Vendor/GLAD`,
   `Vendor/Lua`, `Vendor/stb`, `Vendor/imgui` and `Vendor/zstd`.
