@@ -22,6 +22,16 @@ namespace HachimiEngine
         Lines = 1
     };
 
+    // Triangle culling. Winding is fixed to counter-clockwise front faces, which is what
+    // MeshFactory generates, so a single-sided primitive is visible from its normal side.
+    // Two-sided geometry (the skybox seen from inside, a double-sided plane) uses None.
+    enum class CullMode
+    {
+        None = 0,
+        Back = 1,
+        Front = 2
+    };
+
     // Small OpenGL-style backend abstraction; intentionally simple rather than Vulkan-like.
     class RendererAPI
     {
@@ -36,6 +46,7 @@ namespace HachimiEngine
 
         virtual void SetDepthTest(bool enabled) = 0;
         virtual void SetBlend(bool enabled) = 0;
+        virtual void SetCullMode(CullMode mode) = 0;
         virtual void SetLineWidth(float width) = 0;
         virtual void SetPolygonOffset(bool enabled, float factor = 0.0f, float units = 0.0f) = 0;
 

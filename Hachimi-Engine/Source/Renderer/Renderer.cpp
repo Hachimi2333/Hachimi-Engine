@@ -44,6 +44,11 @@ namespace HachimiEngine
         s_RendererAPI->SetBlend(enabled);
     }
 
+    void Renderer::SetCullMode(CullMode mode)
+    {
+        s_RendererAPI->SetCullMode(mode);
+    }
+
     void Renderer::SetPolygonOffset(bool enabled, float factor, float units)
     {
         s_RendererAPI->SetPolygonOffset(enabled, factor, units);

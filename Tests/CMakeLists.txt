@@ -24,6 +24,7 @@ set(TEST_SOURCES
     Packaging/PackageReaderTests.cpp
     Packaging/PackageWriterTests.cpp
     Packaging/ProjectPackagerTests.cpp
+    Renderer/FrameUniformsTests.cpp
     Renderer/MeshFactoryTests.cpp
     Renderer/RenderPipelineTests.cpp
     Scene/RenderViewTests.cpp

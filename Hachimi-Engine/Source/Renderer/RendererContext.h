@@ -14,6 +14,7 @@ namespace HachimiEngine
     class ShadowMap;
     class Shader;
     class ShaderLibrary;
+    class UniformBuffer;
 
     // Owns every renderer-side GPU resource and the render state that outlives a frame.
     //
@@ -44,6 +45,8 @@ namespace HachimiEngine
         PostProcessPass& GetPostProcessPass() { return *m_PostProcessPass; }
         EnvironmentMap& GetEnvironmentMap() { return *m_EnvironmentMap; }
         ShadowMap& GetShadowMap() { return *m_ShadowMap; }
+        // Per-view constant block. Passes that draw with the scene shader fill and upload it.
+        UniformBuffer& GetFrameUniforms() { return *m_FrameUniforms; }
 
         const Ref<Shader>& GetDefaultShader() const { return m_DefaultShader; }
         const Ref<Shader>& GetGridShader() const { return m_GridShader; }
@@ -60,6 +63,7 @@ namespace HachimiEngine
         Scope<MeshLibrary> m_MeshLibrary;
         Scope<PostProcessPass> m_PostProcessPass;
         Scope<DebugDraw> m_DebugDraw;
+        Ref<UniformBuffer> m_FrameUniforms;
 
         Ref<Shader> m_DefaultShader;
         Ref<Shader> m_GridShader;

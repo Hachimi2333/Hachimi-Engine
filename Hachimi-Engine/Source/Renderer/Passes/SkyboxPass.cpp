@@ -35,6 +35,9 @@ namespace HachimiEngine
             return;
         }
 
+        // The cube is seen from inside, so its outward-facing triangles are the far side:
+        // culling has to be off for the sky to be visible at all.
+        Renderer::SetCullMode(CullMode::None);
         Renderer::SetDepthTest(false);
 
         const Ref<Shader> shader = context.Renderers.GetSkyboxShader();
@@ -50,5 +53,6 @@ namespace HachimiEngine
         Renderer::DrawIndexed(gpuMesh->GetVertexArray(), 0, DrawMode::Triangles);
 
         Renderer::SetDepthTest(true);
+        Renderer::SetCullMode(CullMode::Back);
     }
 }

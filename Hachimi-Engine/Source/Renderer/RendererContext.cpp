@@ -7,8 +7,10 @@
 #include "Renderer/MeshLibrary.h"
 #include "Renderer/PostProcessPass.h"
 #include "Renderer/Renderer.h"
+#include "Renderer/FrameUniforms.h"
 #include "Renderer/Shader.h"
 #include "Renderer/ShadowMap.h"
+#include "Renderer/UniformBuffer.h"
 
 namespace HachimiEngine
 {
@@ -20,6 +22,9 @@ namespace HachimiEngine
         const char* const GridShaderName = "Grid.glsl";
         const char* const DirectionalShadowShaderName = "DirectionalShadow.glsl";
         const char* const SkyboxShaderName = "Skybox.glsl";
+
+        // Matches `layout(std140, binding = 0)` on FrameBlock in Default.glsl.
+        constexpr uint32_t FrameUniformBindingPoint = 0;
     }
 
     RendererContext::RendererContext() = default;
@@ -41,6 +46,10 @@ namespace HachimiEngine
 
         m_Shaders = CreateScope<ShaderLibrary>();
         m_MeshLibrary = CreateScope<MeshLibrary>();
+
+        // Binding point 0 is the one the scene shader's FrameBlock declares, so no
+        // glUniformBlockBinding call is needed anywhere.
+        m_FrameUniforms = UniformBuffer::Create(sizeof(FrameUniforms), FrameUniformBindingPoint);
 
         m_DefaultShader = m_Shaders->LoadEngineShader(DefaultShaderName);
         m_GridShader = m_Shaders->LoadEngineShader(GridShaderName);
@@ -68,6 +77,7 @@ namespace HachimiEngine
         // backend they were created through.
         m_DebugDraw.reset();
         m_PostProcessPass.reset();
+        m_FrameUniforms.reset();
 
         m_EnvironmentMap.reset();
         m_ShadowMap.reset();

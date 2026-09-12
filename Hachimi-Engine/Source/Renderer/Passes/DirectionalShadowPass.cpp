@@ -92,7 +92,7 @@ namespace HachimiEngine
         shadowMap.BindForWriting();
 
         shader->Bind();
-        shader->SetMat4("u_ViewProjection", lightViewProjection);
+        shader->SetMat4("u_LightViewProjection", lightViewProjection);
         Renderer::SetPolygonOffset(true, 1.0f, 1.0f);
 
         for (const RenderItem& item : context.View.Items)

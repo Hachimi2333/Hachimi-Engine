@@ -137,24 +137,34 @@ TEST_SUITE("Renderer")
         CHECK(sphere->GetBounds().Max.y <= 2.0001f);
     }
 
-    TEST_CASE("a plane is flat on the XZ axis and faces up")
+    TEST_CASE("a plane is flat on the XZ axis and carries both faces")
     {
         const Ref<MeshData> plane = MeshFactory::CreatePlane(10.0f, 4.0f);
 
         REQUIRE(plane.get() != nullptr);
-        CHECK(plane->GetVertexCount() == 4);
-        CHECK(plane->GetIndexCount() == 6);
+        // The floor primitive is two-sided so it stays visible from below.
+        CHECK(plane->GetVertexCount() == 8);
+        CHECK(plane->GetIndexCount() == 12);
 
+        int upwardNormals = 0;
+        int downwardNormals = 0;
         bool flat = true;
-        bool facesUp = true;
         for (const MeshVertex& vertex : plane->GetVertices())
         {
             flat = flat && Near(vertex.Position.y, 0.0f);
-            facesUp = facesUp && Near(vertex.Normal, Math::Vec3(0.0f, 1.0f, 0.0f));
+            if (Near(vertex.Normal.y, 1.0f))
+            {
+                ++upwardNormals;
+            }
+            else if (Near(vertex.Normal.y, -1.0f))
+            {
+                ++downwardNormals;
+            }
         }
 
         CHECK(flat);
-        CHECK(facesUp);
+        CHECK(upwardNormals == 4);
+        CHECK(downwardNormals == 4);
         CHECK(Near(plane->GetBounds().Min.x, -5.0f));
         CHECK(Near(plane->GetBounds().Max.z, 2.0f));
     }

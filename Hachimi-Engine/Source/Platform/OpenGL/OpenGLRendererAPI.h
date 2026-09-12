@@ -17,6 +17,7 @@ namespace HachimiEngine
 
         void SetDepthTest(bool enabled) override;
         void SetBlend(bool enabled) override;
+        void SetCullMode(CullMode mode) override;
         void SetLineWidth(float width) override;
         void SetPolygonOffset(bool enabled, float factor = 0.0f, float units = 0.0f) override;
 

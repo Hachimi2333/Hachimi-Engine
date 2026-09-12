@@ -72,6 +72,8 @@ set(ENGINE_SOURCES
     Source/Platform/OpenGL/OpenGLTexture.h
     Source/Platform/OpenGL/OpenGLTextureCube.cpp
     Source/Platform/OpenGL/OpenGLTextureCube.h
+    Source/Platform/OpenGL/OpenGLUniformBuffer.cpp
+    Source/Platform/OpenGL/OpenGLUniformBuffer.h
     Source/Platform/OpenGL/OpenGLVertexArray.cpp
     Source/Platform/OpenGL/OpenGLVertexArray.h
     Source/Project/Project.cpp
@@ -91,6 +93,8 @@ set(ENGINE_SOURCES
     Source/Renderer/EnvironmentSettings.h
     Source/Renderer/FrameBuffer.cpp
     Source/Renderer/FrameBuffer.h
+    Source/Renderer/FrameUniforms.cpp
+    Source/Renderer/FrameUniforms.h
     Source/Renderer/ImageDecoder.cpp
     Source/Renderer/ImageDecoder.h
     Source/Renderer/Lighting.h
@@ -138,6 +142,8 @@ set(ENGINE_SOURCES
     Source/Renderer/Texture.h
     Source/Renderer/TextureCube.cpp
     Source/Renderer/TextureCube.h
+    Source/Renderer/UniformBuffer.cpp
+    Source/Renderer/UniformBuffer.h
     Source/Renderer/VertexArray.cpp
     Source/Renderer/VertexArray.h
     Source/Scene/Components.h

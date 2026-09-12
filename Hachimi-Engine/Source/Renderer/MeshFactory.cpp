@@ -116,19 +116,31 @@ namespace HachimiEngine
     {
         const float halfWidth = width * 0.5f;
         const float halfHeight = height * 0.5f;
-        const Math::Vec3 normal(0.0f, 1.0f, 0.0f);
+        const Math::Vec3 upNormal(0.0f, 1.0f, 0.0f);
+        const Math::Vec3 downNormal(0.0f, -1.0f, 0.0f);
         const Math::Vec4 color(0.75f, 0.75f, 0.78f, 1.0f);
 
+        // The plane is the engine's floor primitive, so it carries both faces: a single-sided
+        // quad disappears as soon as the camera drops below it.
         const std::vector<MeshVertex> vertices =
         {
-            { { -halfWidth, 0.0f, -halfHeight }, normal, { 0.0f, 0.0f }, color },
-            { {  halfWidth, 0.0f, -halfHeight }, normal, { 1.0f, 0.0f }, color },
-            { {  halfWidth, 0.0f,  halfHeight }, normal, { 1.0f, 1.0f }, color },
-            { { -halfWidth, 0.0f,  halfHeight }, normal, { 0.0f, 1.0f }, color }
+            // Upward face, counter-clockwise seen from above.
+            { { -halfWidth, 0.0f, -halfHeight }, upNormal, { 0.0f, 0.0f }, color },
+            { {  halfWidth, 0.0f, -halfHeight }, upNormal, { 1.0f, 0.0f }, color },
+            { {  halfWidth, 0.0f,  halfHeight }, upNormal, { 1.0f, 1.0f }, color },
+            { { -halfWidth, 0.0f,  halfHeight }, upNormal, { 0.0f, 1.0f }, color },
+            // Downward face, counter-clockwise seen from below.
+            { { -halfWidth, 0.0f, -halfHeight }, downNormal, { 0.0f, 0.0f }, color },
+            { { -halfWidth, 0.0f,  halfHeight }, downNormal, { 0.0f, 1.0f }, color },
+            { {  halfWidth, 0.0f,  halfHeight }, downNormal, { 1.0f, 1.0f }, color },
+            { {  halfWidth, 0.0f, -halfHeight }, downNormal, { 1.0f, 0.0f }, color }
         };
 
-        // Counter-clockwise seen from above, matching the upward face normal.
-        const std::vector<uint32_t> indices = { 0, 2, 1, 0, 3, 2 };
+        const std::vector<uint32_t> indices =
+        {
+             0, 2, 1, 0, 3, 2, // up
+             4, 6, 5, 4, 7, 6  // down
+        };
         return MeshData::Create(std::move(vertices), std::move(indices));
     }
 

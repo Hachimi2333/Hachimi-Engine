@@ -13,6 +13,12 @@ namespace HachimiEngine
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
+        // Front faces are counter-clockwise, which is what MeshFactory generates. Stated
+        // explicitly because every cull decision depends on it.
+        glFrontFace(GL_CCW);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
     }
 
     void OpenGLRendererAPI::SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
@@ -51,6 +57,24 @@ namespace HachimiEngine
         else
         {
             glDisable(GL_BLEND);
+        }
+    }
+
+    void OpenGLRendererAPI::SetCullMode(CullMode mode)
+    {
+        switch (mode)
+        {
+            case CullMode::None:
+                glDisable(GL_CULL_FACE);
+                break;
+            case CullMode::Back:
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_BACK);
+                break;
+            case CullMode::Front:
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_FRONT);
+                break;
         }
     }
 
