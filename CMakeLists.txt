@@ -164,6 +164,13 @@ set(ENTT_BUILD_TESTBED  OFF)
 # Box3D build options (only the library is built; its samples and tests were removed).
 set(BOX3D_VALIDATE OFF)
 
+# doctest (test framework). It is consumed with add_subdirectory only: no main() of its
+# own is built, because Tests/Main.cpp defines DOCTEST_CONFIG_IMPLEMENT and provides the
+# entry point, and nothing is installed or exported.
+set(DOCTEST_WITH_TESTS              OFF)
+set(DOCTEST_WITH_MAIN_IN_STATIC_LIB OFF)
+set(DOCTEST_NO_INSTALL              ON)
+
 # ImGuizmo
 set(IMGUIZMO_BUILD_EXAMPLE OFF)
 
@@ -212,6 +219,7 @@ add_subdirectory(Vendor/GLAD)
 add_subdirectory(Vendor/GLFW)
 add_subdirectory(Vendor/Lua)
 add_subdirectory(Vendor/NativeFileDialogExtended)
+add_subdirectory(Vendor/doctest)
 add_subdirectory(Vendor/glm)
 add_subdirectory(Vendor/spdlog)
 add_subdirectory(Vendor/stb)
@@ -239,4 +247,8 @@ add_subdirectory(Vendor/sol2)
 add_subdirectory(Hachimi-Engine)
 add_subdirectory(Hachimi-Editor)
 add_subdirectory(Hachimi-Player)
-add_subdirectory(Hachimi-Tests)
+
+# Headless verification. enable_testing() lives here rather than in Tests/ so that ctest
+# finds the test from the build root.
+enable_testing()
+add_subdirectory(Tests)
