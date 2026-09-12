@@ -1,3 +1,13 @@
 @echo off
+setlocal
+set "ROOT=%~dp0..\.."
+set "BUILD=%ROOT%\Build\x64-debug"
 call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" >nul 2>&1
-cl.exe /nologo /EHsc /std:c++20 /utf-8 /I"D:\Workspace\Cpp\Hachimi-Engine\Hachimi-Engine\Vendor\GLAD\include" /I"D:\Workspace\Cpp\Hachimi-Engine\Hachimi-Engine\Vendor\GLFW\include" FramebufferTestDebug.cpp "D:\Workspace\Cpp\Hachimi-Engine\Bin\Debug-windows-x86_64\GLFW.lib" "D:\Workspace\Cpp\Hachimi-Engine\Bin\Debug-windows-x86_64\GLAD.lib" opengl32.lib user32.lib gdi32.lib shell32.lib /Fe:FramebufferTestDebug.exe
+cl.exe /nologo /EHsc /std:c++20 /utf-8 /MDd /Zi ^
+  /I"%ROOT%\Vendor\GLAD\include" /I"%ROOT%\Vendor\GLFW\include" ^
+  FramebufferTestDebug.cpp ^
+  "%BUILD%\Vendor\GLFW\src\glfw3.lib" ^
+  "%BUILD%\Vendor\GLAD\glad.lib" ^
+  opengl32.lib user32.lib gdi32.lib shell32.lib ^
+  /Fe:FramebufferTestDebug.exe
+exit /b %errorlevel%

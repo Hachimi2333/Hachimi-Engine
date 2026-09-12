@@ -9,7 +9,7 @@ A C++20 3D game engine and editor for Windows, built on OpenGL 4.6 Core and insp
 ### Core
 
 - Windows x86_64 only, Debug / Release configurations
-- Premake5 generates Visual Studio 2026 solutions
+- CMake build driven by `CMakePresets.json`, with Visual Studio 2026 and Ninja presets
 - Application / Entry Point / Layer / LayerStack / Event system
 - Custom math library `HachimiEngine::Math` (internally wraps GLM; game code does not depend on GLM directly)
 - Scene / ECS based on EnTT
@@ -75,35 +75,64 @@ Scripts run only in Play mode. Each Play session creates an isolated Lua VM, and
 - Visual Studio 2026 (Community or later)
 - A driver with OpenGL 4.6 Core support
 
-The repository already includes Premake5 and all third-party library sources; no additional setup is required.
+The repository already includes all third-party library sources; no additional setup is
+required. Visual Studio 2026 ships the CMake and Ninja the build uses, so no separate CMake
+install is needed.
 
 ## Getting Started
 
-### Generate the Solution
+### Configure and Build
 
-Double-click `GenerateSolution.bat` at the repository root, or run manually:
+Everything is driven by `CMakePresets.json`. The build runs Ninja on the MSVC toolset, so
+configure from a **VS 2026 Developer Command Prompt** (Start menu, "Developer Command Prompt
+for VS 2026") in the repository root:
 
 ```
-Vendor\Premake\Bin\premake5.exe vs2026 --file=premake5.lua
+cmake --preset x64-debug
+cmake --build --preset x64-debug
 ```
 
-### Build
+Release:
 
-Open the generated `Hachimi-Engine.slnx` in Visual Studio 2026 and build the solution.
+```
+cmake --preset x64-release
+cmake --build --preset x64-release
+```
+
+No Visual Studio solution is generated; CMake and Ninja build the project themselves and
+`cmake --build` is the only build command involved. You can still open the repository folder
+in Visual Studio 2026 or VS Code, which read the same `CMakePresets.json`.
+
+If `cmake` is not on your `PATH`, Visual Studio 2026 ships one at:
+
+```
+C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe
+```
 
 Output directories:
 
-- Final output: `Bin/<configuration>-<system>-<architecture>/`
-- Intermediate output: `Bin/Obj/<configuration>-<system>-<architecture>/<ProjectName>/`
+- Final binaries: `Build/<preset>/bin/`
+- CMake build files and intermediate objects: `Build/<preset>/`, managed by CMake
 
 For example:
 
 ```
-Bin/Debug-windows-x86_64/Hachimi-Editor.exe
-Bin/Debug-windows-x86_64/Hachimi-Player.exe
-Bin/Release-windows-x86_64/Hachimi-Editor.exe
-Bin/Release-windows-x86_64/Hachimi-Player.exe
+Build/x64-debug/bin/Hachimi-Editor.exe
+Build/x64-debug/bin/Hachimi-Player.exe
+Build/x64-release/bin/Hachimi-Editor.exe
+Build/x64-release/bin/Hachimi-Player.exe
 ```
+
+Shaders and the UI font are copied next to each executable automatically after each build.
+
+### Verify
+
+```
+Build/x64-debug/bin/Hachimi-Tests.exe
+```
+
+`Hachimi-Tests` runs the headless package round-trip and virtual file system checks; it
+exits with code 0 when every check passes.
 
 ### Run
 
@@ -192,27 +221,36 @@ The Player also exposes headless modes, which makes an exported build verifiable
 ## Repository Layout
 
 ```text
+CMakeLists.txt           # Single build entry point (the only project() call)
+CMakePresets.json        # x64-debug / x64-release configure and build presets
 Hachimi-Engine/          # Engine core (static library)
+  CMakeLists.txt
   Resources/Shaders/     # Engine-owned GLSL shaders
+  Resources/Fonts/       # Editor UI font (Inter) and its license
   Source/                # Engine source
   Source/Packaging/      # Game build settings, .hpak format, reader/writer
   Source/Scripting/      # Language-agnostic scripting core + Lua backend
-  Vendor/                # Third-party libraries used by the engine
-  Vendor/Lua/            # Lua 5.4 runtime
-  Vendor/sol2/           # C++ Lua bindings (header-only)
-  Vendor/zstd/           # Zstandard: package compression and xxHash
 Hachimi-Editor/          # Editor client (executable)
+  CMakeLists.txt
   Source/                # Editor source
-  Vendor/                # Third-party libraries used by the editor
 Hachimi-Player/          # Standalone game runtime used by exported builds
+  CMakeLists.txt
   Source/                # Player source
 Hachimi-Tests/           # Headless verification target (package round trip, VFS)
+  CMakeLists.txt
   Source/                # Test source
-Vendor/Premake/          # Premake5 toolchain
-Bin/                     # Build output (gitignored)
-Vendor/Downloads/        # Third-party library download staging area (gitignored)
+Vendor/                  # All third-party libraries, one directory each
+  Box3D/ EnTT/ GLAD/ GLFW/ ImGuizmo/ Lua/
+  NativeFileDialogExtended/ glm/ imgui/ sol2/ spdlog/ stb/ yaml-cpp/ zstd/
+Build/                   # Build output, one directory per preset (gitignored)
 Utils/                   # Ad-hoc debugging tools (FramebufferTest, UIAutomation)
 ```
+
+Each third-party library is added with `add_subdirectory` and exposes its own CMake target,
+so include directories travel with the target instead of being listed per project. GLAD,
+Lua, stb and imgui ship no usable `CMakeLists.txt`, so those four directories contain a thin
+project-owned one, and `Vendor/zstd/CMakeLists.txt` forwards to zstd's own project under
+`build/cmake/`.
 
 Runtime asset access goes through `HachimiEngine::VirtualFileSystem`, a read-only
 mount table. Paths below a mount point are served from the mounted package (or
@@ -262,6 +300,6 @@ Hachimi-Engine builds upon the following open-source projects. Special thanks to
 - [stb](https://github.com/nothings/stb) — single-header image library
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp) — YAML serialization
 - [Inter](https://github.com/rsms/inter) — editor font, licensed under the SIL Open Font License 1.1
-- [Premake5](https://github.com/premake/premake-core) — build system generator
+- [CMake](https://cmake.org/) — build system
 
 The license of each third-party library can be found in its own `LICENSE` file under the corresponding `Vendor` directory.

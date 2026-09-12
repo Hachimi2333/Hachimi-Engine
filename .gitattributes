@@ -31,6 +31,11 @@
 *.imp text eol=lf
 *.in text eol=lf
 
+# CMake files: LF everywhere
+*.cmake text eol=lf
+CMakeLists.txt text eol=lf
+CMakePresets.json text eol=lf
+
 # Windows batch files: CRLF required by cmd.exe
 *.bat text eol=crlf
 

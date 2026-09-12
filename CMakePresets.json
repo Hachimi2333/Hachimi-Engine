@@ -1,0 +1,61 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 28,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "windows-base",
+      "hidden": true,
+      "displayName": "Windows x64 base",
+      "description": "Ninja driving the MSVC toolset through cl.exe. Configure from a VS 2026 Developer Command Prompt.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/Build/${presetName}",
+      "installDir": "${sourceDir}/Build/${presetName}/install",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "cl.exe",
+        "CMAKE_CXX_COMPILER": "cl.exe"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "x64-debug",
+      "displayName": "x64 Debug",
+      "inherits": "windows-base",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/CMake/cmake/Microsoft/SegmentHeap.cmake"
+      }
+    },
+    {
+      "name": "x64-release",
+      "displayName": "x64 Release",
+      "inherits": "x64-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "x64-debug",
+      "displayName": "x64 Debug",
+      "configurePreset": "x64-debug"
+    },
+    {
+      "name": "x64-release",
+      "displayName": "x64 Release",
+      "configurePreset": "x64-release"
+    }
+  ]
+}

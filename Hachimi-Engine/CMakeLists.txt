@@ -1,0 +1,197 @@
+# Hachimi-Engine core static library.
+
+set(ENGINE_SOURCES
+    Source/Asset/Asset.h
+    Source/Asset/AssetManager.cpp
+    Source/Asset/AssetManager.h
+    Source/Asset/TextureImporter.cpp
+    Source/Asset/TextureImporter.h
+    Source/Core/Application.cpp
+    Source/Core/Application.h
+    Source/Core/Assert.h
+    Source/Core/Base.h
+    Source/Core/EntryPoint.h
+    Source/Core/Input.cpp
+    Source/Core/Input.h
+    Source/Core/JobSystem.cpp
+    Source/Core/JobSystem.h
+    Source/Core/KeyCodes.h
+    Source/Core/Layer.h
+    Source/Core/LayerStack.cpp
+    Source/Core/LayerStack.h
+    Source/Core/Log.cpp
+    Source/Core/Log.h
+    Source/Core/Memory.h
+    Source/Core/MouseButtonCodes.h
+    Source/Core/Timestep.h
+    Source/Core/UUID.cpp
+    Source/Core/UUID.h
+    Source/Core/Window.cpp
+    Source/Core/Window.h
+    Source/Events/ApplicationEvent.h
+    Source/Events/Event.h
+    Source/Events/EventDispatcher.h
+    Source/Events/KeyEvent.h
+    Source/Events/MouseEvent.h
+    Source/ImGui/ImGuiLayer.cpp
+    Source/ImGui/ImGuiLayer.h
+    Source/ImGui/ThemeConfig.cpp
+    Source/ImGui/ThemeConfig.h
+    Source/Math/Math.h
+    Source/Packaging/GameBuildSettings.cpp
+    Source/Packaging/GameBuildSettings.h
+    Source/Packaging/PackageEntryStream.cpp
+    Source/Packaging/PackageEntryStream.h
+    Source/Packaging/PackageFormat.cpp
+    Source/Packaging/PackageFormat.h
+    Source/Packaging/PackageReader.cpp
+    Source/Packaging/PackageReader.h
+    Source/Packaging/PackageWriter.cpp
+    Source/Packaging/PackageWriter.h
+    Source/Packaging/ProjectPackager.cpp
+    Source/Packaging/ProjectPackager.h
+    Source/Physics/PhysicsMath.h
+    Source/Physics/PhysicsWorld.cpp
+    Source/Physics/PhysicsWorld.h
+    Source/Platform/GLFW/GLFWWindow.cpp
+    Source/Platform/GLFW/GLFWWindow.h
+    Source/Platform/OpenGL/GraphicsContext.h
+    Source/Platform/OpenGL/OpenGLBuffer.cpp
+    Source/Platform/OpenGL/OpenGLBuffer.h
+    Source/Platform/OpenGL/OpenGLContext.cpp
+    Source/Platform/OpenGL/OpenGLContext.h
+    Source/Platform/OpenGL/OpenGLFrameBuffer.cpp
+    Source/Platform/OpenGL/OpenGLFrameBuffer.h
+    Source/Platform/OpenGL/OpenGLRendererAPI.cpp
+    Source/Platform/OpenGL/OpenGLRendererAPI.h
+    Source/Platform/OpenGL/OpenGLShader.cpp
+    Source/Platform/OpenGL/OpenGLShader.h
+    Source/Platform/OpenGL/OpenGLShadowMap.cpp
+    Source/Platform/OpenGL/OpenGLShadowMap.h
+    Source/Platform/OpenGL/OpenGLTexture.cpp
+    Source/Platform/OpenGL/OpenGLTexture.h
+    Source/Platform/OpenGL/OpenGLTextureCube.cpp
+    Source/Platform/OpenGL/OpenGLTextureCube.h
+    Source/Platform/OpenGL/OpenGLVertexArray.cpp
+    Source/Platform/OpenGL/OpenGLVertexArray.h
+    Source/Project/Project.cpp
+    Source/Project/Project.h
+    Source/Project/ProjectManager.cpp
+    Source/Project/ProjectManager.h
+    Source/Renderer/Buffer.cpp
+    Source/Renderer/Buffer.h
+    Source/Renderer/Camera.cpp
+    Source/Renderer/Camera.h
+    Source/Renderer/DebugDraw.cpp
+    Source/Renderer/DebugDraw.h
+    Source/Renderer/EditorCamera.cpp
+    Source/Renderer/EditorCamera.h
+    Source/Renderer/EnvironmentMap.cpp
+    Source/Renderer/EnvironmentMap.h
+    Source/Renderer/EnvironmentSettings.h
+    Source/Renderer/FrameBuffer.cpp
+    Source/Renderer/FrameBuffer.h
+    Source/Renderer/ImageDecoder.cpp
+    Source/Renderer/ImageDecoder.h
+    Source/Renderer/Material.cpp
+    Source/Renderer/Material.h
+    Source/Renderer/Mesh.cpp
+    Source/Renderer/Mesh.h
+    Source/Renderer/MeshFactory.cpp
+    Source/Renderer/MeshFactory.h
+    Source/Renderer/PostProcessPass.cpp
+    Source/Renderer/PostProcessPass.h
+    Source/Renderer/RenderCommand.h
+    Source/Renderer/Renderer.cpp
+    Source/Renderer/Renderer.h
+    Source/Renderer/RendererAPI.cpp
+    Source/Renderer/RendererAPI.h
+    Source/Renderer/SceneRenderer.cpp
+    Source/Renderer/SceneRenderer.h
+    Source/Renderer/Shader.cpp
+    Source/Renderer/Shader.h
+    Source/Renderer/ShadowMap.cpp
+    Source/Renderer/ShadowMap.h
+    Source/Renderer/stb_image.cpp
+    Source/Renderer/Texture.cpp
+    Source/Renderer/Texture.h
+    Source/Renderer/TextureCube.cpp
+    Source/Renderer/TextureCube.h
+    Source/Renderer/VertexArray.cpp
+    Source/Renderer/VertexArray.h
+    Source/Scene/Components.h
+    Source/Scene/Entity.cpp
+    Source/Scene/Entity.h
+    Source/Scene/Scene.cpp
+    Source/Scene/Scene.h
+    Source/Scripting/Lua/LuaScriptBindings.cpp
+    Source/Scripting/Lua/LuaScriptBindings.h
+    Source/Scripting/Lua/LuaScriptEngine.cpp
+    Source/Scripting/Lua/LuaScriptEngine.h
+    Source/Scripting/Lua/LuaScriptRuntime.cpp
+    Source/Scripting/Lua/LuaScriptRuntime.h
+    Source/Scripting/ScriptEngine.h
+    Source/Scripting/ScriptManager.cpp
+    Source/Scripting/ScriptManager.h
+    Source/Scripting/ScriptRuntime.h
+    Source/Scripting/ScriptWorld.cpp
+    Source/Scripting/ScriptWorld.h
+    Source/Serialization/ProjectSerializer.cpp
+    Source/Serialization/ProjectSerializer.h
+    Source/Serialization/SceneSerializer.cpp
+    Source/Serialization/SceneSerializer.h
+    Source/Utils/FileMapping.h
+    Source/Utils/FileSystem.cpp
+    Source/Utils/FileSystem.h
+    Source/Utils/PlatformUtils.cpp
+    Source/Utils/PlatformUtils.h
+    Source/Utils/VirtualFileSystem.cpp
+    Source/Utils/VirtualFileSystem.h
+    Source/Utils/XXHash.cpp
+    Source/Utils/XXHash.h
+)
+
+add_library(Hachimi-Engine STATIC ${ENGINE_SOURCES})
+add_library(HachimiEngine::Engine ALIAS Hachimi-Engine)
+
+# Source/ is public: the editor, the player and the tests all include engine headers
+# through paths such as "Core/Application.h" and "Renderer/Renderer.h".
+target_include_directories(Hachimi-Engine PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Source>
+)
+
+target_compile_definitions(Hachimi-Engine PUBLIC
+    SPDLOG_COMPILED_LIB
+    YAML_CPP_STATIC_DEFINE
+    GLFW_INCLUDE_NONE
+    GLM_ENABLE_EXPERIMENTAL
+)
+
+# sol2's bounds checking and assertions are only affordable in Debug builds.
+target_compile_definitions(Hachimi-Engine PUBLIC
+    $<$<CONFIG:Debug>:SOL_ALL_SAFETIES_ON>
+)
+
+# Third-party include paths travel with their targets, so no library directory is
+# spelled out here: linking is what pulls in the headers.
+target_link_libraries(Hachimi-Engine
+    PUBLIC
+        box3d
+        EnTT::EnTT
+        glad::glad
+        glfw
+        glm::glm
+        imgui::imgui
+        lua::lua
+        sol2::sol2
+        spdlog::spdlog
+        stb::stb
+        yaml-cpp::yaml-cpp
+        # zstd only creates its zstd:: namespace through install(EXPORT), so the in-tree
+        # target `libzstd` (an INTERFACE target selecting libzstd_static here) is used.
+        libzstd
+    PRIVATE
+        opengl32
+)
+
+set_common_compile_options(Hachimi-Engine)

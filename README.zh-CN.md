@@ -9,7 +9,7 @@
 ### 引擎核心
 
 - 仅支持 Windows x86_64，Debug / Release 两种配置
-- Premake5 生成 Visual Studio 2026 解决方案
+- 由 `CMakePresets.json` 驱动的 CMake 构建，提供 Visual Studio 2026 与 Ninja 预设
 - Application / Entry Point / Layer / LayerStack / Event 系统
 - 自有数学库 `HachimiEngine::Math`（内部封装 GLM，业务代码不直接依赖 GLM）
 - 基于 EnTT 的 Scene / ECS
@@ -75,35 +75,62 @@ return MyScript
 - Visual Studio 2026（Community 或更高版本）
 - 已安装 OpenGL 4.6 Core 驱动
 
-仓库已包含 Premake5 与全部第三方库源码，无需额外配置。
+仓库已包含全部第三方库源码，无需额外配置。Visual Studio 2026 自带构建所需的 CMake 与 Ninja，
+无需单独安装。
 
 ## 快速开始
 
-### 生成解决方案
+### 配置与构建
 
-双击仓库根目录的 `GenerateSolution.bat`，或手动执行：
+构建完全由 `CMakePresets.json` 驱动。构建直接使用 Ninja 调用 MSVC 工具链，因此需要在
+**VS 2026 Developer Command Prompt**（开始菜单中的 "Developer Command Prompt for VS 2026"）
+中、于仓库根目录执行：
 
 ```
-Vendor\Premake\Bin\premake5.exe vs2026 --file=premake5.lua
+cmake --preset x64-debug
+cmake --build --preset x64-debug
 ```
 
-### 构建
+Release：
 
-用 Visual Studio 2026 打开生成的 `Hachimi-Engine.slnx` 并构建解决方案。
+```
+cmake --preset x64-release
+cmake --build --preset x64-release
+```
+
+整个过程不会生成 Visual Studio 解决方案，由 CMake 与 Ninja 自行完成构建，唯一的构建命令就是
+`cmake --build`。也可以直接用 Visual Studio 2026 或 VS Code 打开仓库文件夹，它们读取的是同一份
+`CMakePresets.json`。
+
+如果 `cmake` 不在 `PATH` 中，Visual Studio 2026 自带的路径为：
+
+```
+C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe
+```
 
 输出目录：
 
-- 最终产物：`Bin/<configuration>-<system>-<architecture>/`
-- 中间产物：`Bin/Obj/<configuration>-<system>-<architecture>/<ProjectName>/`
+- 最终产物：`Build/<preset>/bin/`
+- CMake 构建文件与中间产物：`Build/<preset>/`，由 CMake 自行管理
 
 例如：
 
 ```
-Bin/Debug-windows-x86_64/Hachimi-Editor.exe
-Bin/Debug-windows-x86_64/Hachimi-Player.exe
-Bin/Release-windows-x86_64/Hachimi-Editor.exe
-Bin/Release-windows-x86_64/Hachimi-Player.exe
+Build/x64-debug/bin/Hachimi-Editor.exe
+Build/x64-debug/bin/Hachimi-Player.exe
+Build/x64-release/bin/Hachimi-Editor.exe
+Build/x64-release/bin/Hachimi-Player.exe
 ```
+
+着色器与 UI 字体会在每次构建后自动拷贝到各可执行文件所在目录。
+
+### 验证
+
+```
+Build/x64-debug/bin/Hachimi-Tests.exe
+```
+
+`Hachimi-Tests` 执行无界面的包往返与虚拟文件系统校验，全部通过时退出码为 0。
 
 ### 运行
 
@@ -197,27 +224,35 @@ Player 同时提供无窗口模式，让导出构建在没有 GPU 的情况下�
 ## 仓库结构
 
 ```text
+CMakeLists.txt           # 唯一构建入口（也是唯一的 project() 调用）
+CMakePresets.json        # x64-debug / x64-release 的配置与构建预设
 Hachimi-Engine/          # 引擎核心（静态库）
+  CMakeLists.txt
   Resources/Shaders/     # 引擎内置 GLSL 着色器
+  Resources/Fonts/       # 编辑器 UI 字体（Inter）及其许可证
   Source/                # 引擎源码
   Source/Packaging/      # 游戏导出配置、.hpak 格式与读写实现
   Source/Scripting/      # 语言无关脚本核心与 Lua 后端
-  Vendor/                # 引擎使用的第三方库
-  Vendor/Lua/            # Lua 5.4 运行时
-  Vendor/sol2/           # C++ Lua 绑定（header-only）
-  Vendor/zstd/           # Zstandard：资源包压缩与 xxHash
 Hachimi-Editor/          # 编辑器客户端（可执行文件）
+  CMakeLists.txt
   Source/                # 编辑器源码
-  Vendor/                # 编辑器使用的第三方库
 Hachimi-Player/          # 导出构建使用的独立游戏运行时
+  CMakeLists.txt
   Source/                # Player 源码
 Hachimi-Tests/           # 无窗口验证目标（资源包往返、虚拟文件系统）
+  CMakeLists.txt
   Source/                # 测试源码
-Vendor/Premake/          # Premake5 工具链
-Bin/                     # 构建产物（gitignore）
-Vendor/Downloads/        # 第三方库下载暂存区（gitignore）
+Vendor/                  # 全部第三方库，每个库一个目录
+  Box3D/ EnTT/ GLAD/ GLFW/ ImGuizmo/ Lua/
+  NativeFileDialogExtended/ glm/ imgui/ sol2/ spdlog/ stb/ yaml-cpp/ zstd/
+Build/                   # 构建产物，每个预设一个目录（gitignore）
 Utils/                   # 临时调试工具（FramebufferTest 帧缓冲测试、UIAutomation UI 自动化）
 ```
+
+每个第三方库都通过 `add_subdirectory` 引入并导出自己的 CMake target，因此 include
+路径随 target 传递，不再逐个工程手写。GLAD、Lua、stb 与 imgui 未提供可用的
+`CMakeLists.txt`，这四个目录下各有一个本项目自己维护的薄文件；`Vendor/zstd/CMakeLists.txt`
+则转发到 zstd 位于 `build/cmake/` 的自有工程。
 
 ## 当前范围说明
 
@@ -261,6 +296,6 @@ Hachimi-Engine 建立在以下开源项目之上，感谢所有作者与贡献�
 - [stb](https://github.com/nothings/stb) — 单头文件图像库
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp) — YAML 序列化
 - [Inter](https://github.com/rsms/inter) — 编辑器字体，SIL Open Font License 1.1 许可
-- [Premake5](https://github.com/premake/premake-core) — 构建系统生成工具
+- [CMake](https://cmake.org/) — 构建系统
 
 各第三方库的许可证见其对应 `Vendor` 目录下的 `LICENSE` 文件。

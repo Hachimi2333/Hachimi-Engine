@@ -6,54 +6,83 @@ All contributors and automated agents must follow these rules.
 ## General Constraints
 
 - Language standard: C++20.
-- Build system: Premake5, generating Visual Studio 2026 solutions only.
+- Build system: CMake (3.28 or newer) driven by `CMakePresets.json`.
 - Configurations: Debug and Release only.
 - Architecture: x86_64 only.
 - Target platform: Windows.
 - Engine core output: static library `Hachimi-Engine.lib`.
 - Editor output: console executable `Hachimi-Editor.exe`.
-- Output directory: `Bin/<configuration>-<system>-<architecture>`.
-- Intermediate directory: `Bin/Obj/<configuration>-<system>-<architecture>/<ProjectName>`.
-- Vendor projects must follow the same output/intermediate directory convention.
+- Output directory: `Build/<preset>/bin/`, where `<preset>` is the configure preset name
+  (for example `Build/x64-debug/bin/`).
+- Build files and intermediate objects live under `Build/<preset>/`; CMake manages the
+  per-target intermediate directories, so there is no separate `obj` tree to maintain.
 
 ## Build Environment and Commands
 
 - Visual Studio 2026 Community install directory:
   `C:\Program Files\Microsoft Visual Studio\18\Community`
-- MSBuild x64 executable:
-  `C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe`
+- The build runs Ninja directly on the MSVC toolset. CMake and Ninja ship with Visual
+  Studio 2026 and are on `PATH` inside a VS 2026 Developer Command Prompt:
+  - `C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe`
+  - `C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe`
 - MSVC compiler executable:
   `C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x64\cl.exe`
 
-Generate the solution from the repository root:
+Configure and build Debug from a VS 2026 Developer Command Prompt in the repository root:
 
 ```
-cmd /c GenerateSolution.bat
+cmake --preset x64-debug
+cmake --build --preset x64-debug
 ```
 
-or run Premake directly:
+Configure and build Release:
 
 ```
-Vendor\Premake\Bin\premake5.exe vs2026 --file=premake5.lua
+cmake --preset x64-release
+cmake --build --preset x64-release
 ```
 
-Build Debug:
+Run the headless verification target:
 
 ```
-"C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe" Hachimi-Engine.slnx -p:Configuration=Debug -p:Platform=x64 -v:minimal -nologo
+Build/x64-debug/bin/Hachimi-Tests.exe
 ```
 
-Build Release:
+The presets drive Ninja themselves: no Visual Studio solution and no MSBuild project is
+generated at any point, and `cmake --build` is the only build command used. `x64-debug` and
+`x64-release` are single-config presets, so the configuration is fixed when the build tree
+is created. Opening the repository folder in Visual Studio 2026 or VS Code reads the same
+`CMakePresets.json`.
 
-```
-"C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe" Hachimi-Engine.slnx -p:Configuration=Release -p:Platform=x64 -v:minimal -nologo
-```
+Build-system notes:
 
-When using the VS 2026 Developer Command Prompt, `msbuild Hachimi-Engine.slnx -p:Configuration=Debug -p:Platform=x64` is equivalent.
+- The build passes `/showIncludes` nowhere, which the root `CMakeLists.txt` arranges in two
+  places: the flag is stripped from `CMAKE_DEPFILE_FLAGS_C` and `CMAKE_DEPFILE_FLAGS_CXX`, and
+  `CMAKE_CXX_SCAN_FOR_MODULES` is switched `OFF`. cl.exe prints the header list of every
+  translation unit when the flag is passed, and ninja can only delete those lines by matching an
+  `msvc_deps_prefix` that CMake stores in `CMakeFiles/rules.ninja`; that prefix is captured in
+  the code page the build tree was configured under and does not have to match the one the
+  compiler writes while building, in which case the log fills with `注意: 包含文件:` lines.
+  Compile rules and the C++20 module scan are the only steps the flag can enter through, so with
+  both switched off no header list is printed at all. Do not add the flag back, and keep module
+  scanning off while no source imports a module (re-enabling it needs a toolchain that reports in
+  English, where the prefix is plain ASCII).
+- Ninja therefore learns nothing about headers: editing a header does not recompile the
+  sources that include it. Rebuild instead of Build after changing a header, otherwise stale
+  object files stay in the build tree.
+- The root `CMakeLists.txt` holds the one helper the first-party directories call, named after
+  what it does: `set_common_compile_options`. Do not introduce project-prefixed helper names.
+- Runtime resources are copied by the single `copy_runtime_resources` custom target that the
+  executables depend on. Copying them from a POST_BUILD step of each executable makes three
+  parallel copies of one directory into the shared output directory, which fails with
+  "Permission denied" while the executables link at the same time.
+- `x64-debug` and `x64-release` inherit the Segment Heap manifest injection from Visual
+  Studio's own `SegmentHeap.cmake`; it is a tool-owned include, not part of this repository.
 
 ## Testing and Verification
 
-- Automated agents must verify changes by generating the solution and building Debug and Release.
+- Automated agents must verify changes by configuring with CMake and building both Debug
+  and Release, then running `Hachimi-Tests.exe` and confirming it exits with code 0.
 - Automated agents must not perform complex GUI tests such as image recognition, screenshot analysis, or pixel-based clicking.
 - Leave interactive editor behavior verification to the user; user testing is faster and more reliable.
 
@@ -91,10 +120,39 @@ When using the VS 2026 Developer Command Prompt, `msbuild Hachimi-Engine.slnx -p
 
 ## Vendor Libraries
 
-- Vendor folder names may keep their official third-party naming; do not rename files or folders inside Vendor.
-- Never modify third-party library files.
-- Non-header-only vendor libraries must have their own `premake5.lua` project file.
-- Keep only sources required for compilation and the LICENSE files; remove examples, tests, docs, and other non-essential files.
+- All third-party libraries live in the single root `Vendor/` directory, one directory per
+  library, using the library's official name.
+- Vendor folder names may keep their official third-party naming; do not rename files or folders inside `Vendor`.
+- Never modify third-party library files, with one documented exception: a library's own
+  `CMakeLists.txt` may receive a small, clearly marked fix when the upstream file cannot
+  work as a subproject. Existing examples are the CRT alignment in `Vendor/Box3D/CMakeLists.txt`
+  and the imgui link in `Vendor/ImGuizmo/CMakeLists.txt`.
+- Prefer each library's own `CMakeLists.txt`; it is added with `add_subdirectory` from the
+  root `CMakeLists.txt`. Do not rewrite an upstream CMake project as a hand-written target.
+- Only when a library ships no usable `CMakeLists.txt` at the directory it is added from does
+  the project own a thin one, placed inside that library's own directory: `Vendor/GLAD`,
+  `Vendor/Lua`, `Vendor/stb`, `Vendor/imgui` and `Vendor/zstd`.
+- `Vendor/sol2` must remain the last library added with `add_subdirectory`. Its
+  `CMAKE_PROJECT_INCLUDE` assignment breaks any `project()` call processed after it.
+  `Vendor/imgui` must be added before `Vendor/ImGuizmo` so the `imgui` target exists.
+- Never call `project()` in any directory below the root: `Vendor/sol2` sets
+  `CMAKE_PROJECT_INCLUDE`, and CMake applies that variable to every subsequent `project()`
+  call no matter how deep it is.
+- Keep only sources required for compilation and the LICENSE files; remove examples, tests,
+  docs, and other non-essential files. Other-platform sources (Linux/macOS, unused rendering
+  backends) are still sources: keep them.
+  A trimmed library directory holds exactly: source and header files (including the
+  other-platform and unused-backend ones), the build inputs its own `CMakeLists.txt` refers to
+  (`*.in` templates, `*.cmake` modules, `*.xml` protocol definitions), the debugger `.natvis`
+  files a library's own `CMakeLists.txt` adds to its target (currently only
+  `Vendor/Box3D/src/box3d.natvis`, which `Vendor/Box3D/src/CMakeLists.txt` passes to
+  `target_sources` on MSVC), and the license or attribution files. Files that belong to
+  another build system (Bazel, Meson, Conan, Make, BUCK, `VS2008`/`VS_scripts` projects), CI
+  configuration, editor or formatting configuration, upstream helper scripts, documentation,
+  logos, and sample or test data are removed. Check every candidate against the library's own
+  `CMakeLists.txt` before deleting it.
+- Third-party include paths are never spelled out by hand. Link the library's target and let
+  it publish its own include directories.
 
 ## Logging
 

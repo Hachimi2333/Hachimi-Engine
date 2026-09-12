@@ -1,12 +1,22 @@
-# Build output (repository root only; keeps Vendor/Premake/Bin tracked)
-/Bin/
+# Build output (all presets write under Build/)
+/Build/
 
-# Premake generated Visual Studio files
-*.sln
-*.vcxproj
-*.vcxproj.filters
-*.vcxproj.user
+# CMake artefacts (in case an out-of-source configure drops them here)
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+_deps/
+.cache/
+compile_commands.json
+install_manifest.txt
+
+# Local preset overrides
+CMakeUserPresets.json
+
+# Visual Studio / CMake integration
 .vs/
+out/
 
 # Temporary library download area
 Vendor/Downloads/
@@ -15,6 +25,8 @@ Vendor/Downloads/
 Utils/**/*.obj
 Utils/**/*.exe
 Utils/**/*.log
+Utils/**/*.pdb
+Utils/**/*.ilk
 
 # OS / editor junk
 Thumbs.db
@@ -22,7 +34,4 @@ Desktop.ini
 *.suo
 *.user
 *.userosscache
-*.sln.docstates
 imgui.ini
-
-*.slnx
