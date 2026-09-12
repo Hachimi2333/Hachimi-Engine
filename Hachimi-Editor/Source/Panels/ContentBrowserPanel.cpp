@@ -130,7 +130,11 @@ namespace HachimiEngine
 
     void ContentBrowserPanel::Draw(EditorLayer* owner, EditorContext& context)
     {
-        ImGui::Begin("Content Browser");
+        if (!ImGui::Begin("Content Browser"))
+        {
+            ImGui::End();
+            return;
+        }
 
         const std::filesystem::path assetsDirectory = AssetManager::GetAssetsDirectory();
         if (m_CurrentDirectory.empty() || assetsDirectory.empty())

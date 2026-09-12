@@ -1,5 +1,7 @@
 #include "Components/InspectorWidgets.h"
 
+#include "ImGui/ThemeConfig.h"
+
 #include <algorithm>
 #include <cfloat>
 
@@ -9,12 +11,12 @@ namespace HachimiEngine
     {
         const ImVec2 buttonSize { ImGui::GetFrameHeight(), ImGui::GetFrameHeight() };
 
-        // Semantic colors live in ThemeConfig; these four are the shared "destructive action"
-        // state and are kept together with the widget that owns them.
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4 { 0.0f, 0.0f, 0.0f, 0.0f });
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4 { 0.78f, 0.20f, 0.20f, 0.35f });
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4 { 0.90f, 0.25f, 0.25f, 0.55f });
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4 { 0.72f, 0.75f, 0.79f, 1.0f });
+        // The destructive-button palette belongs to the theme, not to this widget.
+        const ThemeConfig::SemanticColors& colors = ThemeConfig::GetColors();
+        ImGui::PushStyleColor(ImGuiCol_Button, colors.DestructiveButton);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colors.DestructiveButtonHovered);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, colors.DestructiveButtonActive);
+        ImGui::PushStyleColor(ImGuiCol_Text, colors.DestructiveButtonText);
         const bool clicked = ImGui::Button("X", buttonSize);
         ImGui::PopStyleColor(4);
 

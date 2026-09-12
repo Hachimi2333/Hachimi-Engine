@@ -10,7 +10,9 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <chrono>
 #include <filesystem>
+#include <thread>
 #include <string>
 #include <vector>
 
@@ -224,6 +226,74 @@ TEST_CASE("reading a package never extracts it")
     {
         CHECK(FileSystem::Exists(extractionCache) == cacheExistedBefore);
     }
+}
+
+TEST_CASE("a borrowed mapping outlives the mount it came from")
+{
+    VirtualFileSystem::UnmountAll();
+
+    FileMapping mapping;
+    std::vector<uint8_t> expected;
+
+    {
+        ScopedArchiveMount mount;
+        REQUIRE(mount.IsMounted());
+
+        const std::filesystem::path storedPath = mount.MountPoint() / StoredEntry;
+        REQUIRE(VirtualFileSystem::IsPackagedPath(storedPath));
+        REQUIRE(VirtualFileSystem::MapFile(storedPath, mapping));
+        REQUIRE(mapping.IsValid());
+
+        REQUIRE(VirtualFileSystem::ReadBinaryFile(storedPath, expected));
+    }
+
+    // The mount is gone, so a stored entry's zero copy view points into the package memory map.
+    // The view has to keep that map alive: reading it here used to read unmapped memory.
+    CHECK_FALSE(VirtualFileSystem::IsArchiveMounted());
+    REQUIRE(mapping.IsValid());
+    CHECK(mapping.Size() == expected.size());
+    CHECK(SameBytes(expected, std::vector<uint8_t>(mapping.Data(), mapping.Data() + mapping.Size())));
+}
+
+TEST_CASE("submitting without pumping is refused instead of growing without bound")
+{
+    VirtualFileSystem::UnmountAll();
+    ScopedArchiveMount mount;
+    REQUIRE(mount.IsMounted());
+
+    // A one byte entry keeps the test cheap even though it fills the queue.
+    const std::filesystem::path path = mount.MountPoint() / "Data/one_byte.bin";
+
+    // Every request is queued but never dispatched, which is what a caller that forgets to pump
+    // would do. The limit has to be reported through a zero request id rather than by dropping
+    // callbacks later.
+    uint64_t lastRequestId = 1;
+    size_t accepted = 0;
+    for (size_t index = 0; index < 8192; ++index)
+    {
+        lastRequestId = VirtualFileSystem::ReadFileAsync(path, [](bool, std::vector<uint8_t>&&) {});
+        if (lastRequestId == 0)
+        {
+            break;
+        }
+        ++accepted;
+    }
+
+    CHECK(accepted > 0);
+    CHECK(accepted < 8192);
+    CHECK(lastRequestId == 0);
+
+    // Draining releases the quota again. The workers are still finishing reads, so the queue is
+    // pumped until it settles rather than assuming one pass is enough.
+    for (int attempt = 0; attempt < 5000 && VirtualFileSystem::GetPendingRequestCount() > 0; ++attempt)
+    {
+        VirtualFileSystem::PumpCompletedRequests();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    CHECK(VirtualFileSystem::GetPendingRequestCount() == 0);
+    CHECK(VirtualFileSystem::ReadFileAsync(path, [](bool, std::vector<uint8_t>&&) {}) != 0);
+    VirtualFileSystem::PumpCompletedRequests();
 }
 
 TEST_SUITE_END();

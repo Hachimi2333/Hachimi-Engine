@@ -65,6 +65,14 @@ namespace HachimiEngine
         std::unordered_map<uint64_t, OutstandingRequest> s_OutstandingRequests;
         std::deque<CompletedRequest> s_CompletedRequests;
 
+        // Ceiling on requests that are queued but not yet dispatched.
+        //
+        // The completed queue is filled by workers and drained by PumpCompletedRequests, so a
+        // caller that submits without pumping would grow it without bound. Refusing the request
+        // up front is the honest failure: the caller learns its request was not queued, instead
+        // of losing the callback later.
+        constexpr size_t MaxOutstandingRequests = 4096;
+
         std::atomic<uint64_t> s_ReadCount{ 0 };
         std::atomic<uint64_t> s_BytesRead{ 0 };
         std::atomic<uint64_t> s_ArchiveReadCount{ 0 };
@@ -616,7 +624,9 @@ namespace HachimiEngine
         const ResolvedLocation location = ResolveLocation(path);
         if (location.Found && location.IsArchive)
         {
-            const bool success = location.Reader->MapEntry(location.EntryIndex, outMapping);
+            // The reader is handed to the mapping: a borrowed view into the package's memory
+            // map must keep that map alive even after the mount is released.
+            const bool success = location.Reader->MapEntry(location.EntryIndex, outMapping, location.Reader);
             if (success)
             {
                 s_ReadCount.fetch_add(1);
@@ -660,6 +670,14 @@ namespace HachimiEngine
         const uint64_t requestId = s_NextRequestId.fetch_add(1);
         {
             std::lock_guard<std::mutex> lock(s_RequestMutex);
+            if (s_OutstandingRequests.size() >= MaxOutstandingRequests)
+            {
+                HE_CORE_ERROR("Refusing async read of '{}': {} requests are already pending; is "
+                              "PumpCompletedRequests being called?",
+                    path.string(),
+                    MaxOutstandingRequests);
+                return 0;
+            }
             s_OutstandingRequests.emplace(requestId, OutstandingRequest{});
         }
         s_AsyncRequestCount.fetch_add(1);

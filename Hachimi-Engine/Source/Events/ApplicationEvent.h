@@ -44,17 +44,6 @@ namespace HachimiEngine
         int GetCategoryFlags() const override { return EventCategoryApplication; }
     };
 
-    class AppTickEvent final : public Event
-    {
-    public:
-        AppTickEvent() = default;
-
-        static EventType GetStaticType() { return EventType::AppTick; }
-        EventType GetEventType() const override { return GetStaticType(); }
-        const char* GetName() const override { return "AppTick"; }
-        int GetCategoryFlags() const override { return EventCategoryApplication; }
-    };
-
     class AppUpdateEvent final : public Event
     {
     public:

@@ -25,7 +25,7 @@ namespace HachimiEngine
         template<typename T, typename... Args>
         T& AddComponent(Args&&... args)
         {
-            HE_CORE_ASSERT(!HasComponent<T>());
+            HE_CORE_VERIFY(!HasComponent<T>());
             return m_Handle.emplace<T>(std::forward<Args>(args)...);
         }
 
@@ -38,14 +38,14 @@ namespace HachimiEngine
         template<typename T>
         T& GetComponent()
         {
-            HE_CORE_ASSERT(HasComponent<T>());
+            HE_CORE_VERIFY(HasComponent<T>());
             return m_Handle.get<T>();
         }
 
         template<typename T>
         const T& GetComponent() const
         {
-            HE_CORE_ASSERT(HasComponent<T>());
+            HE_CORE_VERIFY(HasComponent<T>());
             return m_Handle.get<T>();
         }
 

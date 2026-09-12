@@ -55,6 +55,18 @@ namespace HachimiEngine
         constexpr ImVec4 Black{ 0.000f, 0.000f, 0.000f, 1.000f };
         constexpr ImVec4 White{ 1.000f, 1.000f, 1.000f, 1.000f };
 
+        // Semantic colors used by panels for widget states the ImGuiCol_ table cannot express,
+        // such as a destructive button. They live here so a palette change reaches every panel.
+        constexpr ThemeConfig::SemanticColors SemanticPalette{
+            /* DestructiveButton */ ImVec4{ 0.000f, 0.000f, 0.000f, 0.000f },
+            /* DestructiveButtonHovered */ ImVec4{ 0.780f, 0.200f, 0.200f, 0.350f },
+            /* DestructiveButtonActive */ ImVec4{ 0.900f, 0.250f, 0.250f, 0.550f },
+            /* DestructiveButtonText */ ImVec4{ 0.720f, 0.750f, 0.790f, 1.000f },
+            /* ErrorText */ ImVec4{ 0.950f, 0.450f, 0.450f, 1.000f },
+            /* WarningText */ ImVec4{ 1.000f, 0.761f, 0.278f, 1.000f },
+            /* SuccessText */ ImVec4{ 0.450f, 0.850f, 0.520f, 1.000f }
+        };
+
         struct ColorEntry
         {
             ImGuiCol Index;
@@ -227,6 +239,11 @@ namespace HachimiEngine
             style.CurveTessellationTol = 1.25f;
             style.CircleTessellationMaxError = 0.30f;
         }
+    }
+
+    const ThemeConfig::SemanticColors& ThemeConfig::GetColors()
+    {
+        return SemanticPalette;
     }
 
     void ThemeConfig::Apply(ImGuiStyle& style)

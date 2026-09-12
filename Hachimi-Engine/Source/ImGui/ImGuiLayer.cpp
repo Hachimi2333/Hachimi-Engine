@@ -33,7 +33,12 @@ namespace HachimiEngine
 
         std::filesystem::path GetIconFontPath()
         {
-            return "C:/Windows/Fonts/segmdl2.ttf";
+            // Segoe MDL2 Assets is a Windows system font, so it is looked up under the Windows
+            // directory rather than shipped with the editor. MergeIconFont falls back to text
+            // glyphs when it is not installed.
+            const char* windowsDirectory = std::getenv("WINDIR");
+            const std::filesystem::path root = windowsDirectory != nullptr ? windowsDirectory : "C:/Windows";
+            return root / "Fonts" / "segmdl2.ttf";
         }
 
         // Copies font bytes into memory owned by the ImGui atlas. ImGui frees the

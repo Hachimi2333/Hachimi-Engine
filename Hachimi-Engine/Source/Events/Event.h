@@ -14,7 +14,6 @@ namespace HachimiEngine
         WindowFocus,
         WindowLostFocus,
         WindowMoved,
-        AppTick,
         AppUpdate,
         AppRender,
         KeyPressed,

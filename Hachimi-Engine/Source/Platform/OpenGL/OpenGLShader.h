@@ -5,6 +5,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace HachimiEngine
 {
@@ -38,5 +39,7 @@ namespace HachimiEngine
         uint32_t m_RendererID = 0;
         std::string m_Name;
         mutable std::unordered_map<std::string, int> m_UniformLocationCache;
+        // Names already reported as missing, so a typo warns once rather than every frame.
+        mutable std::unordered_set<std::string> m_ReportedMissingUniforms;
     };
 }

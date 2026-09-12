@@ -115,6 +115,9 @@ namespace HachimiEngine
         void DestroyChildren(entt::entity entity);
         void CollectLights(LightingEnvironment& outLighting) const;
 
+        // Composes the parent chain, guarding against a malformed or over-long one.
+        Math::Mat4 GetWorldTransformRecursive(entt::entity entity, size_t depth) const;
+
         // True when making parentUUID the parent of child would close a loop.
         bool WouldCreateCycle(entt::entity child, UUID parentUUID) const;
 

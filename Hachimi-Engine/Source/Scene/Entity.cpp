@@ -12,7 +12,7 @@ namespace HachimiEngine
     entt::registry& Entity::GetRegistry() const
     {
         entt::registry* registry = m_Handle.registry();
-        HE_CORE_ASSERT(registry != nullptr);
+        HE_CORE_VERIFY(registry != nullptr);
         return *registry;
     }
 }

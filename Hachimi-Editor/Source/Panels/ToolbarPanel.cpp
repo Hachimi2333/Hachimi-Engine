@@ -10,7 +10,11 @@ namespace HachimiEngine
 {
     void ToolbarPanel::Draw(EditorLayer* owner, EditorContext& context)
     {
-        ImGui::Begin("Toolbar");
+        if (!ImGui::Begin("Toolbar"))
+        {
+            ImGui::End();
+            return;
+        }
 
         ImGui::TextUnformatted("Gizmo:");
 

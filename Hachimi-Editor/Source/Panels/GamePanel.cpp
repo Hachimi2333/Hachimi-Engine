@@ -83,7 +83,11 @@ namespace HachimiEngine
     {
         ImGui::SetNextWindowSizeConstraints(ImVec2(320.0f, 240.0f), ImVec2(FLT_MAX, FLT_MAX));
         ImGui::SetNextWindowSize(ImVec2(1280.0f, 720.0f), ImGuiCond_FirstUseEver);
-        ImGui::Begin("Game");
+        if (!ImGui::Begin("Game"))
+        {
+            ImGui::End();
+            return;
+        }
 
         const ImVec2 availableSize = ImGui::GetContentRegionAvail();
         const ImVec2 viewportSize(

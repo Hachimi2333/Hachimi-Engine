@@ -285,6 +285,20 @@ namespace HachimiEngine
 
     Math::Mat4 Scene::GetWorldTransform(entt::entity entity) const
     {
+        return GetWorldTransformRecursive(entity, 0);
+    }
+
+    Math::Mat4 Scene::GetWorldTransformRecursive(entt::entity entity, size_t depth) const
+    {
+        // Release-active: a missing transform would otherwise be read as garbage rather than
+        // reported, and the hierarchy below assumes every entity has one.
+        HE_CORE_VERIFY(m_Registry.valid(entity));
+        HE_CORE_VERIFY(m_Registry.all_of<TransformComponent>(entity));
+
+        // A parent chain longer than the guard is a malformed file rather than a deep scene, and
+        // recursing into it would overflow the stack.
+        HE_CORE_VERIFY(depth < MaxHierarchyDepth);
+
         Math::Mat4 transform = m_Registry.get<TransformComponent>(entity).GetTransform();
 
         const auto* relationship = m_Registry.try_get<RelationshipComponent>(entity);
@@ -293,7 +307,7 @@ namespace HachimiEngine
             const auto parentIt = m_EntityMap.find(relationship->Parent);
             if (parentIt != m_EntityMap.end())
             {
-                transform = GetWorldTransform(parentIt->second) * transform;
+                transform = GetWorldTransformRecursive(parentIt->second, depth + 1) * transform;
             }
         }
 

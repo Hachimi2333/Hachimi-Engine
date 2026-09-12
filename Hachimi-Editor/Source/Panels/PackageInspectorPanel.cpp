@@ -5,6 +5,7 @@
 #include "Utils/FileSystem.h"
 #include "Utils/PlatformUtils.h"
 
+#include "ImGui/ThemeConfig.h"
 #include <imgui.h>
 
 #include <algorithm>
@@ -155,7 +156,7 @@ namespace HachimiEngine
         {
             if (m_StatusIsError)
             {
-                ImGui::TextColored(ImVec4(0.95f, 0.45f, 0.45f, 1.0f), "%s", m_StatusMessage.c_str());
+                ImGui::TextColored(ThemeConfig::GetColors().ErrorText, "%s", m_StatusMessage.c_str());
             }
             else
             {

@@ -226,6 +226,15 @@ namespace HachimiEngine
         }
 
         const int location = glGetUniformLocation(m_RendererID, name.c_str());
+
+        // A miss is cached as -1 by the driver too, so a typo would otherwise stay silent
+        // forever. Report it once per name instead of warning on every frame.
+        if (location == -1 && !m_ReportedMissingUniforms.contains(name))
+        {
+            m_ReportedMissingUniforms.insert(name);
+            HE_CORE_WARN("Shader '{}' has no uniform named '{}'; the write is ignored", m_Name, name);
+        }
+
         m_UniformLocationCache[name] = location;
         return location;
     }

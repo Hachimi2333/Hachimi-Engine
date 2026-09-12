@@ -16,7 +16,11 @@ namespace HachimiEngine
 {
     void SceneHierarchyPanel::Draw(EditorContext& context)
     {
-        ImGui::Begin("Scene Hierarchy");
+        if (!ImGui::Begin("Scene Hierarchy"))
+        {
+            ImGui::End();
+            return;
+        }
 
         if (context.ActiveScene == nullptr)
         {

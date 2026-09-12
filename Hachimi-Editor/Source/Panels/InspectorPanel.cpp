@@ -47,7 +47,11 @@ namespace HachimiEngine
 
     void InspectorPanel::Draw(EditorContext& context)
     {
-        ImGui::Begin("Inspector");
+        if (!ImGui::Begin("Inspector"))
+        {
+            ImGui::End();
+            return;
+        }
 
         if (!context.SelectedEntity || context.ActiveScene == nullptr)
         {

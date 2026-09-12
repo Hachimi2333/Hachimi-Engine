@@ -204,7 +204,11 @@ namespace HachimiEngine
         // Keep the viewport usable even when a stale layout saved a collapsed size.
         ImGui::SetNextWindowSizeConstraints(ImVec2(320.0f, 240.0f), ImVec2(FLT_MAX, FLT_MAX));
         ImGui::SetNextWindowSize(ImVec2(1280.0f, 720.0f), ImGuiCond_FirstUseEver);
-        ImGui::Begin("Viewport");
+        if (!ImGui::Begin("Viewport"))
+        {
+            ImGui::End();
+            return;
+        }
 
         const ImVec2 availableSize = ImGui::GetContentRegionAvail();
         const ImVec2 viewportSize(

@@ -61,8 +61,10 @@ namespace HachimiEngine
         bool HasDirectory(std::string_view directory) const;
 
         bool ReadEntry(size_t entryIndex, std::vector<uint8_t>& outData) const;
-        // Zero copy for stored entries backed by the memory mapping.
-        bool MapEntry(size_t entryIndex, FileMapping& outMapping) const;
+        // Zero copy for stored entries backed by the memory mapping. Keeping the reader alive for
+        // as long as the borrowed view is what makes the view safe: without it, unmounting the
+        // package would release the mapping under a live FileMapping.
+        bool MapEntry(size_t entryIndex, FileMapping& outMapping, std::shared_ptr<const PackageReader> owner = nullptr) const;
         // Partial read served by the entry block table.
         bool ReadEntryRange(size_t entryIndex, uint64_t offset, uint64_t size, std::vector<uint8_t>& outData) const;
         Scope<PackageEntryStream> OpenEntryStream(size_t entryIndex) const;

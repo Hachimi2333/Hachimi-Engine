@@ -777,7 +777,7 @@ namespace HachimiEngine
         return true;
     }
 
-    bool PackageReader::MapEntry(size_t entryIndex, FileMapping& outMapping) const
+    bool PackageReader::MapEntry(size_t entryIndex, FileMapping& outMapping, std::shared_ptr<const PackageReader> owner) const
     {
         outMapping.Reset();
 
@@ -798,7 +798,8 @@ namespace HachimiEngine
             }
 
             outMapping = FileMapping::Borrow(m_Impl->MappedData + entry.DataOffset,
-                static_cast<size_t>(entry.UncompressedSize));
+                static_cast<size_t>(entry.UncompressedSize),
+                std::move(owner));
             return true;
         }
 

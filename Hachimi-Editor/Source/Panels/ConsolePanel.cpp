@@ -27,7 +27,11 @@ namespace HachimiEngine
 
     void ConsolePanel::Draw()
     {
-        ImGui::Begin("Console");
+        if (!ImGui::Begin("Console"))
+        {
+            ImGui::End();
+            return;
+        }
 
         if (ImGui::Button("Clear"))
         {
