@@ -4,6 +4,7 @@
 #include "Core/Application.h"
 #include "Core/Log.h"
 #include "Project/ProjectManager.h"
+#include "Renderer/RendererContext.h"
 #include "Scene/Scene.h"
 
 #include <ImGuizmo.h>
@@ -69,6 +70,12 @@ namespace HachimiEngine
         m_Context.PlayState = EditorPlayState::Stopped;
         m_Context.Camera.SetViewportSize(Application::Get().GetWindow().GetWidth(), Application::Get().GetWindow().GetHeight());
         m_ConsolePanel.RegisterCallbacks();
+
+        // Both panels render the same scene from different cameras, so each gets its own
+        // SceneRenderer; only the GPU resources behind them are shared.
+        RendererContext& rendererContext = Application::Get().GetRendererContext();
+        m_ViewportPanel.Init(rendererContext);
+        m_GamePanel.Init(rendererContext);
 
         HE_CLIENT_INFO("Editing project: {}", project->GetName());
     }

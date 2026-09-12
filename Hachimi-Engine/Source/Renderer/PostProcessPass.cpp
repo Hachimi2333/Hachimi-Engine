@@ -7,38 +7,34 @@
 
 namespace HachimiEngine
 {
-    Ref<Shader> PostProcessPass::s_Shader;
-    uint32_t PostProcessPass::s_VertexArray = 0;
-    float PostProcessPass::s_Exposure = 1.0f;
-
-    void PostProcessPass::Init()
+    PostProcessPass::PostProcessPass()
     {
-        s_Shader = Shader::CreateEngineShader("PostProcess.glsl");
-        glCreateVertexArrays(1, &s_VertexArray);
+        m_Shader = Shader::CreateEngineShader("PostProcess.glsl");
+        glCreateVertexArrays(1, &m_VertexArray);
     }
 
-    void PostProcessPass::Shutdown()
+    PostProcessPass::~PostProcessPass()
     {
-        if (s_VertexArray != 0)
+        if (m_VertexArray != 0)
         {
-            glDeleteVertexArrays(1, &s_VertexArray);
-            s_VertexArray = 0;
+            glDeleteVertexArrays(1, &m_VertexArray);
+            m_VertexArray = 0;
         }
 
-        s_Shader.reset();
+        m_Shader.reset();
     }
 
-    void PostProcessPass::Render(uint32_t inputTexture)
+    void PostProcessPass::Render(uint32_t inputTexture, float exposure)
     {
-        HE_CORE_ASSERT(s_Shader != nullptr);
-        HE_CORE_ASSERT(s_VertexArray != 0);
+        HE_CORE_ASSERT(m_Shader != nullptr);
+        HE_CORE_ASSERT(m_VertexArray != 0);
 
-        s_Shader->Bind();
-        s_Shader->SetInt("u_SceneTexture", 0);
-        s_Shader->SetFloat("u_Exposure", s_Exposure);
+        m_Shader->Bind();
+        m_Shader->SetInt("u_SceneTexture", 0);
+        m_Shader->SetFloat("u_Exposure", exposure);
 
         glBindTextureUnit(0, inputTexture);
-        glBindVertexArray(s_VertexArray);
+        glBindVertexArray(m_VertexArray);
         glDrawArrays(GL_TRIANGLES, 0, 3);
     }
 }

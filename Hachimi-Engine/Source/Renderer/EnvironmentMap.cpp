@@ -113,6 +113,11 @@ namespace HachimiEngine
         m_Prefiltered->Bind(slot);
     }
 
+    bool EnvironmentMap::HasContent() const
+    {
+        return m_Skybox != nullptr && m_Irradiance != nullptr && m_Prefiltered != nullptr;
+    }
+
     uint32_t EnvironmentMap::GetSkyboxRendererID() const
     {
         return m_Skybox->GetRendererID();

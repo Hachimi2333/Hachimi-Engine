@@ -3,25 +3,31 @@
 #include "Core/Base.h"
 #include "Core/Memory.h"
 
+#include <cstdint>
+
 namespace HachimiEngine
 {
     class Shader;
 
     // Fullscreen pass that applies tone mapping and gamma encoding to an HDR scene texture.
+    //
+    // The exposure is passed in per call rather than stored, so two views rendered in the
+    // same frame (editor viewport and game panel) cannot overwrite each other's setting.
     class PostProcessPass
     {
     public:
-        static void Init();
-        static void Shutdown();
+        // Creates the program and the empty vertex array; needs a current GL context.
+        PostProcessPass();
+        ~PostProcessPass();
 
-        static void Render(uint32_t inputTexture);
+        PostProcessPass(const PostProcessPass&) = delete;
+        PostProcessPass& operator=(const PostProcessPass&) = delete;
 
-        static void SetExposure(float exposure) { s_Exposure = exposure; }
-        static float GetExposure() { return s_Exposure; }
+        // Draws the source texture into the currently bound framebuffer.
+        void Render(uint32_t inputTexture, float exposure);
 
     private:
-        static Ref<Shader> s_Shader;
-        static uint32_t s_VertexArray;
-        static float s_Exposure;
+        Ref<Shader> m_Shader;
+        uint32_t m_VertexArray = 0;
     };
 }

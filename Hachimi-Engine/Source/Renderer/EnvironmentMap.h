@@ -19,6 +19,10 @@ namespace HachimiEngine
         void BindIrradiance(uint32_t slot) const;
         void BindPrefiltered(uint32_t slot) const;
 
+        // False when the cubemaps could not be generated, in which case the renderer
+        // skips the skybox and image-based lighting instead of binding nothing.
+        bool HasContent() const;
+
         uint32_t GetSkyboxRendererID() const;
         uint32_t GetIrradianceRendererID() const;
         uint32_t GetPrefilteredRendererID() const;

@@ -20,7 +20,9 @@ namespace HachimiEngine
         static void SetClearColor(const Math::Vec4& color);
         static void Clear();
         static void SetDepthTest(bool enabled);
+        static void SetBlend(bool enabled);
         static void SetPolygonOffset(bool enabled, float factor = 0.0f, float units = 0.0f);
+        static void BindTextureUnit(uint32_t unit, uint32_t textureRendererID);
         static void DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount = 0, DrawMode drawMode = DrawMode::Triangles);
 
         static RendererAPIType GetAPI();

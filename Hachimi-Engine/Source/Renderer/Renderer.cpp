@@ -39,9 +39,19 @@ namespace HachimiEngine
         s_RendererAPI->SetDepthTest(enabled);
     }
 
+    void Renderer::SetBlend(bool enabled)
+    {
+        s_RendererAPI->SetBlend(enabled);
+    }
+
     void Renderer::SetPolygonOffset(bool enabled, float factor, float units)
     {
         s_RendererAPI->SetPolygonOffset(enabled, factor, units);
+    }
+
+    void Renderer::BindTextureUnit(uint32_t unit, uint32_t textureRendererID)
+    {
+        s_RendererAPI->BindTextureUnit(unit, textureRendererID);
     }
 
     void Renderer::DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount, DrawMode drawMode)

@@ -39,6 +39,10 @@ namespace HachimiEngine
         void Add(const std::string& name, const Ref<Shader>& shader);
         Ref<Shader> Load(const std::string& filepath);
         Ref<Shader> Load(const std::string& name, const std::string& filepath);
+        // Loads one of the engine-owned shaders, resolved through the runtime data root:
+        // Resources/Shaders in the editor, inside the game package for a packaged game.
+        // The name is the .glsl file name and doubles as the library key.
+        Ref<Shader> LoadEngineShader(const std::string& name);
 
         Ref<Shader> Get(const std::string& name);
         bool Exists(const std::string& name) const;

@@ -497,13 +497,6 @@ namespace HachimiEngine
 
             ImGui::EndTable();
         }
-
-        if (mesh.MaterialOverride != nullptr)
-        {
-            mesh.MaterialOverride->SetAlbedoColor(mesh.MaterialColor);
-            mesh.MaterialOverride->SetRoughness(mesh.Roughness);
-            mesh.MaterialOverride->SetMetallic(mesh.Metallic);
-        }
     }
 
     void InspectorPanel::DrawCamera(Entity entity)

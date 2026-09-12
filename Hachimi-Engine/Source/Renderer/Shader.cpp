@@ -51,6 +51,13 @@ namespace HachimiEngine
         return shader;
     }
 
+    Ref<Shader> ShaderLibrary::LoadEngineShader(const std::string& name)
+    {
+        const Ref<Shader> shader = Shader::CreateEngineShader(name);
+        Add(name, shader);
+        return shader;
+    }
+
     Ref<Shader> ShaderLibrary::Get(const std::string& name)
     {
         HE_CORE_ASSERT(Exists(name));

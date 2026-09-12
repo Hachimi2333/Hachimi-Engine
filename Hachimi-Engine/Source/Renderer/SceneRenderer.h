@@ -2,96 +2,57 @@
 
 #include "Core/Base.h"
 #include "Core/Memory.h"
-#include "Renderer/EditorCamera.h"
-#include "Renderer/EnvironmentSettings.h"
-#include "Renderer/Material.h"
-#include "Renderer/MeshData.h"
+#include "Renderer/Lighting.h"
+#include "Renderer/RenderView.h"
 #include "Math/Math.h"
-
-#include <array>
 
 namespace HachimiEngine
 {
-    class EnvironmentMap;
-    class MeshLibrary;
-    class ShadowMap;
+    class RendererContext;
 
-    struct DirectionalLight
-    {
-        Math::Vec3 Direction { -0.5f, -1.0f, -0.3f };
-        Math::Vec3 Color { 1.0f, 0.98f, 0.95f };
-        float Intensity = 1.4f;
-        bool CastsShadows = true;
-        float ShadowBias = 0.0005f;
-    };
-
-    struct PointLight
-    {
-        Math::Vec3 Position { 3.0f, 4.0f, 2.0f };
-        Math::Vec3 Color { 1.0f, 0.9f, 0.7f };
-        float Intensity = 12.0f;
-        float Range = 12.0f;
-    };
-
-    struct LightingEnvironment
-    {
-        DirectionalLight Directional;
-        std::array<PointLight, 4> PointLights;
-        int PointLightCount = 1;
-        Math::Vec3 AmbientColor { 0.08f, 0.08f, 0.10f };
-        float AmbientIntensity = 1.0f;
-    };
-
-    // Immediate-mode forward scene renderer used by the editor and runtime scenes.
+    // Draws one RenderView per frame into the currently bound framebuffer.
+    //
+    // The renderer holds the frame state it needs to draw (matrices, light transforms,
+    // the shadow pass flag) as instance members, so the editor viewport, the game panel
+    // and the Player each own one and cannot disturb each other. Everything that outlives
+    // a frame - shaders, built-in geometry and the GPU mesh cache - lives in the shared
+    // RendererContext it is constructed with.
     class SceneRenderer
     {
     public:
-        static void Init();
-        static void Shutdown();
+        explicit SceneRenderer(RendererContext& context);
 
-        static void BeginScene(const EditorCamera& camera);
-        static void BeginScene(const Math::Mat4& view, const Math::Mat4& projection, const Math::Vec3& cameraPosition);
-        // Geometry is submitted as CPU MeshData; the GPU mesh is uploaded and cached
-        // by the MeshLibrary on first use.
-        static void SubmitMesh(const Ref<MeshData>& mesh, const Math::Mat4& transform, const Ref<Material>& material);
-        static void DrawGrid(float size = 20.0f, uint32_t divisions = 20);
-        static void DrawSkybox();
-        static void EndScene();
+        SceneRenderer(const SceneRenderer&) = delete;
+        SceneRenderer& operator=(const SceneRenderer&) = delete;
 
-        static void BeginDirectionalShadowPass(const Math::Mat4& lightViewProjection);
-        static void SubmitShadowMesh(const Ref<MeshData>& mesh, const Math::Mat4& transform);
-        static void EndDirectionalShadowPass();
-
-        static Math::Mat4 CalculateDirectionalLightViewProjection(const Math::Vec3& cameraPosition);
-
-        static LightingEnvironment& GetLightingEnvironment() { return s_Lighting; }
-        static EnvironmentSettings& GetEnvironmentSettings() { return s_Environment; }
-        static Ref<Material> GetDefaultMaterial() { return s_DefaultMaterial; }
-        static MeshLibrary& GetMeshLibrary() { return *s_MeshLibrary; }
+        // Renders the view into whatever framebuffer is bound. Callers own the target.
+        void Render(const RenderView& view);
 
     private:
-        static void UploadLighting(const Ref<Shader>& shader, const Math::Vec3& cameraPosition);
+        // Per-frame values derived from the view, shared by the passes below.
+        struct FrameState
+        {
+            Math::Mat4 ViewProjection { 1.0f };
+            Math::Mat4 View { 1.0f };
+            Math::Mat4 Projection { 1.0f };
+            Math::Vec3 CameraPosition { 0.0f };
+            Math::Vec3 CameraForward { 0.0f, 0.0f, -1.0f };
+            Math::Mat4 DirectionalLightViewProjection { 1.0f };
+            bool DirectionalShadowEnabled = false;
+        };
+
+        void DrawDirectionalShadowPass(const RenderView& view, const FrameState& frame);
+        void DrawSkybox(const RenderView& view, const FrameState& frame);
+        void DrawGrid(const FrameState& frame);
+        void DrawItems(const RenderView& view, const FrameState& frame);
+
+        void SubmitMesh(const RenderView& view, const FrameState& frame, const RenderItem& item);
+
+        void UploadLighting(const Ref<Shader>& shader, const FrameState& frame, const LightingEnvironment& lighting);
+
+        Math::Mat4 CalculateDirectionalLightViewProjection(const FrameState& frame, const DirectionalLight& light) const;
 
     private:
-        static Ref<Shader> s_DefaultShader;
-        static Ref<Shader> s_GridShader;
-        static Ref<Shader> s_DirectionalShadowShader;
-        static Ref<Shader> s_SkyboxShader;
-        static Ref<Material> s_DefaultMaterial;
-        static Scope<MeshLibrary> s_MeshLibrary;
-        static Ref<MeshData> s_GridMesh;
-        static Ref<MeshData> s_SkyboxMesh;
-        static Ref<ShadowMap> s_DirectionalShadowMap;
-        static Ref<EnvironmentMap> s_EnvironmentMap;
-        static LightingEnvironment s_Lighting;
-        static EnvironmentSettings s_Environment;
-        static Math::Mat4 s_ViewProjection;
-        static Math::Mat4 s_View;
-        static Math::Mat4 s_Projection;
-        static Math::Vec3 s_CameraPosition;
-        static Math::Vec3 s_CameraForward;
-        static Math::Mat4 s_DirectionalLightViewProjection;
-        static bool s_DirectionalShadowEnabled;
-        static bool s_DirectionalShadowPassActive;
+        RendererContext& m_Context;
     };
 }

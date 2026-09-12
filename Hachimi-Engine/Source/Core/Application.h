@@ -9,6 +9,7 @@
 namespace HachimiEngine
 {
     class ImGuiLayer;
+    class RendererContext;
 
     // Engine entry point object: owns the window and drives the main loop.
     class Application
@@ -33,6 +34,10 @@ namespace HachimiEngine
         bool HasOverlay(Layer* overlay) const { return m_LayerStack.ContainsOverlay(overlay); }
 
         Window& GetWindow() { return *m_Window; }
+        // Renderer-side GPU resources and frame-independent render state. Valid from the
+        // constructor until the destructor, and only while a GL context is current.
+        RendererContext& GetRendererContext() { return *m_RendererContext; }
+
         static Application& Get() { return *s_Instance; }
 
     private:
@@ -48,6 +53,10 @@ namespace HachimiEngine
         bool m_Minimized = false;
 
     private:
+        // Declared after m_Window so it is destroyed before the window and its GL
+        // context, even if the destructor body is never reached.
+        Scope<RendererContext> m_RendererContext;
+
         static Application* s_Instance;
     };
 }

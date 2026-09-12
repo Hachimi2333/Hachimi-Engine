@@ -6,6 +6,8 @@
 #include "Panels/EditorContext.h"
 #include "Renderer/PostProcessPass.h"
 #include "Renderer/RenderCommand.h"
+#include "Renderer/RendererContext.h"
+#include "Renderer/SceneRenderer.h"
 #include "Scene/Components.h"
 #include "Scene/Scene.h"
 #include "Viewport/SelectionIndicators.h"
@@ -181,9 +183,17 @@ namespace HachimiEngine
         m_DisplayFramebuffer = Framebuffer::Create(displaySpecification);
     }
 
+    void ViewportPanel::Init(RendererContext& rendererContext)
+    {
+        m_Renderer = &rendererContext;
+        m_SceneRenderer = CreateScope<SceneRenderer>(rendererContext);
+    }
+
+    ViewportPanel::~ViewportPanel() = default;
+
     void ViewportPanel::RenderScene(EditorContext& context)
     {
-        if (context.ActiveScene == nullptr)
+        if (context.ActiveScene == nullptr || m_SceneRenderer == nullptr)
         {
             return;
         }
@@ -201,17 +211,21 @@ namespace HachimiEngine
         ResizeFramebufferIfNeeded(m_DisplayFramebuffer, width, height);
         context.Camera.SetViewportSize(width, height);
 
+        const RenderView view = context.ActiveScene->BuildRenderView(context.Camera, true);
+
         m_SceneFramebuffer->Bind();
         // Linear-space clear color matching the previous sRGB editor background.
         RenderCommand::SetClearColor({ 0.00719f, 0.00719f, 0.01002f, 1.0f });
         RenderCommand::Clear();
-        context.ActiveScene->OnRender(context.Camera);
-        DrawSelectionIndicators(context);
+        m_SceneRenderer->Render(view);
+        DrawSelectionIndicators(context, m_Renderer->GetDebugDraw());
         m_SceneFramebuffer->Unbind();
 
         m_DisplayFramebuffer->Bind();
         RenderCommand::Clear();
-        PostProcessPass::Render(m_SceneFramebuffer->GetColorAttachmentRendererID());
+        m_Renderer->GetPostProcessPass().Render(
+            m_SceneFramebuffer->GetColorAttachmentRendererID(),
+            view.Environment.Exposure);
         m_DisplayFramebuffer->Unbind();
     }
 

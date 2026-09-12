@@ -93,6 +93,7 @@ set(ENGINE_SOURCES
     Source/Renderer/FrameBuffer.h
     Source/Renderer/ImageDecoder.cpp
     Source/Renderer/ImageDecoder.h
+    Source/Renderer/Lighting.h
     Source/Renderer/Material.cpp
     Source/Renderer/Material.h
     Source/Renderer/Mesh.cpp
@@ -110,6 +111,9 @@ set(ENGINE_SOURCES
     Source/Renderer/Renderer.h
     Source/Renderer/RendererAPI.cpp
     Source/Renderer/RendererAPI.h
+    Source/Renderer/RendererContext.cpp
+    Source/Renderer/RendererContext.h
+    Source/Renderer/RenderView.h
     Source/Renderer/SceneRenderer.cpp
     Source/Renderer/SceneRenderer.h
     Source/Renderer/Shader.cpp

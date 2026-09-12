@@ -72,6 +72,11 @@ namespace HachimiEngine
         }
     }
 
+    void OpenGLRendererAPI::BindTextureUnit(uint32_t unit, uint32_t textureRendererID)
+    {
+        glBindTextureUnit(unit, textureRendererID);
+    }
+
     void OpenGLRendererAPI::DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount, DrawMode drawMode)
     {
         vertexArray->Bind();

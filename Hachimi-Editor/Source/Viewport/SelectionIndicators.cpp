@@ -29,19 +29,20 @@ namespace HachimiEngine
         }
 
         void DrawWorldRectangle(
+            DebugDraw& debugDraw,
             const Math::Vec3& topLeft,
             const Math::Vec3& topRight,
             const Math::Vec3& bottomRight,
             const Math::Vec3& bottomLeft,
             const Math::Vec4& color)
         {
-            DebugDraw::DrawLine(topLeft, topRight, color);
-            DebugDraw::DrawLine(topRight, bottomRight, color);
-            DebugDraw::DrawLine(bottomRight, bottomLeft, color);
-            DebugDraw::DrawLine(bottomLeft, topLeft, color);
+            debugDraw.DrawLine(topLeft, topRight, color);
+            debugDraw.DrawLine(topRight, bottomRight, color);
+            debugDraw.DrawLine(bottomRight, bottomLeft, color);
+            debugDraw.DrawLine(bottomLeft, topLeft, color);
         }
 
-        void DrawCameraIndicator(const EditorContext& context, const Math::Mat4& worldTransform)
+        void DrawCameraIndicator(DebugDraw& debugDraw, const EditorContext& context, const Math::Mat4& worldTransform)
         {
             const auto& camera = context.SelectedEntity.GetComponent<CameraComponent>();
 
@@ -74,25 +75,25 @@ namespace HachimiEngine
             const Math::Vec3 farBottomRight = farCenter - up * farHalfHeight + right * farHalfWidth;
             const Math::Vec3 farBottomLeft = farCenter - up * farHalfHeight - right * farHalfWidth;
 
-            DrawWorldRectangle(nearTopLeft, nearTopRight, nearBottomRight, nearBottomLeft, CameraIndicatorColor);
-            DrawWorldRectangle(farTopLeft, farTopRight, farBottomRight, farBottomLeft, CameraIndicatorColor);
+            DrawWorldRectangle(debugDraw, nearTopLeft, nearTopRight, nearBottomRight, nearBottomLeft, CameraIndicatorColor);
+            DrawWorldRectangle(debugDraw, farTopLeft, farTopRight, farBottomRight, farBottomLeft, CameraIndicatorColor);
 
-            DebugDraw::DrawLine(nearTopLeft, farTopLeft, CameraIndicatorColor);
-            DebugDraw::DrawLine(nearTopRight, farTopRight, CameraIndicatorColor);
-            DebugDraw::DrawLine(nearBottomRight, farBottomRight, CameraIndicatorColor);
-            DebugDraw::DrawLine(nearBottomLeft, farBottomLeft, CameraIndicatorColor);
+            debugDraw.DrawLine(nearTopLeft, farTopLeft, CameraIndicatorColor);
+            debugDraw.DrawLine(nearTopRight, farTopRight, CameraIndicatorColor);
+            debugDraw.DrawLine(nearBottomRight, farBottomRight, CameraIndicatorColor);
+            debugDraw.DrawLine(nearBottomLeft, farBottomLeft, CameraIndicatorColor);
 
             // Emphasize the camera's forward axis inside the frustum.
-            DebugDraw::DrawLine(position, farCenter, CameraIndicatorColor);
+            debugDraw.DrawLine(position, farCenter, CameraIndicatorColor);
         }
 
-        void DrawPointLightIndicator(const LightComponent& light, const Math::Mat4& worldTransform)
+        void DrawPointLightIndicator(DebugDraw& debugDraw, const LightComponent& light, const Math::Mat4& worldTransform)
         {
             const Math::Vec3 position = WorldPosition(worldTransform);
-            DebugDraw::DrawSphere(position, std::max(0.01f, light.Range), PointLightIndicatorColor, 48);
+            debugDraw.DrawSphere(position, std::max(0.01f, light.Range), PointLightIndicatorColor, 48);
         }
 
-        void DrawDirectionalLightIndicator(const EditorContext& context, const Math::Mat4& worldTransform)
+        void DrawDirectionalLightIndicator(DebugDraw& debugDraw, const EditorContext& context, const Math::Mat4& worldTransform)
         {
             const Math::Vec3 position = WorldPosition(worldTransform);
             const Math::Vec3 direction = WorldDirection(worldTransform, Math::Vec3(0.0f, 0.0f, -1.0f));
@@ -101,7 +102,7 @@ namespace HachimiEngine
             const float length = std::clamp(context.Camera.GetDistance() * 0.15f, 0.75f, 20.0f);
             const Math::Vec3 end = position + direction * length;
 
-            DebugDraw::DrawLine(position, end, DirectionalLightIndicatorColor);
+            debugDraw.DrawLine(position, end, DirectionalLightIndicatorColor);
 
             Math::Vec3 right = Math::Cross(direction, Math::Vec3(0.0f, 1.0f, 0.0f));
             right = Math::Length(right) > 0.001f ? Math::Normalize(right) : Math::Vec3(1.0f, 0.0f, 0.0f);
@@ -111,14 +112,14 @@ namespace HachimiEngine
             const float headWidth = length * 0.09f;
             const Math::Vec3 headBase = end - direction * headLength;
 
-            DebugDraw::DrawLine(end, headBase + right * headWidth, DirectionalLightIndicatorColor);
-            DebugDraw::DrawLine(end, headBase - right * headWidth, DirectionalLightIndicatorColor);
-            DebugDraw::DrawLine(end, headBase + up * headWidth, DirectionalLightIndicatorColor);
-            DebugDraw::DrawLine(end, headBase - up * headWidth, DirectionalLightIndicatorColor);
+            debugDraw.DrawLine(end, headBase + right * headWidth, DirectionalLightIndicatorColor);
+            debugDraw.DrawLine(end, headBase - right * headWidth, DirectionalLightIndicatorColor);
+            debugDraw.DrawLine(end, headBase + up * headWidth, DirectionalLightIndicatorColor);
+            debugDraw.DrawLine(end, headBase - up * headWidth, DirectionalLightIndicatorColor);
         }
     }
 
-    void DrawSelectionIndicators(EditorContext& context)
+    void DrawSelectionIndicators(EditorContext& context, DebugDraw& debugDraw)
     {
         if (context.ActiveScene == nullptr || !context.SelectedEntity)
         {
@@ -137,11 +138,11 @@ namespace HachimiEngine
         }
 
         const Math::Mat4 worldTransform = context.ActiveScene->GetWorldTransform(selected.GetHandle());
-        DebugDraw::Begin(context.Camera.GetViewProjection());
+        debugDraw.Begin(context.Camera.GetViewProjection());
 
         if (selected.HasComponent<CameraComponent>())
         {
-            DrawCameraIndicator(context, worldTransform);
+            DrawCameraIndicator(debugDraw, context, worldTransform);
         }
 
         if (selected.HasComponent<LightComponent>())
@@ -149,14 +150,14 @@ namespace HachimiEngine
             const auto& light = selected.GetComponent<LightComponent>();
             if (light.Type == LightComponent::LightType::Point)
             {
-                DrawPointLightIndicator(light, worldTransform);
+                DrawPointLightIndicator(debugDraw, light, worldTransform);
             }
             else
             {
-                DrawDirectionalLightIndicator(context, worldTransform);
+                DrawDirectionalLightIndicator(debugDraw, context, worldTransform);
             }
         }
 
-        DebugDraw::End();
+        debugDraw.End();
     }
 }

@@ -2,8 +2,9 @@
 
 #include "Core/Log.h"
 #include "Renderer/MeshFactory.h"
-#include "Renderer/SceneRenderer.h"
 #include "Math/Math.h"
+
+#include <utility>
 
 namespace HachimiEngine
 {
@@ -294,55 +295,33 @@ namespace HachimiEngine
         }
     }
 
-    void Scene::OnRender(const EditorCamera& camera)
+    RenderView Scene::BuildRenderView(const EditorCamera& camera, bool drawGrid) const
     {
-        RenderScene(camera.GetViewMatrix(), camera.GetProjection(), camera.GetPosition(), true);
+        SceneRenderDesc desc;
+        desc.View = camera.GetViewMatrix();
+        desc.Projection = camera.GetProjection();
+        desc.CameraPosition = camera.GetPosition();
+        desc.DrawGrid = drawGrid;
+        return BuildRenderView(desc);
     }
 
-    void Scene::OnRender(const Math::Mat4& view, const Math::Mat4& projection, const Math::Vec3& cameraPosition)
+    RenderView Scene::BuildRenderView(const SceneRenderDesc& desc) const
     {
-        RenderScene(view, projection, cameraPosition, false);
-    }
+        RenderView view;
 
-    void Scene::RenderScene(const Math::Mat4& view, const Math::Mat4& projection, const Math::Vec3& cameraPosition, bool drawGrid)
-    {
-        ApplyLightsToRenderer();
-        SceneRenderer::GetEnvironmentSettings() = m_Environment;
-        SceneRenderer::BeginScene(view, projection, cameraPosition);
+        view.View = desc.View;
+        view.Projection = desc.Projection;
+        view.ViewProjection = desc.Projection * desc.View;
+        view.CameraPosition = desc.CameraPosition;
+        view.CameraForward = Math::Normalize(-Math::Vec3(Math::Transpose(desc.View)[2]));
+        view.Environment = m_Environment;
+        view.DrawGrid = desc.DrawGrid;
 
-        const LightingEnvironment& lighting = SceneRenderer::GetLightingEnvironment();
-        const bool castsDirectionalShadows = lighting.Directional.CastsShadows
-            && lighting.Directional.Intensity > 0.0f
-            && Math::Length(lighting.Directional.Direction) > 0.001f;
-
-        if (castsDirectionalShadows)
-        {
-            const Math::Mat4 lightViewProjection = SceneRenderer::CalculateDirectionalLightViewProjection(cameraPosition);
-            SceneRenderer::BeginDirectionalShadowPass(lightViewProjection);
-
-            auto shadowMeshView = m_Registry.view<MeshComponent, TransformComponent>();
-            for (const entt::entity entity : shadowMeshView)
-            {
-                const auto& [meshComponent, transformComponent] = shadowMeshView.get<MeshComponent, TransformComponent>(entity);
-                if (!meshComponent.Visible || meshComponent.Mesh == nullptr || meshComponent.Mesh->GetDrawMode() != MeshDrawMode::Triangles)
-                {
-                    continue;
-                }
-
-                SceneRenderer::SubmitShadowMesh(meshComponent.Mesh, GetWorldTransform(entity));
-            }
-
-            SceneRenderer::EndDirectionalShadowPass();
-        }
-
-        SceneRenderer::DrawSkybox();
-
-        if (drawGrid)
-        {
-            SceneRenderer::DrawGrid();
-        }
+        CollectLights(view.Lighting);
 
         auto meshView = m_Registry.view<MeshComponent, TransformComponent>();
+        view.Items.reserve(meshView.size_hint());
+
         for (const entt::entity entity : meshView)
         {
             const auto& [meshComponent, transformComponent] = meshView.get<MeshComponent, TransformComponent>(entity);
@@ -351,45 +330,20 @@ namespace HachimiEngine
                 continue;
             }
 
-            const Math::Mat4 worldTransform = GetWorldTransform(entity);
-
-            // Keep the per-entity material parameters authoritative even when no
-            // explicit material override was created yet.
-            if (meshComponent.MaterialOverride == nullptr)
-            {
-                meshComponent.MaterialOverride = Material::Create(SceneRenderer::GetDefaultMaterial()->GetShader());
-            }
-
-            Ref<Material> material = meshComponent.MaterialOverride;
-            material->SetAlbedoColor(meshComponent.MaterialColor);
-            material->SetRoughness(meshComponent.Roughness);
-            material->SetMetallic(meshComponent.Metallic);
-
-            SceneRenderer::SubmitMesh(meshComponent.Mesh, worldTransform, material);
+            RenderItem item;
+            item.Mesh = meshComponent.Mesh;
+            item.Transform = GetWorldTransform(entity);
+            item.AlbedoColor = meshComponent.MaterialColor;
+            item.Roughness = meshComponent.Roughness;
+            item.Metallic = meshComponent.Metallic;
+            item.Material = meshComponent.MaterialOverride;
+            view.Items.push_back(std::move(item));
         }
 
-        SceneRenderer::EndScene();
+        return view;
     }
 
-    void Scene::DestroyChildren(entt::entity entity)
-    {
-        auto* relationship = m_Registry.try_get<RelationshipComponent>(entity);
-        if (relationship == nullptr)
-        {
-            return;
-        }
-
-        for (const UUID childUUID : relationship->Children)
-        {
-            const auto childIt = m_EntityMap.find(childUUID);
-            if (childIt != m_EntityMap.end())
-            {
-                DestroyEntity(Entity(childIt->second, this));
-            }
-        }
-    }
-
-    void Scene::ApplyLightsToRenderer()
+    void Scene::CollectLights(LightingEnvironment& outLighting) const
     {
         LightingEnvironment lighting;
         lighting.Directional.Direction = Math::Vec3(0.0f);
@@ -407,11 +361,12 @@ namespace HachimiEngine
 
         bool hasAnyLight = false;
         bool hasDirectionalLight = false;
+        size_t droppedPointLights = 0;
 
-        auto view = m_Registry.view<LightComponent, TransformComponent>();
-        for (const entt::entity entity : view)
+        auto lightView = m_Registry.view<LightComponent, TransformComponent>();
+        for (const entt::entity entity : lightView)
         {
-            const auto& [lightComponent, transformComponent] = view.get<LightComponent, TransformComponent>(entity);
+            const auto& [lightComponent, transformComponent] = lightView.get<LightComponent, TransformComponent>(entity);
             hasAnyLight = true;
 
             if (lightComponent.Type == LightComponent::LightType::Directional)
@@ -433,6 +388,20 @@ namespace HachimiEngine
                 pointLight.Intensity = lightComponent.Intensity;
                 pointLight.Range = lightComponent.Range;
             }
+            else
+            {
+                ++droppedPointLights;
+            }
+        }
+
+        if (droppedPointLights > 0)
+        {
+            // The shader declares a fixed point light array, so the extras cannot be lit.
+            // Say so instead of silently rendering a darker scene.
+            HE_CORE_WARN("Scene '{}' has {} point light(s) beyond the {} the renderer supports; the extras are not lit",
+                m_Name,
+                droppedPointLights,
+                LightingEnvironment::MaxPointLights);
         }
 
         if (!hasAnyLight)
@@ -447,6 +416,24 @@ namespace HachimiEngine
             lighting.Directional.Intensity = 0.0f;
         }
 
-        SceneRenderer::GetLightingEnvironment() = lighting;
+        outLighting = lighting;
+    }
+
+    void Scene::DestroyChildren(entt::entity entity)
+    {
+        auto* relationship = m_Registry.try_get<RelationshipComponent>(entity);
+        if (relationship == nullptr)
+        {
+            return;
+        }
+
+        for (const UUID childUUID : relationship->Children)
+        {
+            const auto childIt = m_EntityMap.find(childUUID);
+            if (childIt != m_EntityMap.end())
+            {
+                DestroyEntity(Entity(childIt->second, this));
+            }
+        }
     }
 }

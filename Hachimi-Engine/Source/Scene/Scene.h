@@ -7,6 +7,7 @@
 #include "Physics/PhysicsWorld.h"
 #include "Renderer/EditorCamera.h"
 #include "Renderer/EnvironmentSettings.h"
+#include "Renderer/RenderView.h"
 #include "Scene/Components.h"
 #include "Scene/Entity.h"
 #include "Scripting/ScriptWorld.h"
@@ -20,6 +21,16 @@
 
 namespace HachimiEngine
 {
+    // Camera and options for one extracted frame. The scene turns this into a RenderView;
+    // the caller decides which SceneRenderer and which render target consume it.
+    struct SceneRenderDesc
+    {
+        Math::Mat4 View { 1.0f };
+        Math::Mat4 Projection { 1.0f };
+        Math::Vec3 CameraPosition { 0.0f };
+        bool DrawGrid = false;
+    };
+
     // Scene owns an EnTT registry and helpers for entity hierarchy and rendering.
     class Scene
     {
@@ -45,8 +56,12 @@ namespace HachimiEngine
         void OnRuntimeStart();
         void OnRuntimeStop();
         void OnUpdate(Timestep timestep);
-        void OnRender(const EditorCamera& camera);
-        void OnRender(const Math::Mat4& view, const Math::Mat4& projection, const Math::Vec3& cameraPosition);
+
+        // Extracts everything a renderer needs for one frame, as plain data. Rendering
+        // itself is the caller's job, which is why the editor viewport, the game panel
+        // and the Player can share this without sharing renderer state.
+        RenderView BuildRenderView(const SceneRenderDesc& desc) const;
+        RenderView BuildRenderView(const EditorCamera& camera, bool drawGrid) const;
 
         const std::string& GetName() const { return m_Name; }
         void SetName(const std::string& name) { m_Name = name; }
@@ -67,8 +82,7 @@ namespace HachimiEngine
 
     private:
         void DestroyChildren(entt::entity entity);
-        void ApplyLightsToRenderer();
-        void RenderScene(const Math::Mat4& view, const Math::Mat4& projection, const Math::Vec3& cameraPosition, bool drawGrid);
+        void CollectLights(LightingEnvironment& outLighting) const;
 
     private:
         entt::registry m_Registry;

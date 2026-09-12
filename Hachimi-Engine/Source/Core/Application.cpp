@@ -8,10 +8,8 @@
 #include "Events/ApplicationEvent.h"
 #include "Events/EventDispatcher.h"
 #include "ImGui/ImGuiLayer.h"
-#include "Renderer/DebugDraw.h"
-#include "Renderer/PostProcessPass.h"
 #include "Renderer/RenderCommand.h"
-#include "Renderer/SceneRenderer.h"
+#include "Renderer/RendererContext.h"
 #include "Scripting/ScriptManager.h"
 #include "Utils/VirtualFileSystem.h"
 
@@ -35,9 +33,10 @@ namespace HachimiEngine
 
         RenderCommand::Init();
         RenderCommand::SetClearColor({ 0.08f, 0.08f, 0.10f, 1.0f });
-        SceneRenderer::Init();
-        DebugDraw::Init();
-        PostProcessPass::Init();
+
+        m_RendererContext = CreateScope<RendererContext>();
+        m_RendererContext->Init();
+
         ScriptManager::Init();
 
         m_ImGuiLayer = CreateRef<ImGuiLayer>();
@@ -47,11 +46,9 @@ namespace HachimiEngine
     Application::~Application()
     {
         ScriptManager::Shutdown();
-        PostProcessPass::Shutdown();
-        DebugDraw::Shutdown();
-        SceneRenderer::Shutdown();
-        RenderCommand::SetDepthTest(false);
-        Renderer::Shutdown();
+        // Releases every renderer GPU resource, including the backend, while the GL
+        // context is still current and before the ImGui overlay detaches.
+        m_RendererContext->Shutdown();
 
         // Stop workers before dropping the mounts so no read is in flight while
         // packages are released, and no deferred callback can fire afterwards.

@@ -3,6 +3,8 @@
 #include "Panels/EditorContext.h"
 #include "Renderer/PostProcessPass.h"
 #include "Renderer/RenderCommand.h"
+#include "Renderer/RendererContext.h"
+#include "Renderer/SceneRenderer.h"
 #include "Scene/Components.h"
 #include "Scene/Scene.h"
 #include "Math/Math.h"
@@ -46,9 +48,17 @@ namespace HachimiEngine
         m_DisplayFramebuffer = Framebuffer::Create(displaySpecification);
     }
 
+    void GamePanel::Init(RendererContext& rendererContext)
+    {
+        m_Renderer = &rendererContext;
+        m_SceneRenderer = CreateScope<SceneRenderer>(rendererContext);
+    }
+
+    GamePanel::~GamePanel() = default;
+
     void GamePanel::RenderScene(EditorContext& context)
     {
-        if (context.ActiveScene == nullptr)
+        if (context.ActiveScene == nullptr || m_SceneRenderer == nullptr)
         {
             return;
         }
@@ -66,9 +76,8 @@ namespace HachimiEngine
 
         const float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
 
-        Math::Mat4 viewMatrix(1.0f);
-        Math::Mat4 projectionMatrix(1.0f);
-        Math::Vec3 cameraPosition(0.0f);
+        SceneRenderDesc desc;
+        desc.DrawGrid = false;
 
         // Render from the primary scene camera, falling back to the editor camera.
         const Entity primaryCamera = context.ActiveScene->GetPrimaryCameraEntity();
@@ -78,9 +87,9 @@ namespace HachimiEngine
         {
             const auto& cameraComponent = primaryCamera.GetComponent<CameraComponent>();
             const Math::Mat4 cameraWorld = context.ActiveScene->GetWorldTransform(primaryCamera.GetHandle());
-            viewMatrix = Math::Inverse(cameraWorld);
-            cameraPosition = Math::Vec3(cameraWorld[3].x, cameraWorld[3].y, cameraWorld[3].z);
-            projectionMatrix = Math::Perspective(
+            desc.View = Math::Inverse(cameraWorld);
+            desc.CameraPosition = Math::Vec3(cameraWorld[3].x, cameraWorld[3].y, cameraWorld[3].z);
+            desc.Projection = Math::Perspective(
                 Math::Radians(cameraComponent.FieldOfView),
                 aspectRatio,
                 cameraComponent.NearClip,
@@ -88,21 +97,25 @@ namespace HachimiEngine
         }
         else
         {
-            viewMatrix = context.Camera.GetViewMatrix();
-            cameraPosition = context.Camera.GetPosition();
-            projectionMatrix = Math::Perspective(Math::Radians(context.Camera.GetFieldOfView()), aspectRatio, 0.1f, 1000.0f);
+            desc.View = context.Camera.GetViewMatrix();
+            desc.CameraPosition = context.Camera.GetPosition();
+            desc.Projection = Math::Perspective(Math::Radians(context.Camera.GetFieldOfView()), aspectRatio, 0.1f, 1000.0f);
         }
+
+        const RenderView view = context.ActiveScene->BuildRenderView(desc);
 
         m_SceneFramebuffer->Bind();
         // Linear-space clear color matching the previous sRGB editor background.
         RenderCommand::SetClearColor({ 0.00719f, 0.00719f, 0.01002f, 1.0f });
         RenderCommand::Clear();
-        context.ActiveScene->OnRender(viewMatrix, projectionMatrix, cameraPosition);
+        m_SceneRenderer->Render(view);
         m_SceneFramebuffer->Unbind();
 
         m_DisplayFramebuffer->Bind();
         RenderCommand::Clear();
-        PostProcessPass::Render(m_SceneFramebuffer->GetColorAttachmentRendererID());
+        m_Renderer->GetPostProcessPass().Render(
+            m_SceneFramebuffer->GetColorAttachmentRendererID(),
+            view.Environment.Exposure);
         m_DisplayFramebuffer->Unbind();
     }
 

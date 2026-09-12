@@ -1,135 +1,210 @@
 #include "Renderer/SceneRenderer.h"
 
 #include "Core/Assert.h"
+#include "Core/Log.h"
 #include "Renderer/EnvironmentMap.h"
 #include "Renderer/Mesh.h"
-#include "Renderer/MeshFactory.h"
 #include "Renderer/MeshLibrary.h"
-#include "Renderer/PostProcessPass.h"
 #include "Renderer/Renderer.h"
+#include "Renderer/RendererContext.h"
 #include "Renderer/ShadowMap.h"
 #include "Math/Math.h"
 
-#include <glad/gl.h>
-
-#include <algorithm>
 #include <array>
 #include <limits>
 
 namespace HachimiEngine
 {
-    Ref<Shader> SceneRenderer::s_DefaultShader;
-    Ref<Shader> SceneRenderer::s_GridShader;
-    Ref<Shader> SceneRenderer::s_DirectionalShadowShader;
-    Ref<Shader> SceneRenderer::s_SkyboxShader;
-    Ref<Material> SceneRenderer::s_DefaultMaterial;
-    Scope<MeshLibrary> SceneRenderer::s_MeshLibrary;
-    Ref<MeshData> SceneRenderer::s_GridMesh;
-    Ref<MeshData> SceneRenderer::s_SkyboxMesh;
-    Ref<ShadowMap> SceneRenderer::s_DirectionalShadowMap;
-    Ref<EnvironmentMap> SceneRenderer::s_EnvironmentMap;
-    LightingEnvironment SceneRenderer::s_Lighting;
-    EnvironmentSettings SceneRenderer::s_Environment;
-    Math::Mat4 SceneRenderer::s_ViewProjection { 1.0f };
-    Math::Mat4 SceneRenderer::s_View { 1.0f };
-    Math::Mat4 SceneRenderer::s_Projection { 1.0f };
-    Math::Vec3 SceneRenderer::s_CameraPosition { 0.0f };
-    Math::Vec3 SceneRenderer::s_CameraForward { 0.0f, 0.0f, -1.0f };
-    Math::Mat4 SceneRenderer::s_DirectionalLightViewProjection { 1.0f };
-    bool SceneRenderer::s_DirectionalShadowEnabled = false;
-    bool SceneRenderer::s_DirectionalShadowPassActive = false;
-
-    void SceneRenderer::Init()
+    namespace
     {
-        s_DefaultShader = Shader::CreateEngineShader("Default.glsl");
-        s_GridShader = Shader::CreateEngineShader("Grid.glsl");
-        s_DirectionalShadowShader = Shader::CreateEngineShader("DirectionalShadow.glsl");
-        s_SkyboxShader = Shader::CreateEngineShader("Skybox.glsl");
-        s_DefaultMaterial = Material::Create(s_DefaultShader);
-        s_MeshLibrary = CreateScope<MeshLibrary>();
-        s_GridMesh = MeshFactory::CreateGrid();
-        s_SkyboxMesh = MeshFactory::CreateCube(2.0f);
-        s_DirectionalShadowMap = ShadowMap::Create(2048, 2048);
-        s_EnvironmentMap = CreateRef<EnvironmentMap>(128);
+        // Span of the shadow volume around the camera, in world units.
+        constexpr float ShadowDistance = 30.0f;
+
+        // Point light 0 is bound to a fixed texture unit, and each additional light costs
+        // a group of uniforms, so the shader declares exactly LightingEnvironment::MaxPointLights.
+        constexpr int ShadowMapTextureUnit = 1;
+        constexpr int IrradianceTextureUnit = 2;
+        constexpr int PrefilteredTextureUnit = 3;
     }
 
-    void SceneRenderer::Shutdown()
+    SceneRenderer::SceneRenderer(RendererContext& context)
+        : m_Context(context)
     {
-        s_EnvironmentMap.reset();
-        s_DirectionalShadowMap.reset();
-        s_SkyboxMesh.reset();
-        s_GridMesh.reset();
-        s_MeshLibrary.reset();
-        s_DefaultMaterial.reset();
-        s_DefaultShader.reset();
-        s_GridShader.reset();
-        s_DirectionalShadowShader.reset();
-        s_SkyboxShader.reset();
-        s_ViewProjection = Math::Mat4(1.0f);
-        s_View = Math::Mat4(1.0f);
-        s_Projection = Math::Mat4(1.0f);
-        s_CameraPosition = Math::Vec3(0.0f);
-        s_CameraForward = Math::Vec3(0.0f, 0.0f, -1.0f);
-        s_DirectionalLightViewProjection = Math::Mat4(1.0f);
-        s_DirectionalShadowEnabled = false;
-        s_DirectionalShadowPassActive = false;
     }
 
-    void SceneRenderer::BeginScene(const EditorCamera& camera)
+    void SceneRenderer::Render(const RenderView& view)
     {
-        BeginScene(camera.GetViewMatrix(), camera.GetProjection(), camera.GetPosition());
+        HE_CORE_ASSERT(m_Context.IsInitialized());
+
+        FrameState frame;
+        frame.View = view.View;
+        frame.Projection = view.Projection;
+        frame.ViewProjection = view.ViewProjection;
+        frame.CameraPosition = view.CameraPosition;
+        frame.CameraForward = view.CameraForward;
+
+        const DirectionalLight& directional = view.Lighting.Directional;
+        const bool castsDirectionalShadows = directional.CastsShadows
+            && directional.Intensity > 0.0f
+            && Math::Length(directional.Direction) > 0.001f;
+
+        if (castsDirectionalShadows)
+        {
+            frame.DirectionalLightViewProjection = CalculateDirectionalLightViewProjection(frame, directional);
+            frame.DirectionalShadowEnabled = true;
+            DrawDirectionalShadowPass(view, frame);
+        }
+
+        DrawSkybox(view, frame);
+
+        if (view.DrawGrid)
+        {
+            DrawGrid(frame);
+        }
+
+        DrawItems(view, frame);
     }
 
-    void SceneRenderer::BeginScene(const Math::Mat4& view, const Math::Mat4& projection, const Math::Vec3& cameraPosition)
+    void SceneRenderer::DrawDirectionalShadowPass(const RenderView& view, const FrameState& frame)
     {
-        s_ViewProjection = projection * view;
-        s_View = view;
-        s_Projection = projection;
-        s_CameraPosition = cameraPosition;
+        ShadowMap& shadowMap = m_Context.GetShadowMap();
+        const Ref<Shader>& shader = m_Context.GetDirectionalShadowShader();
+        HE_CORE_ASSERT(shader != nullptr);
 
-        const Math::Mat4 transposedView = Math::Transpose(view);
-        s_CameraForward = Math::Normalize(-Math::Vec3(transposedView[2]));
+        shadowMap.BindForWriting();
 
-        // No shadow data has been rendered for this scene yet.
-        s_DirectionalShadowEnabled = false;
+        shader->Bind();
+        shader->SetMat4("u_ViewProjection", frame.DirectionalLightViewProjection);
+        Renderer::SetPolygonOffset(true, 1.0f, 1.0f);
 
-        PostProcessPass::SetExposure(s_Environment.Exposure);
+        for (const RenderItem& item : view.Items)
+        {
+            if (item.Mesh == nullptr || item.Mesh->GetDrawMode() != MeshDrawMode::Triangles)
+            {
+                continue;
+            }
+
+            const Ref<Mesh> gpuMesh = m_Context.GetMeshes().GetOrCreate(item.Mesh);
+            if (gpuMesh == nullptr)
+            {
+                continue;
+            }
+
+            shader->SetMat4("u_Model", item.Transform);
+            Renderer::DrawIndexed(gpuMesh->GetVertexArray(), 0, DrawMode::Triangles);
+        }
+
+        Renderer::SetPolygonOffset(false);
+        shadowMap.Unbind();
+
+        // frame.DirectionalShadowEnabled stays set so the scene pass samples the map
+        // rendered above.
     }
 
-    void SceneRenderer::SubmitMesh(const Ref<MeshData>& mesh, const Math::Mat4& transform, const Ref<Material>& material)
+    void SceneRenderer::DrawSkybox(const RenderView& view, const FrameState& frame)
     {
-        const Ref<Mesh> gpuMesh = s_MeshLibrary->GetOrCreate(mesh);
+        if (!view.Environment.ShowSkybox || !m_Context.GetEnvironmentMap().HasContent())
+        {
+            return;
+        }
+
+        const Ref<Mesh> gpuMesh = m_Context.GetMeshes().GetOrCreate(m_Context.GetSkyboxMesh());
         if (gpuMesh == nullptr)
         {
             return;
         }
 
-        const Ref<Material>& drawMaterial = material != nullptr ? material : s_DefaultMaterial;
-        drawMaterial->Bind();
+        // Draw the sky first without depth testing; later geometry simply overwrites it.
+        Renderer::SetDepthTest(false);
+        const Ref<Shader>& shader = m_Context.GetSkyboxShader();
+        shader->Bind();
 
-        const Ref<Shader>& shader = drawMaterial->GetShader();
-        HE_CORE_ASSERT(shader != nullptr);
+        const Math::Mat4 skyViewProjection = frame.Projection * Math::Mat4(Math::Mat3(frame.View));
+        shader->SetMat4("u_ViewProjection", skyViewProjection);
+        shader->SetInt("u_SkyboxTexture", 0);
+        shader->SetFloat("u_SkyboxIntensity", view.Environment.EnvironmentIntensity);
+        m_Context.GetEnvironmentMap().BindSkybox(0);
 
-        shader->SetMat4("u_ViewProjection", s_ViewProjection);
-        shader->SetMat4("u_Model", transform);
-        UploadLighting(shader, s_CameraPosition);
+        Renderer::DrawIndexed(gpuMesh->GetVertexArray(), 0, DrawMode::Triangles);
+        Renderer::SetDepthTest(true);
+    }
 
-        shader->SetInt("u_DirectionalShadowEnabled", s_DirectionalShadowEnabled ? 1 : 0);
-        shader->SetMat4("u_DirectionalLightViewProjection", s_DirectionalLightViewProjection);
-        shader->SetFloat("u_DirectionalShadowBias", s_Lighting.Directional.ShadowBias);
-        shader->SetInt("u_DirectionalShadowMap", 1);
-        if (s_DirectionalShadowMap != nullptr && s_DirectionalShadowMap->GetDepthTextureRendererID() != 0)
+    void SceneRenderer::DrawGrid(const FrameState& frame)
+    {
+        const Ref<Mesh> gpuMesh = m_Context.GetMeshes().GetOrCreate(m_Context.GetGridMesh());
+        if (gpuMesh == nullptr)
         {
-            glBindTextureUnit(1, s_DirectionalShadowMap->GetDepthTextureRendererID());
+            return;
         }
 
-        if (s_EnvironmentMap != nullptr)
+        const Ref<Shader>& shader = m_Context.GetGridShader();
+        shader->Bind();
+        shader->SetMat4("u_ViewProjection", frame.ViewProjection);
+        Renderer::DrawIndexed(gpuMesh->GetVertexArray(), 0, DrawMode::Lines);
+    }
+
+    void SceneRenderer::DrawItems(const RenderView& view, const FrameState& frame)
+    {
+        for (const RenderItem& item : view.Items)
         {
-            shader->SetInt("u_IrradianceMap", 2);
-            shader->SetInt("u_PrefilteredMap", 3);
-            shader->SetFloat("u_EnvironmentIntensity", s_Environment.EnvironmentIntensity);
-            s_EnvironmentMap->BindIrradiance(2);
-            s_EnvironmentMap->BindPrefiltered(3);
+            SubmitMesh(view, frame, item);
+        }
+    }
+
+    void SceneRenderer::SubmitMesh(const RenderView& view, const FrameState& frame, const RenderItem& item)
+    {
+        const Ref<Mesh> gpuMesh = m_Context.GetMeshes().GetOrCreate(item.Mesh);
+        if (gpuMesh == nullptr)
+        {
+            return;
+        }
+
+        // An explicit material supplies the shader and the albedo texture; the surface
+        // values stay with the entity, so no per-entity Material instance is needed.
+        const Ref<Shader> shader = item.Material != nullptr
+            ? item.Material->GetShader()
+            : m_Context.GetDefaultShader();
+        HE_CORE_ASSERT(shader != nullptr);
+
+        if (item.Material != nullptr)
+        {
+            item.Material->Bind();
+        }
+        else
+        {
+            shader->Bind();
+            shader->SetInt("u_HasAlbedoTexture", 0);
+        }
+
+        shader->SetMat4("u_ViewProjection", frame.ViewProjection);
+        shader->SetMat4("u_Model", item.Transform);
+        shader->SetFloat4("u_AlbedoColor", item.AlbedoColor);
+        shader->SetFloat("u_Roughness", item.Roughness);
+        shader->SetFloat("u_Metallic", item.Metallic);
+
+        UploadLighting(shader, frame, view.Lighting);
+
+        shader->SetInt("u_DirectionalShadowEnabled", frame.DirectionalShadowEnabled ? 1 : 0);
+        shader->SetMat4("u_DirectionalLightViewProjection", frame.DirectionalLightViewProjection);
+        shader->SetFloat("u_DirectionalShadowBias", view.Lighting.Directional.ShadowBias);
+
+        if (frame.DirectionalShadowEnabled)
+        {
+            const uint32_t shadowTexture = m_Context.GetShadowMap().GetDepthTextureRendererID();
+            if (shadowTexture != 0)
+            {
+                shader->SetInt("u_DirectionalShadowMap", ShadowMapTextureUnit);
+                Renderer::BindTextureUnit(ShadowMapTextureUnit, shadowTexture);
+            }
+        }
+
+        if (m_Context.GetEnvironmentMap().HasContent())
+        {
+            shader->SetInt("u_IrradianceMap", IrradianceTextureUnit);
+            shader->SetInt("u_PrefilteredMap", PrefilteredTextureUnit);
+            shader->SetFloat("u_EnvironmentIntensity", view.Environment.EnvironmentIntensity);
+            m_Context.GetEnvironmentMap().BindIrradiance(IrradianceTextureUnit);
+            m_Context.GetEnvironmentMap().BindPrefiltered(PrefilteredTextureUnit);
         }
         else
         {
@@ -140,109 +215,13 @@ namespace HachimiEngine
         Renderer::DrawIndexed(gpuMesh->GetVertexArray(), 0, drawMode);
     }
 
-    void SceneRenderer::DrawGrid(float size, uint32_t divisions)
+    Math::Mat4 SceneRenderer::CalculateDirectionalLightViewProjection(const FrameState& frame, const DirectionalLight& light) const
     {
-        HE_CORE_ASSERT(s_GridMesh != nullptr);
-
-        if (size != 20.0f || divisions != 20)
-        {
-            s_GridMesh = MeshFactory::CreateGrid(size, divisions);
-        }
-
-        const Ref<Mesh> gpuMesh = s_MeshLibrary->GetOrCreate(s_GridMesh);
-        if (gpuMesh == nullptr)
-        {
-            return;
-        }
-
-        s_GridShader->Bind();
-        s_GridShader->SetMat4("u_ViewProjection", s_ViewProjection);
-        Renderer::DrawIndexed(gpuMesh->GetVertexArray(), 0, DrawMode::Lines);
-    }
-
-    void SceneRenderer::DrawSkybox()
-    {
-        if (!s_Environment.ShowSkybox || s_EnvironmentMap == nullptr)
-        {
-            return;
-        }
-
-        const Ref<Mesh> gpuMesh = s_MeshLibrary->GetOrCreate(s_SkyboxMesh);
-        if (gpuMesh == nullptr)
-        {
-            return;
-        }
-
-        // Draw the sky first without depth testing; later geometry simply overwrites it.
-        Renderer::SetDepthTest(false);
-        s_SkyboxShader->Bind();
-
-        const Math::Mat4 skyViewProjection = s_Projection * Math::Mat4(Math::Mat3(s_View));
-        s_SkyboxShader->SetMat4("u_ViewProjection", skyViewProjection);
-        s_SkyboxShader->SetInt("u_SkyboxTexture", 0);
-        s_SkyboxShader->SetFloat("u_SkyboxIntensity", s_Environment.EnvironmentIntensity);
-        s_EnvironmentMap->BindSkybox(0);
-
-        Renderer::DrawIndexed(gpuMesh->GetVertexArray(), 0, DrawMode::Triangles);
-        Renderer::SetDepthTest(true);
-    }
-
-    void SceneRenderer::EndScene()
-    {
-    }
-
-    void SceneRenderer::BeginDirectionalShadowPass(const Math::Mat4& lightViewProjection)
-    {
-        HE_CORE_ASSERT(s_DirectionalShadowMap != nullptr);
-        HE_CORE_ASSERT(s_DirectionalShadowShader != nullptr);
-
-        s_DirectionalShadowMap->BindForWriting();
-        s_DirectionalLightViewProjection = lightViewProjection;
-        s_DirectionalShadowEnabled = true;
-        s_DirectionalShadowPassActive = true;
-
-        s_DirectionalShadowShader->Bind();
-        s_DirectionalShadowShader->SetMat4("u_ViewProjection", lightViewProjection);
-        Renderer::SetPolygonOffset(true, 1.0f, 1.0f);
-    }
-
-    void SceneRenderer::SubmitShadowMesh(const Ref<MeshData>& mesh, const Math::Mat4& transform)
-    {
-        HE_CORE_ASSERT(s_DirectionalShadowPassActive);
-
-        if (mesh == nullptr || mesh->GetDrawMode() != MeshDrawMode::Triangles)
-        {
-            return;
-        }
-
-        const Ref<Mesh> gpuMesh = s_MeshLibrary->GetOrCreate(mesh);
-        if (gpuMesh == nullptr)
-        {
-            return;
-        }
-
-        s_DirectionalShadowShader->SetMat4("u_Model", transform);
-        Renderer::DrawIndexed(gpuMesh->GetVertexArray(), 0, DrawMode::Triangles);
-    }
-
-    void SceneRenderer::EndDirectionalShadowPass()
-    {
-        Renderer::SetPolygonOffset(false);
-        s_DirectionalShadowPassActive = false;
-        s_DirectionalShadowMap->Unbind();
-
-        // Keep s_DirectionalShadowEnabled set so SubmitMesh samples the map
-        // rendered above during the current scene pass.
-    }
-
-    Math::Mat4 SceneRenderer::CalculateDirectionalLightViewProjection(const Math::Vec3& cameraPosition)
-    {
-        const Math::Vec3 lightDirection = Math::Normalize(s_Lighting.Directional.Direction);
-        constexpr float shadowDistance = 30.0f;
+        const Math::Vec3 lightDirection = Math::Normalize(light.Direction);
 
         // Center the shadow volume between the camera and the area it is looking at.
-        const Math::Vec3 center = cameraPosition + s_CameraForward * (shadowDistance * 0.5f);
-        const Math::Vec3 lightPosition = center - lightDirection * shadowDistance;
+        const Math::Vec3 center = frame.CameraPosition + frame.CameraForward * (ShadowDistance * 0.5f);
+        const Math::Vec3 lightPosition = center - lightDirection * ShadowDistance;
         const Math::Vec3 upDirection = std::abs(lightDirection.y) > 0.99f
             ? Math::Vec3(1.0f, 0.0f, 0.0f)
             : Math::Vec3(0.0f, 1.0f, 0.0f);
@@ -251,14 +230,14 @@ namespace HachimiEngine
 
         std::array<Math::Vec3, 8> corners =
         {
-            center + Math::Vec3(-shadowDistance, -shadowDistance, -shadowDistance),
-            center + Math::Vec3( shadowDistance, -shadowDistance, -shadowDistance),
-            center + Math::Vec3(-shadowDistance,  shadowDistance, -shadowDistance),
-            center + Math::Vec3( shadowDistance,  shadowDistance, -shadowDistance),
-            center + Math::Vec3(-shadowDistance, -shadowDistance,  shadowDistance),
-            center + Math::Vec3( shadowDistance, -shadowDistance,  shadowDistance),
-            center + Math::Vec3(-shadowDistance,  shadowDistance,  shadowDistance),
-            center + Math::Vec3( shadowDistance,  shadowDistance,  shadowDistance)
+            center + Math::Vec3(-ShadowDistance, -ShadowDistance, -ShadowDistance),
+            center + Math::Vec3( ShadowDistance, -ShadowDistance, -ShadowDistance),
+            center + Math::Vec3(-ShadowDistance,  ShadowDistance, -ShadowDistance),
+            center + Math::Vec3( ShadowDistance,  ShadowDistance, -ShadowDistance),
+            center + Math::Vec3(-ShadowDistance, -ShadowDistance,  ShadowDistance),
+            center + Math::Vec3( ShadowDistance, -ShadowDistance,  ShadowDistance),
+            center + Math::Vec3(-ShadowDistance,  ShadowDistance,  ShadowDistance),
+            center + Math::Vec3( ShadowDistance,  ShadowDistance,  ShadowDistance)
         };
 
         Math::Vec3 minimum(std::numeric_limits<float>::max());
@@ -282,23 +261,24 @@ namespace HachimiEngine
         return lightProjection * lightView;
     }
 
-    void SceneRenderer::UploadLighting(const Ref<Shader>& shader, const Math::Vec3& cameraPosition)
+    void SceneRenderer::UploadLighting(const Ref<Shader>& shader, const FrameState& frame, const LightingEnvironment& lighting)
     {
-        shader->SetFloat3("u_CameraPosition", cameraPosition);
-        shader->SetFloat3("u_AmbientColor", s_Lighting.AmbientColor);
-        shader->SetFloat("u_AmbientIntensity", s_Lighting.AmbientIntensity);
-        shader->SetFloat3("u_DirectionalLightDirection", s_Lighting.Directional.Direction);
-        shader->SetFloat3("u_DirectionalLightColor", s_Lighting.Directional.Color);
-        shader->SetFloat("u_DirectionalLightIntensity", s_Lighting.Directional.Intensity);
-        shader->SetInt("u_PointLightCount", s_Lighting.PointLightCount);
+        shader->SetFloat3("u_CameraPosition", frame.CameraPosition);
+        shader->SetFloat3("u_AmbientColor", lighting.AmbientColor);
+        shader->SetFloat("u_AmbientIntensity", lighting.AmbientIntensity);
+        shader->SetFloat3("u_DirectionalLightDirection", lighting.Directional.Direction);
+        shader->SetFloat3("u_DirectionalLightColor", lighting.Directional.Color);
+        shader->SetFloat("u_DirectionalLightIntensity", lighting.Directional.Intensity);
+        shader->SetInt("u_PointLightCount", lighting.PointLightCount);
 
-        for (int i = 0; i < 4; ++i)
+        for (size_t index = 0; index < lighting.PointLights.size(); ++index)
         {
-            const std::string indexString = std::to_string(i);
-            shader->SetFloat3("u_PointLights[" + indexString + "].Position", s_Lighting.PointLights[static_cast<size_t>(i)].Position);
-            shader->SetFloat3("u_PointLights[" + indexString + "].Color", s_Lighting.PointLights[static_cast<size_t>(i)].Color);
-            shader->SetFloat("u_PointLights[" + indexString + "].Intensity", s_Lighting.PointLights[static_cast<size_t>(i)].Intensity);
-            shader->SetFloat("u_PointLights[" + indexString + "].Range", s_Lighting.PointLights[static_cast<size_t>(i)].Range);
+            const PointLight& pointLight = lighting.PointLights[index];
+            const std::string indexString = std::to_string(index);
+            shader->SetFloat3("u_PointLights[" + indexString + "].Position", pointLight.Position);
+            shader->SetFloat3("u_PointLights[" + indexString + "].Color", pointLight.Color);
+            shader->SetFloat("u_PointLights[" + indexString + "].Intensity", pointLight.Intensity);
+            shader->SetFloat("u_PointLights[" + indexString + "].Range", pointLight.Range);
         }
     }
 }

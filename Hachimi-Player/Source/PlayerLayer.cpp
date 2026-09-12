@@ -6,6 +6,8 @@
 #include "Project/Project.h"
 #include "Renderer/PostProcessPass.h"
 #include "Renderer/RenderCommand.h"
+#include "Renderer/RendererContext.h"
+#include "Renderer/SceneRenderer.h"
 #include "Scene/Components.h"
 #include "Scene/Scene.h"
 #include "Serialization/ProjectSerializer.h"
@@ -50,6 +52,8 @@ namespace HachimiEngine
         sceneSpecification.ColorFormat = FramebufferColorFormat::RGBA16F;
         m_SceneFramebuffer = Framebuffer::Create(sceneSpecification);
     }
+
+    PlayerLayer::~PlayerLayer() = default;
 
     void PlayerLayer::OnAttach()
     {
@@ -99,6 +103,8 @@ namespace HachimiEngine
         m_Scene->SetViewportSize(window.GetWidth(), window.GetHeight());
         m_Scene->OnRuntimeStart();
 
+        m_SceneRenderer = CreateScope<SceneRenderer>(Application::Get().GetRendererContext());
+
         HE_CLIENT_INFO("Started packaged game '{}' from {}", m_Project->GetName(), m_ContentRoot.string());
     }
 
@@ -119,7 +125,7 @@ namespace HachimiEngine
 
     void PlayerLayer::OnUpdate(Timestep timestep)
     {
-        if (m_Scene == nullptr)
+        if (m_Scene == nullptr || m_SceneRenderer == nullptr)
         {
             return;
         }
@@ -134,9 +140,8 @@ namespace HachimiEngine
 
         const float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
 
-        Math::Mat4 viewMatrix(1.0f);
-        Math::Mat4 projectionMatrix(1.0f);
-        Math::Vec3 cameraPosition(0.0f);
+        SceneRenderDesc desc;
+        desc.DrawGrid = false;
 
         const Entity primaryCamera = m_Scene->GetPrimaryCameraEntity();
         if (primaryCamera
@@ -145,9 +150,9 @@ namespace HachimiEngine
         {
             const auto& cameraComponent = primaryCamera.GetComponent<CameraComponent>();
             const Math::Mat4 cameraWorld = m_Scene->GetWorldTransform(primaryCamera.GetHandle());
-            viewMatrix = Math::Inverse(cameraWorld);
-            cameraPosition = Math::Vec3(cameraWorld[3].x, cameraWorld[3].y, cameraWorld[3].z);
-            projectionMatrix = Math::Perspective(
+            desc.View = Math::Inverse(cameraWorld);
+            desc.CameraPosition = Math::Vec3(cameraWorld[3].x, cameraWorld[3].y, cameraWorld[3].z);
+            desc.Projection = Math::Perspective(
                 Math::Radians(cameraComponent.FieldOfView),
                 aspectRatio,
                 cameraComponent.NearClip,
@@ -161,27 +166,31 @@ namespace HachimiEngine
                 HE_CORE_WARN("Packaged scene has no primary camera; using a fallback camera");
                 warnedOnce = true;
             }
-            cameraPosition = { 0.0f, 6.0f, 12.0f };
-            viewMatrix = Math::LookAt(cameraPosition, Math::Vec3(0.0f), Math::Vec3(0.0f, 1.0f, 0.0f));
-            projectionMatrix = Math::Perspective(Math::Radians(45.0f), aspectRatio, 0.1f, 1000.0f);
+            desc.CameraPosition = { 0.0f, 6.0f, 12.0f };
+            desc.View = Math::LookAt(desc.CameraPosition, Math::Vec3(0.0f), Math::Vec3(0.0f, 1.0f, 0.0f));
+            desc.Projection = Math::Perspective(Math::Radians(45.0f), aspectRatio, 0.1f, 1000.0f);
         }
+
+        const RenderView view = m_Scene->BuildRenderView(desc);
 
         m_SceneFramebuffer->Bind();
         RenderCommand::SetClearColor({ 0.00719f, 0.00719f, 0.01002f, 1.0f });
         RenderCommand::Clear();
-        m_Scene->OnRender(viewMatrix, projectionMatrix, cameraPosition);
+        m_SceneRenderer->Render(view);
         m_SceneFramebuffer->Unbind();
     }
 
     void PlayerLayer::OnRender()
     {
-        if (m_Scene == nullptr || m_SceneFramebuffer->GetColorAttachmentRendererID() == 0)
+        if (m_Scene == nullptr || m_SceneRenderer == nullptr || m_SceneFramebuffer->GetColorAttachmentRendererID() == 0)
         {
             return;
         }
 
         const Window& window = Application::Get().GetWindow();
         RenderCommand::SetViewport(0, 0, window.GetWidth(), window.GetHeight());
-        PostProcessPass::Render(m_SceneFramebuffer->GetColorAttachmentRendererID());
+        Application::Get().GetRendererContext().GetPostProcessPass().Render(
+            m_SceneFramebuffer->GetColorAttachmentRendererID(),
+            m_Scene->GetEnvironmentSettings().Exposure);
     }
 }

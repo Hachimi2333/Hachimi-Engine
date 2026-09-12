@@ -39,6 +39,8 @@ namespace HachimiEngine
         virtual void SetLineWidth(float width) = 0;
         virtual void SetPolygonOffset(bool enabled, float factor = 0.0f, float units = 0.0f) = 0;
 
+        virtual void BindTextureUnit(uint32_t unit, uint32_t textureRendererID) = 0;
+
         virtual void DrawIndexed(const Ref<class VertexArray>& vertexArray, uint32_t indexCount = 0, DrawMode drawMode = DrawMode::Triangles) = 0;
 
         static RendererAPIType GetAPI();

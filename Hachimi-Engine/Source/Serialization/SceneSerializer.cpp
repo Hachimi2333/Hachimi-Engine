@@ -2,7 +2,6 @@
 
 #include "Core/Log.h"
 #include "Renderer/MeshFactory.h"
-#include "Renderer/SceneRenderer.h"
 #include "Scene/Components.h"
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
@@ -365,13 +364,9 @@ namespace HachimiEngine
             mesh.Metallic = meshNode["Metallic"].as<float>(0.05f);
             mesh.Visible = meshNode["Visible"].as<bool>(true);
 
-            if (SceneRenderer::GetDefaultMaterial() != nullptr)
-            {
-                mesh.MaterialOverride = Material::Create(SceneRenderer::GetDefaultMaterial()->GetShader());
-                mesh.MaterialOverride->SetAlbedoColor(mesh.MaterialColor);
-                mesh.MaterialOverride->SetRoughness(mesh.Roughness);
-                mesh.MaterialOverride->SetMetallic(mesh.Metallic);
-            }
+            // No material instance is created here: the surface values above are what the
+            // renderer draws with, and MaterialOverride stays empty until a material asset
+            // is assigned. That also keeps serialization free of any renderer dependency.
         }
 
         if (const YAML::Node cameraNode = entityNode["CameraComponent"])

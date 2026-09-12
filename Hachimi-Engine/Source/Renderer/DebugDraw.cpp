@@ -17,6 +17,7 @@ namespace HachimiEngine
         constexpr uint32_t MaxVertexCount = 8192;
 
         void DrawCircle(
+            DebugDraw& debugDraw,
             const Math::Vec3& center,
             const Math::Vec3& axisA,
             const Math::Vec3& axisB,
@@ -32,25 +33,18 @@ namespace HachimiEngine
                 const float angle = Math::TwoPi<float>() * static_cast<float>(index) / static_cast<float>(segments);
                 const Math::Vec3 current = center
                     + (axisA * std::cos(angle) + axisB * std::sin(angle)) * radius;
-                DebugDraw::DrawLine(previous, current, color);
+                debugDraw.DrawLine(previous, current, color);
                 previous = current;
             }
         }
     }
 
-    Ref<Shader> DebugDraw::s_Shader;
-    Ref<VertexBuffer> DebugDraw::s_VertexBuffer;
-    Ref<IndexBuffer> DebugDraw::s_IndexBuffer;
-    Ref<VertexArray> DebugDraw::s_VertexArray;
-    std::vector<DebugDraw::Vertex> DebugDraw::s_Vertices;
-    Math::Mat4 DebugDraw::s_ViewProjection { 1.0f };
-
-    void DebugDraw::Init()
+    DebugDraw::DebugDraw()
     {
-        s_Shader = Shader::CreateEngineShader("DebugDraw.glsl");
+        m_Shader = Shader::CreateEngineShader("DebugDraw.glsl");
 
-        s_VertexBuffer = VertexBuffer::Create(MaxVertexCount * static_cast<uint32_t>(sizeof(Vertex)));
-        s_VertexBuffer->SetLayout({
+        m_VertexBuffer = VertexBuffer::Create(MaxVertexCount * static_cast<uint32_t>(sizeof(Vertex)));
+        m_VertexBuffer->SetLayout({
             { ShaderDataType::Float3, "a_Position" },
             { ShaderDataType::Float4, "a_Color" }
         });
@@ -58,45 +52,45 @@ namespace HachimiEngine
         std::vector<uint32_t> indices(MaxVertexCount);
         std::iota(indices.begin(), indices.end(), 0u);
 
-        s_IndexBuffer = IndexBuffer::Create(indices.data(), MaxVertexCount);
+        m_IndexBuffer = IndexBuffer::Create(indices.data(), MaxVertexCount);
 
-        s_VertexArray = VertexArray::Create();
-        s_VertexArray->AddVertexBuffer(s_VertexBuffer);
-        s_VertexArray->SetIndexBuffer(s_IndexBuffer);
+        m_VertexArray = VertexArray::Create();
+        m_VertexArray->AddVertexBuffer(m_VertexBuffer);
+        m_VertexArray->SetIndexBuffer(m_IndexBuffer);
 
-        s_Vertices.reserve(MaxVertexCount);
+        m_Vertices.reserve(MaxVertexCount);
     }
 
-    void DebugDraw::Shutdown()
+    DebugDraw::~DebugDraw()
     {
-        s_Vertices.clear();
-        s_ViewProjection = Math::Mat4(1.0f);
-        s_VertexArray.reset();
-        s_IndexBuffer.reset();
-        s_VertexBuffer.reset();
-        s_Shader.reset();
+        m_Vertices.clear();
+        m_ViewProjection = Math::Mat4(1.0f);
+        m_VertexArray.reset();
+        m_IndexBuffer.reset();
+        m_VertexBuffer.reset();
+        m_Shader.reset();
     }
 
     void DebugDraw::Begin(const Math::Mat4& viewProjection)
     {
-        s_ViewProjection = viewProjection;
-        s_Vertices.clear();
+        m_ViewProjection = viewProjection;
+        m_Vertices.clear();
     }
 
     void DebugDraw::DrawLine(const Math::Vec3& start, const Math::Vec3& end, const Math::Vec4& color)
     {
-        HE_CORE_ASSERT(s_Vertices.size() + 2 <= MaxVertexCount);
-        s_Vertices.push_back({ start, color });
-        s_Vertices.push_back({ end, color });
+        HE_CORE_ASSERT(m_Vertices.size() + 2 <= MaxVertexCount);
+        m_Vertices.push_back({ start, color });
+        m_Vertices.push_back({ end, color });
     }
 
     void DebugDraw::DrawSphere(const Math::Vec3& center, float radius, const Math::Vec4& color, uint32_t segments)
     {
         radius = std::max(radius, 0.001f);
 
-        DrawCircle(center, { 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, radius, color, segments);
-        DrawCircle(center, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, radius, color, segments);
-        DrawCircle(center, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, radius, color, segments);
+        DrawCircle(*this, center, { 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, radius, color, segments);
+        DrawCircle(*this, center, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, radius, color, segments);
+        DrawCircle(*this, center, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, radius, color, segments);
     }
 
     void DebugDraw::DrawAxes(const Math::Vec3& origin, float size)
@@ -110,20 +104,20 @@ namespace HachimiEngine
 
     void DebugDraw::End()
     {
-        if (s_Shader == nullptr || s_VertexArray == nullptr || s_VertexBuffer == nullptr || s_Vertices.empty())
+        if (m_Shader == nullptr || m_VertexArray == nullptr || m_VertexBuffer == nullptr || m_Vertices.empty())
         {
             return;
         }
 
-        const uint32_t dataSize = static_cast<uint32_t>(s_Vertices.size() * sizeof(Vertex));
-        s_VertexBuffer->SetData(s_Vertices.data(), dataSize);
+        const uint32_t dataSize = static_cast<uint32_t>(m_Vertices.size() * sizeof(Vertex));
+        m_VertexBuffer->SetData(m_Vertices.data(), dataSize);
 
-        s_Shader->Bind();
-        s_Shader->SetMat4("u_ViewProjection", s_ViewProjection);
+        m_Shader->Bind();
+        m_Shader->SetMat4("u_ViewProjection", m_ViewProjection);
 
         Renderer::SetDepthTest(true);
         glDepthMask(GL_FALSE);
-        Renderer::DrawIndexed(s_VertexArray, static_cast<uint32_t>(s_Vertices.size()), DrawMode::Lines);
+        Renderer::DrawIndexed(m_VertexArray, static_cast<uint32_t>(m_Vertices.size()), DrawMode::Lines);
         glDepthMask(GL_TRUE);
     }
 }
