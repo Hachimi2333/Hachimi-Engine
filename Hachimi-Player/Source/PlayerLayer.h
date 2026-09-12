@@ -3,7 +3,7 @@
 #include "Core/Layer.h"
 #include "Core/Memory.h"
 #include "Packaging/PackageFormat.h"
-#include "Renderer/FrameBuffer.h"
+#include "Renderer/SceneRenderTarget.h"
 
 #include <filesystem>
 
@@ -36,6 +36,6 @@ namespace HachimiEngine
         Ref<Project> m_Project;
         Ref<Scene> m_Scene;
         Scope<SceneRenderer> m_SceneRenderer;
-        Ref<Framebuffer> m_SceneFramebuffer;
+        Scope<SceneRenderTarget> m_Target;
     };
 }

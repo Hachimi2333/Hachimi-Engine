@@ -23,8 +23,9 @@ namespace HachimiEngine
         PostProcessPass(const PostProcessPass&) = delete;
         PostProcessPass& operator=(const PostProcessPass&) = delete;
 
-        // Draws the source texture into the currently bound framebuffer.
-        void Render(uint32_t inputTexture, float exposure);
+        // Draws the source texture into the currently bound framebuffer. Stateless, so a
+        // render target can hold it by const reference.
+        void Render(uint32_t inputTexture, float exposure) const;
 
     private:
         Ref<Shader> m_Shader;

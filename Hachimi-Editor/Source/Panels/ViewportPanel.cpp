@@ -154,39 +154,16 @@ namespace HachimiEngine
             return closestEntity;
         }
 
-        void ResizeFramebufferIfNeeded(const Ref<Framebuffer>& framebuffer, uint32_t width, uint32_t height)
-        {
-            if (framebuffer == nullptr)
-            {
-                return;
-            }
 
-            const auto& specification = framebuffer->GetSpecification();
-            if (width > 0 && height > 0 && (width != specification.Width || height != specification.Height))
-            {
-                framebuffer->Resize(width, height);
-            }
-        }
     }
 
-    ViewportPanel::ViewportPanel()
-    {
-        FramebufferSpecification sceneSpecification;
-        sceneSpecification.Width = 1280;
-        sceneSpecification.Height = 720;
-        sceneSpecification.ColorFormat = FramebufferColorFormat::RGBA16F;
-        m_SceneFramebuffer = Framebuffer::Create(sceneSpecification);
-
-        FramebufferSpecification displaySpecification;
-        displaySpecification.Width = 1280;
-        displaySpecification.Height = 720;
-        m_DisplayFramebuffer = Framebuffer::Create(displaySpecification);
-    }
+    ViewportPanel::ViewportPanel() = default;
 
     void ViewportPanel::Init(RendererContext& rendererContext)
     {
         m_Renderer = &rendererContext;
         m_SceneRenderer = CreateScope<SceneRenderer>(rendererContext);
+        m_Target = CreateScope<SceneRenderTarget>();
     }
 
     ViewportPanel::~ViewportPanel() = default;
@@ -207,26 +184,17 @@ namespace HachimiEngine
         const uint32_t width = static_cast<uint32_t>(context.ViewportSize.x);
         const uint32_t height = static_cast<uint32_t>(context.ViewportSize.y);
 
-        ResizeFramebufferIfNeeded(m_SceneFramebuffer, width, height);
-        ResizeFramebufferIfNeeded(m_DisplayFramebuffer, width, height);
+        m_Target->Resize(width, height);
         context.Camera.SetViewportSize(width, height);
 
         const RenderView view = context.ActiveScene->BuildRenderView(context.Camera, true);
 
-        m_SceneFramebuffer->Bind();
-        // Linear-space clear color matching the previous sRGB editor background.
-        RenderCommand::SetClearColor({ 0.00719f, 0.00719f, 0.01002f, 1.0f });
-        RenderCommand::Clear();
-        m_SceneRenderer->Render(view);
-        DrawSelectionIndicators(context, m_Renderer->GetDebugDraw());
-        m_SceneFramebuffer->Unbind();
-
-        m_DisplayFramebuffer->Bind();
-        RenderCommand::Clear();
-        m_Renderer->GetPostProcessPass().Render(
-            m_SceneFramebuffer->GetColorAttachmentRendererID(),
-            view.Environment.Exposure);
-        m_DisplayFramebuffer->Unbind();
+        // The selection gizmos are editor-only and must be tone mapped with the scene, so
+        // they are drawn as an overlay inside the scene pass.
+        m_SceneRenderer->Render(view, *m_Target, [&context, this]
+        {
+            DrawSelectionIndicators(context, m_Renderer->GetDebugDraw());
+        });
     }
 
     void ViewportPanel::Draw(EditorContext& context)
@@ -248,11 +216,11 @@ namespace HachimiEngine
         ImVec2 imageMax(0.0f, 0.0f);
         bool hasViewportImage = false;
 
-        if (m_DisplayFramebuffer->GetColorAttachmentRendererID() != 0 && viewportSize.x > 0.0f && viewportSize.y > 0.0f)
+        if (m_Target != nullptr && m_Target->GetDisplayColorRendererID() != 0 && viewportSize.x > 0.0f && viewportSize.y > 0.0f)
         {
             // UVs are flipped vertically for the OpenGL framebuffer texture.
             ImGui::Image(
-                static_cast<ImTextureID>(m_DisplayFramebuffer->GetColorAttachmentRendererID()),
+                static_cast<ImTextureID>(m_Target->GetDisplayColorRendererID()),
                 viewportSize,
                 ImVec2(0.0f, 1.0f),
                 ImVec2(1.0f, 0.0f));

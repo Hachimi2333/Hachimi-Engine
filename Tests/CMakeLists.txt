@@ -25,6 +25,7 @@ set(TEST_SOURCES
     Packaging/PackageWriterTests.cpp
     Packaging/ProjectPackagerTests.cpp
     Renderer/MeshFactoryTests.cpp
+    Renderer/RenderPipelineTests.cpp
     Scene/RenderViewTests.cpp
     Scene/SceneTests.cpp
     Serialization/ProjectSerializerTests.cpp

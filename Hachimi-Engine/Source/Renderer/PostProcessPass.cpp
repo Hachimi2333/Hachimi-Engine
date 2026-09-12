@@ -24,7 +24,7 @@ namespace HachimiEngine
         m_Shader.reset();
     }
 
-    void PostProcessPass::Render(uint32_t inputTexture, float exposure)
+    void PostProcessPass::Render(uint32_t inputTexture, float exposure) const
     {
         HE_CORE_ASSERT(m_Shader != nullptr);
         HE_CORE_ASSERT(m_VertexArray != 0);

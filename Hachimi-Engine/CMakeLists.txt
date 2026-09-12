@@ -104,6 +104,14 @@ set(ENGINE_SOURCES
     Source/Renderer/MeshFactory.h
     Source/Renderer/MeshLibrary.cpp
     Source/Renderer/MeshLibrary.h
+    Source/Renderer/Passes/DirectionalShadowPass.cpp
+    Source/Renderer/Passes/DirectionalShadowPass.h
+    Source/Renderer/Passes/GridPass.cpp
+    Source/Renderer/Passes/GridPass.h
+    Source/Renderer/Passes/OpaquePass.cpp
+    Source/Renderer/Passes/OpaquePass.h
+    Source/Renderer/Passes/SkyboxPass.cpp
+    Source/Renderer/Passes/SkyboxPass.h
     Source/Renderer/PostProcessPass.cpp
     Source/Renderer/PostProcessPass.h
     Source/Renderer/RenderCommand.h
@@ -113,9 +121,14 @@ set(ENGINE_SOURCES
     Source/Renderer/RendererAPI.h
     Source/Renderer/RendererContext.cpp
     Source/Renderer/RendererContext.h
+    Source/Renderer/RenderPass.h
+    Source/Renderer/RenderPipeline.cpp
+    Source/Renderer/RenderPipeline.h
     Source/Renderer/RenderView.h
     Source/Renderer/SceneRenderer.cpp
     Source/Renderer/SceneRenderer.h
+    Source/Renderer/SceneRenderTarget.cpp
+    Source/Renderer/SceneRenderTarget.h
     Source/Renderer/Shader.cpp
     Source/Renderer/Shader.h
     Source/Renderer/ShadowMap.cpp

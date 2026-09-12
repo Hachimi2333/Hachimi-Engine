@@ -2,7 +2,7 @@
 
 #include "Core/Base.h"
 #include "Core/Memory.h"
-#include "Renderer/FrameBuffer.h"
+#include "Renderer/SceneRenderTarget.h"
 
 #include <imgui.h>
 
@@ -36,7 +36,6 @@ namespace HachimiEngine
     private:
         RendererContext* m_Renderer = nullptr;
         Scope<SceneRenderer> m_SceneRenderer;
-        Ref<Framebuffer> m_SceneFramebuffer;
-        Ref<Framebuffer> m_DisplayFramebuffer;
+        Scope<SceneRenderTarget> m_Target;
     };
 }

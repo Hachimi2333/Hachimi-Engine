@@ -4,8 +4,6 @@
 #include "Core/Application.h"
 #include "Core/Log.h"
 #include "Project/Project.h"
-#include "Renderer/PostProcessPass.h"
-#include "Renderer/RenderCommand.h"
 #include "Renderer/RendererContext.h"
 #include "Renderer/SceneRenderer.h"
 #include "Scene/Components.h"
@@ -15,8 +13,6 @@
 #include "Utils/VirtualFileSystem.h"
 #include "Math/Math.h"
 
-#include <glad/gl.h>
-
 #include <algorithm>
 
 namespace HachimiEngine
@@ -25,20 +21,6 @@ namespace HachimiEngine
     {
         constexpr uint32_t DefaultWindowWidth = 1600;
         constexpr uint32_t DefaultWindowHeight = 900;
-
-        void ResizeFramebufferIfNeeded(const Ref<Framebuffer>& framebuffer, uint32_t width, uint32_t height)
-        {
-            if (framebuffer == nullptr)
-            {
-                return;
-            }
-
-            const auto& specification = framebuffer->GetSpecification();
-            if (width > 0 && height > 0 && (width != specification.Width || height != specification.Height))
-            {
-                framebuffer->Resize(width, height);
-            }
-        }
     }
 
     PlayerLayer::PlayerLayer(PackageBuildInfo buildInfo, std::filesystem::path contentRoot)
@@ -46,11 +28,7 @@ namespace HachimiEngine
         , m_BuildInfo(std::move(buildInfo))
         , m_ContentRoot(std::move(contentRoot))
     {
-        FramebufferSpecification sceneSpecification;
-        sceneSpecification.Width = DefaultWindowWidth;
-        sceneSpecification.Height = DefaultWindowHeight;
-        sceneSpecification.ColorFormat = FramebufferColorFormat::RGBA16F;
-        m_SceneFramebuffer = Framebuffer::Create(sceneSpecification);
+        m_Target = CreateScope<SceneRenderTarget>(DefaultWindowWidth, DefaultWindowHeight);
     }
 
     PlayerLayer::~PlayerLayer() = default;
@@ -125,17 +103,25 @@ namespace HachimiEngine
 
     void PlayerLayer::OnUpdate(Timestep timestep)
     {
-        if (m_Scene == nullptr || m_SceneRenderer == nullptr)
+        if (m_Scene == nullptr)
         {
             return;
         }
 
         m_Scene->OnUpdate(timestep);
+    }
+
+    void PlayerLayer::OnRender()
+    {
+        if (m_Scene == nullptr || m_SceneRenderer == nullptr)
+        {
+            return;
+        }
 
         const Window& window = Application::Get().GetWindow();
         const uint32_t width = std::max(window.GetWidth(), 1u);
         const uint32_t height = std::max(window.GetHeight(), 1u);
-        ResizeFramebufferIfNeeded(m_SceneFramebuffer, width, height);
+        m_Target->Resize(width, height);
         m_Scene->SetViewportSize(width, height);
 
         const float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
@@ -171,26 +157,6 @@ namespace HachimiEngine
             desc.Projection = Math::Perspective(Math::Radians(45.0f), aspectRatio, 0.1f, 1000.0f);
         }
 
-        const RenderView view = m_Scene->BuildRenderView(desc);
-
-        m_SceneFramebuffer->Bind();
-        RenderCommand::SetClearColor({ 0.00719f, 0.00719f, 0.01002f, 1.0f });
-        RenderCommand::Clear();
-        m_SceneRenderer->Render(view);
-        m_SceneFramebuffer->Unbind();
-    }
-
-    void PlayerLayer::OnRender()
-    {
-        if (m_Scene == nullptr || m_SceneRenderer == nullptr || m_SceneFramebuffer->GetColorAttachmentRendererID() == 0)
-        {
-            return;
-        }
-
-        const Window& window = Application::Get().GetWindow();
-        RenderCommand::SetViewport(0, 0, window.GetWidth(), window.GetHeight());
-        Application::Get().GetRendererContext().GetPostProcessPass().Render(
-            m_SceneFramebuffer->GetColorAttachmentRendererID(),
-            m_Scene->GetEnvironmentSettings().Exposure);
+        m_SceneRenderer->Render(m_Scene->BuildRenderView(desc), *m_Target);
     }
 }
