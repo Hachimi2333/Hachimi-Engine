@@ -248,7 +248,8 @@ add_subdirectory(Hachimi-Engine)
 add_subdirectory(Hachimi-Editor)
 add_subdirectory(Hachimi-Player)
 
-# Headless verification. enable_testing() lives here rather than in Tests/ so that ctest
-# finds the test from the build root.
+# Headless verification and its companion tool. enable_testing() lives here rather than in
+# Tests/ so that ctest finds the test from the build root.
 enable_testing()
 add_subdirectory(Tests)
+add_subdirectory(Utils/EmitPackage)
