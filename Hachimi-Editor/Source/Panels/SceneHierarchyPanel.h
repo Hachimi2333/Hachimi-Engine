@@ -2,6 +2,7 @@
 
 #include "Core/Base.h"
 #include "Scene/Entity.h"
+#include "Renderer/MeshFactory.h"
 
 namespace HachimiEngine
 {
@@ -17,5 +18,8 @@ namespace HachimiEngine
         void DrawEntityNode(EditorContext& context, Entity entity);
         void DrawEntityContextMenu(EditorContext& context, Entity entity);
         void DrawCreateMenu(EditorContext& context);
+
+        // Creating a mesh entity means the same four lines everywhere a primitive is offered.
+        Entity CreatePrimitive(EditorContext& context, const char* name, PrimitiveMeshType primitive);
     };
 }

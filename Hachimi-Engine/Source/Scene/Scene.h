@@ -45,7 +45,8 @@ namespace HachimiEngine
         void DestroyEntity(Entity entity);
         Entity DuplicateEntity(Entity entity);
 
-        // Creates a runtime copy with matching UUIDs; mesh assets are shared while material overrides are cloned.
+        // Creates a runtime copy with matching UUIDs. Geometry and asset references are shared
+        // values, so the copy points at the same mesh data and the same material asset.
         Ref<Scene> Clone() const;
 
         Entity GetEntityByUUID(UUID uuid);
@@ -98,6 +99,13 @@ namespace HachimiEngine
         const std::string& GetName() const { return m_Name; }
         void SetName(const std::string& name) { m_Name = name; }
 
+        // Whether the in-memory scene differs from the file it was loaded from or last saved to.
+        // Clearing is the serializer's job, because only it knows that a write succeeded; marking
+        // is the caller's, and in the editor every edit path goes through CommandHistory.
+        bool IsDirty() const { return m_Dirty; }
+        void MarkDirty() { m_Dirty = true; }
+        void ClearDirty() { m_Dirty = false; }
+
         uint32_t GetViewportWidth() const { return m_ViewportWidth; }
         uint32_t GetViewportHeight() const { return m_ViewportHeight; }
 
@@ -108,6 +116,7 @@ namespace HachimiEngine
         const PhysicsSettings& GetPhysicsSettings() const { return m_PhysicsSettings; }
 
         entt::registry& GetRegistry() { return m_Registry; }
+        const entt::registry& GetRegistry() const { return m_Registry; }
         const std::unordered_map<UUID, entt::entity>& GetEntityMap() const { return m_EntityMap; }
 
     private:
@@ -140,6 +149,7 @@ namespace HachimiEngine
         uint32_t m_ViewportHeight = 720;
         EnvironmentSettings m_Environment;
         PhysicsSettings m_PhysicsSettings;
+        bool m_Dirty = false;
 
         std::vector<Scope<SceneSystem>> m_Systems;
         // The systems OnRuntimeStart attached, so stopping detaches exactly those.

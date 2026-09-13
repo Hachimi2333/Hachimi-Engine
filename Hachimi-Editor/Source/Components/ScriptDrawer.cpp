@@ -1,48 +1,23 @@
 #include "Components/ComponentDrawers.h"
 
-#include "Asset/AssetManager.h"
+#include "Asset/AssetDatabase.h"
 #include "Components/InspectorWidgets.h"
 #include "Core/Log.h"
+#include "Editor/CommandHistory.h"
+#include "Editor/SceneCommands.h"
+#include "Editor/SceneDirtyState.h"
+#include "Panels/EditorContext.h"
 #include "Scene/ComponentRegistry.h"
 #include "Scene/Components/ScriptComponent.h"
-#include "UI/AssetBrowserGrid.h"
-#include "UI/AssetPickerPopup.h"
+#include "Scene/Entity.h"
+#include "UI/AssetField.h"
 
-#include <algorithm>
-#include <cctype>
+#include <imgui.h>
+
 #include <cstdio>
-#include <filesystem>
 
 namespace HachimiEngine
 {
-    namespace
-    {
-        bool IsLuaScriptPath(const std::string& path)
-        {
-            std::string extension = std::filesystem::path(path).extension().string();
-            std::transform(extension.begin(), extension.end(), extension.begin(),
-                [](unsigned char character) { return static_cast<char>(std::tolower(character)); });
-            return extension == ".lua";
-        }
-
-        // Scripts are stored relative to Assets/Scripts so a project can be moved or packaged
-        // without rewriting the paths.
-        void MakeScriptPathRelative(const std::string& selectedPath, ScriptComponent::ScriptReference& reference)
-        {
-            const std::filesystem::path scriptsDirectory = AssetManager::GetAssetsDirectory() / "Scripts";
-
-            std::error_code errorCode;
-            const std::filesystem::path relativePath = std::filesystem::relative(selectedPath, scriptsDirectory, errorCode);
-            if (errorCode)
-            {
-                reference.Path = std::filesystem::path(selectedPath).filename().string();
-                return;
-            }
-
-            reference.Path = relativePath.generic_string();
-        }
-    }
-
     void DrawScriptComponent(Entity entity, InspectorDrawContext& context)
     {
         const ComponentDescriptor* descriptor = ComponentRegistry::Find(entt::type_hash<ScriptComponent>::value());
@@ -52,14 +27,17 @@ namespace HachimiEngine
         }
 
         bool removed = false;
-        const bool open = DrawComponentHeader(entity, *descriptor, true, removed);
+        const bool open = DrawComponentHeaderUndoable(entity, *descriptor, true, removed, context.Context.History);
         if (removed || !open)
         {
-            context.AssetPicker.Close();
+            context.AssetFields.Picker.Close();
+            context.AssetFields.Pending.Clear();
             return;
         }
 
         auto& script = entity.GetComponent<ScriptComponent>();
+        CommandHistory* history = context.Context.History;
+        AssetDatabase* database = context.Context.Assets;
 
         int removeSlot = -1;
         for (int slotIndex = 0; slotIndex < static_cast<int>(script.Scripts.size()); ++slotIndex)
@@ -72,50 +50,34 @@ namespace HachimiEngine
                 BeginInspectorProperty("Enabled");
                 ImGui::Checkbox("##Enabled", &reference.Enabled);
 
-                BeginInspectorPropertyLabel("Path");
+                BeginInspectorProperty("Script");
+                context.NextAssetFieldSlot = AssetFieldScriptSlotBase + static_cast<uint32_t>(slotIndex);
+                DrawAssetField("##Script", entity, context.NextAssetFieldSlot, reference.Script,
+                    AssetType::Script, context.AssetFields, context);
 
-                const float buttonWidth = ImGui::GetFrameHeight();
-                const float inputWidth = std::max(ImGui::GetContentRegionAvail().x - buttonWidth * 2.0f - ImGui::GetStyle().ItemSpacing.x * 2.0f, 40.0f);
-                ImGui::SetNextItemWidth(inputWidth);
-
-                char pathBuffer[256] = {};
-                std::snprintf(pathBuffer, sizeof(pathBuffer), "%s", reference.Path.c_str());
-                if (ImGui::InputText("##Path", pathBuffer, sizeof(pathBuffer)))
+                // The display name is only a label for a reference whose asset is gone; when the
+                // asset is known, the database already knows the better name.
+                const bool known = database != nullptr && database->Contains(reference.Script);
+                BeginInspectorProperty("Name");
+                if (known)
                 {
-                    reference.Path = pathBuffer;
+                    ImGui::TextDisabled("%s", database->GetDisplayName(reference.Script).c_str());
                 }
-
-                if (ImGui::IsItemHovered())
+                else
                 {
-                    ImGui::SetTooltip("Drag a Lua script here from the Content Browser");
-                }
-
-                // Accept script files dragged from the Content Browser grid.
-                if (ImGui::BeginDragDropTarget())
-                {
-                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(AssetBrowserGrid::FilePayload))
+                    char nameBuffer[256] = {};
+                    std::snprintf(nameBuffer, sizeof(nameBuffer), "%s", reference.DisplayName.c_str());
+                    if (ImGui::InputText("##DisplayName", nameBuffer, sizeof(nameBuffer)))
                     {
-                        const std::string droppedPath(static_cast<const char*>(payload->Data));
-                        if (IsLuaScriptPath(droppedPath))
+                        reference.DisplayName = nameBuffer;
+                        if (context.Context.DirtyState != nullptr)
                         {
-                            MakeScriptPathRelative(droppedPath, reference);
+                            context.Context.DirtyState->MarkDirty();
                         }
                     }
-                    ImGui::EndDragDropTarget();
                 }
 
-                ImGui::SameLine();
-                if (ImGui::Button("...", ImVec2 { buttonWidth, buttonWidth }))
-                {
-                    context.PendingAssetPickerSlot = slotIndex;
-                    context.AssetPicker.Open("Select Script", AssetManager::GetAssetsDirectory() / "Scripts", { ".lua" });
-                }
-                if (ImGui::IsItemHovered())
-                {
-                    ImGui::SetTooltip("Browse script");
-                }
-
-                ImGui::SameLine();
+                BeginInspectorProperty("Remove");
                 if (DrawRemoveButton("Remove script"))
                 {
                     removeSlot = slotIndex;
@@ -131,27 +93,22 @@ namespace HachimiEngine
         if (ImGui::Button("Add Script", GetFullWidthButtonSize()))
         {
             script.Scripts.emplace_back();
-        }
-
-        std::filesystem::path selectedPath;
-        if (context.AssetPicker.Draw(selectedPath))
-        {
-            const int slot = context.PendingAssetPickerSlot;
-            if (slot >= 0 && slot < static_cast<int>(script.Scripts.size()))
-            {
-                MakeScriptPathRelative(selectedPath.string(), script.Scripts[static_cast<size_t>(slot)]);
-            }
-            context.PendingAssetPickerSlot = -1;
+            ImGui::Separator();
         }
 
         if (removeSlot >= 0)
         {
+            // Dropping a slot shifts every later one, so the undo stack is dropped rather than left
+            // holding commands that now address a different script. The edit itself still counts as
+            // an unsaved change.
             script.Scripts.erase(script.Scripts.begin() + removeSlot);
-
-            if (context.PendingAssetPickerSlot == removeSlot)
+            if (history != nullptr)
             {
-                context.PendingAssetPickerSlot = -1;
-                context.AssetPicker.Close();
+                history->Clear();
+            }
+            if (context.Context.DirtyState != nullptr)
+            {
+                context.Context.DirtyState->MarkDirty();
             }
         }
     }

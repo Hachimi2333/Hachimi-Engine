@@ -11,7 +11,8 @@ namespace HachimiEngine
     class ProjectHubLayer final : public Layer
     {
     public:
-        ProjectHubLayer();
+        // A non-empty project file opens immediately instead of showing the hub.
+        explicit ProjectHubLayer(std::filesystem::path projectFile = {});
 
         void OnAttach() override;
         void OnImGuiRender() override;
@@ -22,6 +23,7 @@ namespace HachimiEngine
     private:
         char m_ProjectName[128] = "NewProject";
         char m_ProjectLocation[1024] = {};
+        std::filesystem::path m_StartupProjectFile;
         bool m_EditorPushed = false;
         Layer* m_EditorLayer = nullptr;
     };

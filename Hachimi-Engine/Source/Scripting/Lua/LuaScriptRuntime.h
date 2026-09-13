@@ -3,6 +3,9 @@
 #include "Core/Memory.h"
 #include "Scripting/ScriptRuntime.h"
 
+#include <filesystem>
+#include <string>
+
 namespace HachimiEngine
 {
     class Scene;
@@ -15,7 +18,8 @@ namespace HachimiEngine
         explicit LuaScriptRuntime(Scene& scene);
         ~LuaScriptRuntime() override;
 
-        void CreateInstance(Entity entity, uint32_t slotIndex, const std::string& relativePath, bool enabled) override;
+        void CreateInstance(Entity entity, uint32_t slotIndex, const std::filesystem::path& sourcePath,
+                            const std::string& displayName) override;
         void Update(Timestep timestep, Scene& scene) override;
         void Shutdown(Scene& scene) override;
 

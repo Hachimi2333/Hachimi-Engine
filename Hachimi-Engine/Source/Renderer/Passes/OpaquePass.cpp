@@ -3,6 +3,8 @@
 #include "Core/Assert.h"
 #include "Renderer/EnvironmentMap.h"
 #include "Renderer/FrameUniforms.h"
+#include "Renderer/Material.h"
+#include "Renderer/MaterialResolver.h"
 #include "Renderer/Mesh.h"
 #include "Renderer/MeshLibrary.h"
 #include "Renderer/Renderer.h"
@@ -40,6 +42,7 @@ namespace HachimiEngine
         frameUniforms.Bind();
 
         MeshLibrary& meshes = context.Renderers.GetMeshes();
+        MaterialResolver& materials = context.Renderers.GetMaterials();
         EnvironmentMap& environmentMap = context.Renderers.GetEnvironmentMap();
 
         if (context.DirectionalShadowEnabled)
@@ -85,19 +88,18 @@ namespace HachimiEngine
                 continue;
             }
 
-            // An explicit material supplies the shader and the albedo texture; the surface
-            // values stay with the entity, so no per-entity Material instance is needed.
-            const Ref<Shader>& shader = item.Material != nullptr
-                ? item.Material->GetShader()
-                : defaultShader;
+            // The item carries a material reference, not a material: resolving it here is what
+            // keeps the scene extraction free of GPU work.
+            const Ref<Material> material = materials.Resolve(item.Material);
+            const Ref<Shader>& shader = material != nullptr ? material->GetShader() : defaultShader;
             HE_CORE_ASSERT(shader != nullptr);
 
             activateShader(shader);
 
-            if (item.Material != nullptr)
+            if (material != nullptr)
             {
                 // Re-applies the same program and sets the albedo texture state.
-                item.Material->Bind();
+                material->Bind();
             }
             else
             {

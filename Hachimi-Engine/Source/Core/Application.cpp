@@ -1,6 +1,7 @@
 #include "Core/Application.h"
 
-#include "Asset/AssetManager.h"
+#include "Asset/AssetDatabase.h"
+#include "Asset/TextureCache.h"
 #include "Core/Assert.h"
 #include "Core/JobSystem.h"
 #include "Core/Log.h"
@@ -37,6 +38,14 @@ namespace HachimiEngine
         m_RendererContext = CreateScope<RendererContext>();
         m_RendererContext->Init();
 
+        // The asset services are application-wide and the renderer only borrows them, so a pass
+        // can resolve an asset handle without reaching for a global.
+        m_AssetDatabase = CreateScope<AssetDatabase>();
+        m_TextureCache = CreateScope<TextureCache>();
+        m_TextureCache->SetDatabase(m_AssetDatabase.get());
+        m_RendererContext->SetAssetDatabase(m_AssetDatabase.get());
+        m_RendererContext->SetTextureCache(m_TextureCache.get());
+
         ScriptManager::Init();
 
         m_ImGuiLayer = CreateRef<ImGuiLayer>();
@@ -46,13 +55,18 @@ namespace HachimiEngine
     Application::~Application()
     {
         ScriptManager::Shutdown();
+
+        // Texture objects hold GL handles, so they are released while the context is still
+        // current, and before the renderer context that created the backend they belong to.
+        m_TextureCache->Clear();
+        m_AssetDatabase->Clear();
+
         // Releases every renderer GPU resource, including the backend, while the GL
         // context is still current and before the ImGui overlay detaches.
         m_RendererContext->Shutdown();
 
         // Stop workers before dropping the mounts so no read is in flight while
         // packages are released, and no deferred callback can fire afterwards.
-        AssetManager::Shutdown();
         JobSystem::Shutdown();
         VirtualFileSystem::UnmountAll();
 
@@ -75,7 +89,7 @@ namespace HachimiEngine
             // Deliver completed background reads and GPU-upload finished texture
             // decodes on the main thread, where OpenGL calls are legal.
             VirtualFileSystem::PumpCompletedRequests();
-            AssetManager::PumpCompletedRequests();
+            m_TextureCache->PumpCompletedRequests();
 
             m_Window->OnUpdate();
 

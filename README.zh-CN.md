@@ -16,6 +16,10 @@
 - 带显式阶段的场景系统（PreUpdate / FixedUpdate / Update / LateUpdate），物理与脚本独立挂载
 - 派生式实体层级（只存父节点），重父级带环检测，删除父节点销毁整棵子树
 - yaml-cpp 场景（`.hscene`，带格式版本）与项目（`.hproj`）序列化，枚举按名字存储
+- 资产管线：`AssetDatabase` 扫描 `Assets/`，每个资产在 `<文件>.meta` 侧车里持有 UUID 身份，
+  组件通过 UUID 而非路径引用资产，因此改名或移动文件不会打断引用
+- 材质资产（`Assets/Materials/*.hmaterial`）：引擎着色器、基础色与 albedo 贴图引用，编辑器可直接创建与编辑
+- 每个资产的纹理导入设置（色彩空间、mipmap、wrap、filter）保存在侧车里
 - 控制台日志（引擎与客户端双 logger，暂不输出日志文件）
 - Lua 5.4 脚本系统，底层采用语言无关的后端抽象，为后续支持更多脚本语言预留
 
@@ -39,6 +43,9 @@
 ### 编辑器
 
 - ImGui Docking 编辑器：Project Hub、Viewport、Scene Hierarchy、Inspector、Content Browser、Console
+- 撤销 / 重做命令栈（Ctrl+Z / Ctrl+Y），gizmo 拖拽与文本输入等连续编辑合并为一条记录
+- 关闭编辑器、切换场景、返回 Project Hub 前提示保存未保存的改动
+- Content Browser 文件管理：新建文件夹、新建材质、重命名、复制、删除（删除前列出引用者）与拖拽移动，`.meta` 随资产移动
 - 游戏导出管线：Build Settings 弹窗、Windows_x64 导出、`Data.hpak` 资源打包，以及独立的 `Hachimi-Player` 运行时
 - 大图标 Content Browser 网格，支持纹理缩略图，可将文件拖拽到 Inspector 资产字段
 - Native File Dialog Extended 系统原生文件对话框
@@ -49,7 +56,7 @@
 
 ## 脚本系统
 
-脚本为 `Assets/Scripts` 下的 Lua 5.4 源文件，通过 Inspector 的 `Script` 组件挂到实体上。路径相对 `Assets/Scripts` 存储，因此也支持 `Player/Controller.lua` 这样的子目录路径。
+脚本为 `Assets/Scripts` 下的 Lua 5.4 源文件，通过 Inspector 的 `Script` 组件挂到实体上。引用存的是脚本资产的 UUID，因此移动或重命名 `.lua` 文件不会断开挂载；面板会同时显示文件名。
 
 脚本文件返回一个模块表，并提供可选的生命周期回调：
 
@@ -256,6 +263,8 @@ Hachimi-Engine/          # 引擎核心（静态库）
   Resources/Shaders/     # 引擎内置 GLSL 着色器
   Resources/Fonts/       # 编辑器 UI 字体（Inter）及其许可证
   Source/                # 引擎源码
+  Source/Asset/          # 资产身份、侧车元数据、资产数据库、纹理缓存与材质资产
+  Source/Editor/         # 可撤销编辑命令、命令历史与场景脏标记
   Source/Packaging/      # 游戏导出配置、.hpak 格式与读写实现
   Source/Renderer/       # 渲染上下文、管线、通道、视图与资源
   Source/Scene/          # 组件注册表、组件、实体、场景、系统
@@ -264,6 +273,7 @@ Hachimi-Editor/          # 编辑器客户端（可执行文件）
   CMakeLists.txt
   Source/                # 编辑器源码
   Source/Components/     # Inspector 控件、绘制注册表与各组件绘制器
+  Source/UI/             # 资产网格、资产选择弹窗与共享的资产字段控件
 Hachimi-Player/          # 导出构建使用的独立游戏运行时
   CMakeLists.txt
   Source/                # Player 源码
@@ -285,6 +295,11 @@ Utils/                   # 临时调试工具（FramebufferTest 帧缓冲测试�
 则转发到 zstd 位于 `build/cmake/` 的自有工程。doctest 保留上游 CMake 工程，由根
 `CMakeLists.txt` 与其它库一样引入。
 
+工程拥有的一切都在 `<项目>/Assets` 下，每个资产文件旁边有一个 `<文件>.meta` 侧车，
+记录它的 UUID（纹理还记录导入设置）。侧车是资产引用稳定的原因：组件与材质存的是 UUID，
+改名或移动文件只改变数据库解析路径。两种文件都会被打进 `Data.hpak`，因此导出后的游戏
+解析到的引用与编辑器里完全一致。
+
 ## 当前范围说明
 
 以下内容已预留架构位置，但暂未实现：
@@ -296,6 +311,8 @@ Utils/                   # 临时调试工具（FramebufferTest 帧缓冲测试�
 - 外部 3D 模型导入（当前使用内置网格）
 - 日志文件输出（当前仅控制台）
 - 物理 Joints / Character Mover / Mesh / HeightField 碰撞体 / 物理 Debug Draw / Box3D 多线程（当前使用基础刚体与凸碰撞体）
+- 除 albedo 外的材质贴图通道（法线 / 自发光 / AO / 粗糙度 / 金属度）与 Alpha 模式；材质资产目前只有 albedo 通道
+- 编辑器之外的资产改名追踪：手工删除 `.meta` 侧车后会以新身份重建，指向它的引用随之失效
 
 后续画面效果与系统规划详见 `FUTURE.md`。
 

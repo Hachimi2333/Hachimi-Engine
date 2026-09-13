@@ -13,6 +13,7 @@ namespace HachimiEngine
     class RendererContext;
     class Scene;
     class SceneRenderer;
+    class ScreenPresenter;
 
     // Runtime layer for a packaged game: loads the project straight out of the
     // game package and drives scene simulation plus rendering for the lifetime of
@@ -21,8 +22,8 @@ namespace HachimiEngine
     {
     public:
         PlayerLayer(PackageBuildInfo buildInfo, std::filesystem::path contentRoot);
-        // Defined out of line: the layer owns a SceneRenderer, and the destructor needs
-        // its complete type.
+        // Defined out of line: the layer owns a SceneRenderer and a ScreenPresenter, and the
+        // destructor needs their complete types.
         ~PlayerLayer() override;
 
         void OnAttach() override;
@@ -37,5 +38,6 @@ namespace HachimiEngine
         Ref<Scene> m_Scene;
         Scope<SceneRenderer> m_SceneRenderer;
         Scope<SceneRenderTarget> m_Target;
+        Scope<ScreenPresenter> m_ScreenPresenter;
     };
 }

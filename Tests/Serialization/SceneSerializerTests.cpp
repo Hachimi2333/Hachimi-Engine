@@ -15,7 +15,7 @@
 #include "Scene/Components/CameraComponent.h"
 #include "Scene/Components/ColliderComponent.h"
 #include "Scene/Components/LightComponent.h"
-#include "Scene/Components/MeshComponent.h"
+#include "Scene/Components/MeshRendererComponent.h"
 #include "Scene/Components/RelationshipComponent.h"
 #include "Scene/Components/RigidbodyComponent.h"
 #include "Scene/Components/ScriptComponent.h"
@@ -97,10 +97,10 @@ namespace
         child.Transform().Scale = { 2.0f, 2.0f, 2.0f };
         scene->SetParent(child, parent);
 
-        auto& mesh = child.AddComponent<MeshComponent>();
-        mesh.PrimitiveType = PrimitiveMeshType::Sphere;
+        auto& mesh = child.AddComponent<MeshRendererComponent>().SetPrimitive(PrimitiveMeshType::Cube);
+        mesh.Primitive = PrimitiveMeshType::Sphere;
         mesh.Mesh = MeshFactory::CreateSphere();
-        mesh.MaterialColor = { 0.1f, 0.2f, 0.3f, 0.4f };
+        mesh.AlbedoColor = { 0.1f, 0.2f, 0.3f, 0.4f };
         mesh.Roughness = 0.25f;
         mesh.Metallic = 0.75f;
         mesh.Visible = false;
@@ -133,8 +133,15 @@ namespace
         lightComponent.CastsShadows = false;
 
         auto& scriptComponent = light.AddComponent<ScriptComponent>();
-        scriptComponent.Scripts.push_back({ "Rotator.lua", true });
-        scriptComponent.Scripts.push_back({ "Disabled.lua", false });
+        ScriptComponent::ScriptReference rotator;
+        rotator.DisplayName = "Rotator.lua";
+        rotator.Enabled = true;
+        scriptComponent.Scripts.push_back(rotator);
+
+        ScriptComponent::ScriptReference disabled;
+        disabled.DisplayName = "Disabled.lua";
+        disabled.Enabled = false;
+        scriptComponent.Scripts.push_back(disabled);
 
         return scene;
     }
@@ -187,8 +194,8 @@ TEST_SUITE("Serialization")
         CHECK(SameUUID(child.GetComponent<RelationshipComponent>().Parent, parent.GetUUID()));
         CHECK(Near(child.Transform().Scale.x, 2.0f));
 
-        const auto& mesh = child.GetComponent<MeshComponent>();
-        CHECK(mesh.PrimitiveType == PrimitiveMeshType::Sphere);
+        const auto& mesh = child.GetComponent<MeshRendererComponent>();
+        CHECK(mesh.Primitive == PrimitiveMeshType::Sphere);
         REQUIRE(mesh.Mesh.get() != nullptr);
         CHECK_FALSE(mesh.Mesh->IsEmpty());
         CHECK(Near(mesh.Roughness, 0.25f));
@@ -219,9 +226,11 @@ TEST_SUITE("Serialization")
 
         const auto& scripts = light.GetComponent<ScriptComponent>().Scripts;
         REQUIRE(scripts.size() == 2);
-        CHECK(scripts[0].Path == "Rotator.lua");
+        // The label travels with the reference, so a scene whose script asset is missing still says
+        // what it used to point at.
+        CHECK(scripts[0].DisplayName == "Rotator.lua");
         CHECK(scripts[0].Enabled);
-        CHECK(scripts[1].Path == "Disabled.lua");
+        CHECK(scripts[1].DisplayName == "Disabled.lua");
         CHECK_FALSE(scripts[1].Enabled);
     }
 

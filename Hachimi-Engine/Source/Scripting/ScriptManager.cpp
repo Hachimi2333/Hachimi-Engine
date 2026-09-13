@@ -1,6 +1,5 @@
 #include "Scripting/ScriptManager.h"
 
-#include "Asset/AssetManager.h"
 #include "Scripting/Lua/LuaScriptEngine.h"
 #include "Scripting/ScriptEngine.h"
 
@@ -50,20 +49,5 @@ namespace HachimiEngine
     bool ScriptManager::IsScriptFile(const std::string& filePath)
     {
         return GetEngineForFile(filePath) != nullptr;
-    }
-
-    std::filesystem::path ScriptManager::GetScriptsDirectory()
-    {
-        return AssetManager::GetAssetsDirectory() / "Scripts";
-    }
-
-    std::filesystem::path ScriptManager::ResolveScriptPath(const std::string& relativePath)
-    {
-        if (relativePath.empty())
-        {
-            return {};
-        }
-
-        return (GetScriptsDirectory() / relativePath).lexically_normal();
     }
 }

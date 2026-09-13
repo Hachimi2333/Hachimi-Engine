@@ -18,7 +18,7 @@
 #include "Scene/Components/CameraComponent.h"
 #include "Scene/Components/ColliderComponent.h"
 #include "Scene/Components/LightComponent.h"
-#include "Scene/Components/MeshComponent.h"
+#include "Scene/Components/MeshRendererComponent.h"
 #include "Scene/Components/RelationshipComponent.h"
 #include "Scene/Components/RigidbodyComponent.h"
 #include "Scene/Components/ScriptComponent.h"
@@ -91,9 +91,9 @@ TEST_SUITE("Scene")
 
         const Entity cube = FindEntityByName(scene, "Cube");
         REQUIRE_FALSE(IsNull(cube));
-        REQUIRE(cube.HasComponent<MeshComponent>());
+        REQUIRE(cube.HasComponent<MeshRendererComponent>());
 
-        const Ref<MeshData>& mesh = cube.GetComponent<MeshComponent>().Mesh;
+        const Ref<MeshData>& mesh = cube.GetComponent<MeshRendererComponent>().Mesh;
         REQUIRE(mesh.get() != nullptr);
         CHECK_FALSE(mesh->IsEmpty());
         CHECK(mesh->GetBounds().IsValid());
@@ -167,7 +167,7 @@ TEST_SUITE("Scene")
 
         Entity source = scene.CreateEntity("Source");
         source.Transform().Position = { 1.0f, 2.0f, 3.0f };
-        source.AddComponent<MeshComponent>().Mesh = MeshFactory::CreateSphere();
+        source.AddComponent<MeshRendererComponent>().SetPrimitive(PrimitiveMeshType::Sphere);
         source.AddComponent<RigidbodyComponent>().Type = RigidbodyComponent::RigidbodyType::Static;
         source.AddComponent<ColliderComponent>().Radius = 0.25f;
         source.AddComponent<CameraComponent>().FieldOfView = 70.0f;
@@ -187,7 +187,7 @@ TEST_SUITE("Scene")
         CHECK(Near(duplicateTransform.Position.z, sourceTransform.Position.z));
 
         // Geometry is shared; only the material override is cloned.
-        CHECK(duplicate.GetComponent<MeshComponent>().Mesh.get() == source.GetComponent<MeshComponent>().Mesh.get());
+        CHECK(duplicate.GetComponent<MeshRendererComponent>().Mesh.get() == source.GetComponent<MeshRendererComponent>().Mesh.get());
         CHECK(duplicate.GetComponent<RigidbodyComponent>().Type == RigidbodyComponent::RigidbodyType::Static);
         CHECK(Near(duplicate.GetComponent<ColliderComponent>().Radius, 0.25f));
         CHECK(Near(duplicate.GetComponent<CameraComponent>().FieldOfView, 70.0f));
@@ -208,7 +208,7 @@ TEST_SUITE("Scene")
         Entity child = scene.CreateEntity("Child");
         scene.SetParent(child, parent);
         child.Transform().Position = { 0.0f, 5.0f, 0.0f };
-        child.AddComponent<MeshComponent>().Mesh = MeshFactory::CreateCube();
+        child.AddComponent<MeshRendererComponent>().SetPrimitive(PrimitiveMeshType::Cube);
 
         const Ref<Scene> clone = scene.Clone();
 
@@ -224,7 +224,7 @@ TEST_SUITE("Scene")
         CHECK_FALSE(IsNull(clone->GetEntityByUUID(parent.GetUUID())));
 
         // The GPU mesh is uploaded per scene, but the CPU geometry stays shared.
-        CHECK(clonedChild.GetComponent<MeshComponent>().Mesh.get() == child.GetComponent<MeshComponent>().Mesh.get());
+        CHECK(clonedChild.GetComponent<MeshRendererComponent>().Mesh.get() == child.GetComponent<MeshRendererComponent>().Mesh.get());
         CHECK(Near(clone->GetWorldTransform(clonedChild.GetHandle())[3].y, 5.0f));
 
         // The clone is independent: destroying one side leaves the other intact.

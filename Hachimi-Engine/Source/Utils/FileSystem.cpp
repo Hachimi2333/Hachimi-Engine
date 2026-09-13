@@ -17,6 +17,12 @@ namespace HachimiEngine
         return std::filesystem::is_directory(path, errorCode);
     }
 
+    bool FileSystem::IsFile(const std::filesystem::path& path)
+    {
+        std::error_code errorCode;
+        return std::filesystem::is_regular_file(path, errorCode);
+    }
+
     bool FileSystem::CreateDirectories(const std::filesystem::path& path)
     {
         std::error_code errorCode;
@@ -105,6 +111,31 @@ namespace HachimiEngine
     {
         std::error_code errorCode;
         std::filesystem::copy_file(source, destination, std::filesystem::copy_options::overwrite_existing, errorCode);
+        return !errorCode;
+    }
+
+    bool FileSystem::MoveFile(const std::filesystem::path& source, const std::filesystem::path& destination)
+    {
+        std::error_code errorCode;
+        std::filesystem::rename(source, destination, errorCode);
+        if (!errorCode)
+        {
+            return true;
+        }
+
+        // rename() cannot cross volumes; a copy plus a delete is the portable equivalent. Both
+        // forms move files and directories alike, which is what the asset operations need.
+        errorCode.clear();
+        std::filesystem::copy(source, destination,
+            std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing,
+            errorCode);
+        if (errorCode)
+        {
+            return false;
+        }
+
+        errorCode.clear();
+        std::filesystem::remove_all(source, errorCode);
         return !errorCode;
     }
 

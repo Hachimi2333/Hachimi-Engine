@@ -63,27 +63,39 @@ namespace HachimiEngine
         // available without touching any other project content.
         FileSystem::CreateDirectories(project->GetAssetsDirectory() / "Scripts");
 
+        // The start scene is not opened here: it is loaded once the asset database has scanned the
+        // project, so its material and script references resolve. See EnsureStartScene.
+        s_ActiveProject = project;
+        AddRecentProject(projectFilePath);
+        HE_CLIENT_INFO("Opened project {}", project->GetName());
+        return project;
+    }
+
+    bool ProjectManager::EnsureStartScene(const Ref<Project>& project)
+    {
+        if (project == nullptr)
+        {
+            return false;
+        }
+
         if (!FileSystem::Exists(project->GetStartScenePath()))
         {
             HE_CLIENT_WARN("Start scene is missing, creating a default scene");
             const Ref<Scene> defaultScene = CreateRef<Scene>();
             defaultScene->SetName("Default Scene");
+
+            // The project has to own the scene before SaveActiveSceneAs can write it.
             project->SetActiveScene(defaultScene);
 
             if (!project->SaveActiveSceneAs(project->GetStartScenePath()))
             {
                 HE_CLIENT_ERROR("Could not write a default scene for project '{}'", project->GetName());
+                return false;
             }
-        }
-        else
-        {
-            project->OpenScene(project->GetStartScenePath());
+            return true;
         }
 
-        s_ActiveProject = project;
-        AddRecentProject(projectFilePath);
-        HE_CLIENT_INFO("Opened project {}", project->GetName());
-        return project;
+        return project->OpenScene(project->GetStartScenePath());
     }
 
     void ProjectManager::AddRecentProject(const std::filesystem::path& projectFilePath)

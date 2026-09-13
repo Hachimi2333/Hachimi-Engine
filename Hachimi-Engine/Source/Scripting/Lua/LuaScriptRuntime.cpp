@@ -17,7 +17,7 @@ namespace HachimiEngine
         {
             Entity Entity;
             uint32_t SlotIndex = 0;
-            std::string RelativePath;
+            std::string DisplayName;
             bool IsBroken = false;
             sol::object Module = sol::nil;
         };
@@ -61,13 +61,13 @@ namespace HachimiEngine
                 {
                     const sol::error error = result;
                     instance.IsBroken = true;
-                    HE_CORE_ERROR("Lua script error in '{}' during {} (entity '{}'): {}", instance.RelativePath, functionName, GetEntityDisplayName(instance), error.what());
+                    HE_CORE_ERROR("Lua script error in '{}' during {} (entity '{}'): {}", instance.DisplayName, functionName, GetEntityDisplayName(instance), error.what());
                 }
             }
             catch (const std::exception& exception)
             {
                 instance.IsBroken = true;
-                HE_CORE_ERROR("Lua script exception in '{}' during {} (entity '{}'): {}", instance.RelativePath, functionName, GetEntityDisplayName(instance), exception.what());
+                HE_CORE_ERROR("Lua script exception in '{}' during {} (entity '{}'): {}", instance.DisplayName, functionName, GetEntityDisplayName(instance), exception.what());
             }
         }
     }
@@ -105,58 +105,57 @@ namespace HachimiEngine
 
     LuaScriptRuntime::~LuaScriptRuntime() = default;
 
-    void LuaScriptRuntime::CreateInstance(Entity entity, uint32_t slotIndex, const std::string& relativePath, bool enabled)
+    void LuaScriptRuntime::CreateInstance(Entity entity, uint32_t slotIndex, const std::filesystem::path& sourcePath,
+                                          const std::string& displayName)
     {
-        if (!enabled)
-        {
-            return;
-        }
+        const std::string entityName = entity.HasComponent<TagComponent>()
+            ? entity.GetComponent<TagComponent>().Tag
+            : std::string("Unknown Entity");
 
-        const std::filesystem::path fullPath = ScriptManager::ResolveScriptPath(relativePath);
-        if (!VirtualFileSystem::Exists(fullPath))
+        if (sourcePath.empty() || !VirtualFileSystem::Exists(sourcePath))
         {
-            HE_CORE_ERROR("Lua script file does not exist: {} (entity '{}')", fullPath.string(), entity.HasComponent<TagComponent>() ? entity.GetComponent<TagComponent>().Tag : "Unknown Entity");
+            HE_CORE_ERROR("Lua script asset '{}' does not exist (entity '{}')", displayName, entityName);
             return;
         }
 
         // Lua cannot open a file inside a package itself, so the source is read
         // through the virtual file system and loaded from memory. The chunk keeps
-        // the virtual path so runtime errors still point at the right script.
+        // the resolved path so runtime errors still point at the right script.
         std::string source;
-        if (!VirtualFileSystem::ReadTextFile(fullPath, source))
+        if (!VirtualFileSystem::ReadTextFile(sourcePath, source))
         {
-            HE_CORE_ERROR("Failed to read Lua script '{}' (entity '{}')", relativePath, entity.HasComponent<TagComponent>() ? entity.GetComponent<TagComponent>().Tag : "Unknown Entity");
+            HE_CORE_ERROR("Failed to read Lua script '{}' (entity '{}')", sourcePath.string(), entityName);
             return;
         }
 
         Scope<LuaScriptInstance> instance = CreateScope<LuaScriptInstance>();
         instance->Entity = entity;
         instance->SlotIndex = slotIndex;
-        instance->RelativePath = relativePath;
+        instance->DisplayName = displayName;
 
         try
         {
             const sol::environment environment(m_Impl->State, sol::create, m_Impl->State.globals());
             const sol::protected_function_result loadResult = m_Impl->State.safe_script(
-                source, environment, sol::script_pass_on_error, fullPath.string());
+                source, environment, sol::script_pass_on_error, sourcePath.string());
 
             if (!loadResult.valid())
             {
                 const sol::error error = loadResult;
-                HE_CORE_ERROR("Failed to load Lua script '{}': {}", relativePath, error.what());
+                HE_CORE_ERROR("Failed to load Lua script '{}': {}", displayName, error.what());
                 return;
             }
 
             if (loadResult.return_count() <= 0)
             {
-                HE_CORE_ERROR("Lua script '{}' must return a module table", relativePath);
+                HE_CORE_ERROR("Lua script '{}' must return a module table", displayName);
                 return;
             }
 
             const sol::object moduleObject = loadResult.get<sol::object>(0);
             if (moduleObject.get_type() != sol::type::table)
             {
-                HE_CORE_ERROR("Lua script '{}' returned a non-table value instead of a module table", relativePath);
+                HE_CORE_ERROR("Lua script '{}' returned a non-table value instead of a module table", displayName);
                 return;
             }
 
@@ -171,11 +170,11 @@ namespace HachimiEngine
         }
         catch (const sol::error& error)
         {
-            HE_CORE_ERROR("Failed to create Lua script instance '{}': {}", relativePath, error.what());
+            HE_CORE_ERROR("Failed to create Lua script instance '{}': {}", displayName, error.what());
         }
         catch (const std::exception& exception)
         {
-            HE_CORE_ERROR("Failed to create Lua script instance '{}': {}", relativePath, exception.what());
+            HE_CORE_ERROR("Failed to create Lua script instance '{}': {}", displayName, exception.what());
         }
     }
 

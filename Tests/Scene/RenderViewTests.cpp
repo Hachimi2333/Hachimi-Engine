@@ -12,7 +12,7 @@
 #include "Renderer/MeshFactory.h"
 #include "Renderer/RenderView.h"
 #include "Scene/Components/LightComponent.h"
-#include "Scene/Components/MeshComponent.h"
+#include "Scene/Components/MeshRendererComponent.h"
 #include "Scene/Components/RelationshipComponent.h"
 #include "Scene/Components/TransformComponent.h"
 #include "Scene/Entity.h"
@@ -83,21 +83,22 @@ TEST_SUITE("Scene")
         ClearScene(scene);
 
         Entity visible = scene.CreateEntity("Visible");
-        visible.AddComponent<MeshComponent>().Mesh = MeshFactory::CreateCube();
+        visible.AddComponent<MeshRendererComponent>().SetPrimitive(PrimitiveMeshType::Cube);
 
         Entity hidden = scene.CreateEntity("Hidden");
-        auto& hiddenMesh = hidden.AddComponent<MeshComponent>();
-        hiddenMesh.Mesh = MeshFactory::CreateCube();
+        auto& hiddenMesh = hidden.AddComponent<MeshRendererComponent>().SetPrimitive(PrimitiveMeshType::Cube);
         hiddenMesh.Visible = false;
 
+        // No geometry at all: an entity whose primitive is None has nothing to draw, which is what
+        // the "empty" case means rather than "was never given a mesh".
         Entity empty = scene.CreateEntity("Empty");
-        empty.AddComponent<MeshComponent>();
+        empty.AddComponent<MeshRendererComponent>().SetPrimitive(PrimitiveMeshType::None);
 
         const RenderView view = scene.BuildRenderView(MakeDesc());
 
         REQUIRE(view.Items.size() == 1);
         CHECK(view.Items[0].Mesh.get() != nullptr);
-        CHECK(view.Items[0].Mesh.get() == visible.GetComponent<MeshComponent>().Mesh.get());
+        CHECK(view.Items[0].Mesh.get() == visible.GetComponent<MeshRendererComponent>().Mesh.get());
     }
 
     TEST_CASE("an item carries the entity surface values and its world transform")
@@ -112,9 +113,9 @@ TEST_SUITE("Scene")
         child.Transform().Position = { 1.0f, 2.0f, 3.0f };
         child.GetComponent<RelationshipComponent>().Parent = parent.GetUUID();
 
-        auto& mesh = child.AddComponent<MeshComponent>();
+        auto& mesh = child.AddComponent<MeshRendererComponent>().SetPrimitive(PrimitiveMeshType::Cube);
         mesh.Mesh = MeshFactory::CreateSphere();
-        mesh.MaterialColor = { 0.1f, 0.2f, 0.3f, 0.4f };
+        mesh.AlbedoColor = { 0.1f, 0.2f, 0.3f, 0.4f };
         mesh.Roughness = 0.35f;
         mesh.Metallic = 0.65f;
 
@@ -126,26 +127,30 @@ TEST_SUITE("Scene")
         CHECK(Near(item.AlbedoColor.w, 0.4f));
         CHECK(Near(item.Roughness, 0.35f));
         CHECK(Near(item.Metallic, 0.65f));
-        CHECK(item.Material.get() == nullptr);
+        CHECK_FALSE(item.Material.IsValid());
         CHECK(Near(item.Transform[3].x, 5.0f));
         CHECK(Near(item.Transform[3].y, 2.0f));
     }
 
-    TEST_CASE("an explicit material override travels with the item")
+    TEST_CASE("a material reference travels with the item")
     {
         Scene scene;
         ClearScene(scene);
 
+        // Extraction carries the reference itself, not a resolved object: turning it into a shader
+        // and a texture needs a GL context, which this suite deliberately does not have.
+        const AssetHandle material = AssetHandle::From(UUID(0x1234), AssetType::Material);
+
         Entity entity = scene.CreateEntity("Textured");
-        auto& mesh = entity.AddComponent<MeshComponent>();
+        auto& mesh = entity.AddComponent<MeshRendererComponent>().SetPrimitive(PrimitiveMeshType::Cube);
         mesh.Mesh = MeshFactory::CreateCube();
-        mesh.MaterialOverride = Material::Create(nullptr);
+        mesh.Material = material;
 
         const RenderView view = scene.BuildRenderView(MakeDesc());
 
         REQUIRE(view.Items.size() == 1);
-        CHECK(view.Items[0].Material.get() != nullptr);
-        CHECK(view.Items[0].Material.get() == mesh.MaterialOverride.get());
+        CHECK(view.Items[0].Material == material);
+        CHECK(view.Items[0].Material.Type == AssetType::Material);
     }
 
     TEST_CASE("a scene with no lights falls back to the default lighting")
@@ -214,15 +219,15 @@ TEST_SUITE("Scene")
         ClearScene(scene);
 
         Entity entity = scene.CreateEntity("Cube");
-        auto& mesh = entity.AddComponent<MeshComponent>();
+        auto& mesh = entity.AddComponent<MeshRendererComponent>().SetPrimitive(PrimitiveMeshType::Cube);
         mesh.Mesh = MeshFactory::CreateCube();
 
         // Extraction is const and must not materialize anything behind the caller's back:
-        // a mesh entity keeps its empty material override, and building twice is stable.
+        // a mesh entity keeps its invalid material reference, and building twice is stable.
         const RenderView first = scene.BuildRenderView(MakeDesc());
         const RenderView second = scene.BuildRenderView(MakeDesc());
 
-        CHECK(mesh.MaterialOverride.get() == nullptr);
+        CHECK_FALSE(mesh.Material.IsValid());
         CHECK(first.Items.size() == second.Items.size());
         CHECK(first.Items.size() == 1);
     }

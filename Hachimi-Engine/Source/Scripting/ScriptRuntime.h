@@ -1,10 +1,11 @@
 #pragma once
 
+#include "Asset/AssetHandle.h"
 #include "Core/Timestep.h"
 #include "Scene/Entity.h"
 
 #include <cstdint>
-#include <string>
+#include <filesystem>
 
 namespace HachimiEngine
 {
@@ -19,7 +20,10 @@ namespace HachimiEngine
 
         // Creates an instance for one script slot. slotIndex identifies the entry
         // inside ScriptComponent::Scripts and is stable for the lifetime of the scene.
-        virtual void CreateInstance(Entity entity, uint32_t slotIndex, const std::string& relativePath, bool enabled) = 0;
+        // sourcePath is the resolved on-disk or in-package path of the script asset, which the
+        // caller looks up once so a backend never has to know how assets are addressed.
+        virtual void CreateInstance(Entity entity, uint32_t slotIndex, const std::filesystem::path& sourcePath,
+                                    const std::string& displayName) = 0;
 
         // Advances every live instance by one frame.
         virtual void Update(Timestep timestep, Scene& scene) = 0;

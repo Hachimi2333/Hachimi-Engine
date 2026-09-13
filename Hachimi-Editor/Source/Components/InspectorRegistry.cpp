@@ -7,7 +7,7 @@
 #include "Scene/Components/CameraComponent.h"
 #include "Scene/Components/ColliderComponent.h"
 #include "Scene/Components/LightComponent.h"
-#include "Scene/Components/MeshComponent.h"
+#include "Scene/Components/MeshRendererComponent.h"
 #include "Scene/Components/RigidbodyComponent.h"
 #include "Scene/Components/ScriptComponent.h"
 #include "Scene/Components/TransformComponent.h"
@@ -64,7 +64,7 @@ namespace HachimiEngine
         Register(entt::type_hash<TransformComponent>::value(), &DrawTransformComponent);
         Register(entt::type_hash<RigidbodyComponent>::value(), &DrawRigidbodyComponent);
         Register(entt::type_hash<ColliderComponent>::value(), &DrawColliderComponent);
-        Register(entt::type_hash<MeshComponent>::value(), &DrawMeshComponent);
+        Register(entt::type_hash<MeshRendererComponent>::value(), &DrawMeshRendererComponent);
         Register(entt::type_hash<CameraComponent>::value(), &DrawCameraComponent);
         Register(entt::type_hash<LightComponent>::value(), &DrawLightComponent);
         Register(entt::type_hash<ScriptComponent>::value(), &DrawScriptComponent);

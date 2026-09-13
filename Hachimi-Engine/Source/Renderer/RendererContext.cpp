@@ -3,6 +3,7 @@
 #include "Core/Assert.h"
 #include "Renderer/DebugDraw.h"
 #include "Renderer/EnvironmentMap.h"
+#include "Renderer/MaterialResolver.h"
 #include "Renderer/MeshFactory.h"
 #include "Renderer/MeshLibrary.h"
 #include "Renderer/PostProcessPass.h"
@@ -46,6 +47,9 @@ namespace HachimiEngine
 
         m_Shaders = CreateScope<ShaderLibrary>();
         m_MeshLibrary = CreateScope<MeshLibrary>();
+        // The resolver reads the asset database, the shaders and the texture cache through this
+        // context, so it is built last: everything it reaches for already exists.
+        m_Materials = CreateScope<MaterialResolver>(*this);
 
         // Binding point 0 is the one the scene shader's FrameBlock declares, so no
         // glUniformBlockBinding call is needed anywhere.
@@ -82,7 +86,9 @@ namespace HachimiEngine
         m_EnvironmentMap.reset();
         m_ShadowMap.reset();
 
-        // Releasing the mesh library frees the uploaded vertex arrays.
+        // Releasing the mesh library frees the uploaded vertex arrays, and the material resolver
+        // frees the materials it built on top of them.
+        m_Materials.reset();
         m_MeshLibrary.reset();
 
         m_SkyboxMesh.reset();

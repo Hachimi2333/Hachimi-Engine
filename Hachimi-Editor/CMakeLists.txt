@@ -23,6 +23,8 @@ set(EDITOR_SOURCES
     Source/Panels/EditorLayer.h
     Source/Panels/EditorMenuBar.cpp
     Source/Panels/EditorMenuBar.h
+    Source/Panels/EditorShortcuts.cpp
+    Source/Panels/EditorShortcuts.h
     Source/Panels/GamePanel.cpp
     Source/Panels/GamePanel.h
     Source/Panels/InspectorPanel.cpp
@@ -31,6 +33,8 @@ set(EDITOR_SOURCES
     Source/Panels/PackageInspectorPanel.h
     Source/Panels/ProjectHubLayer.cpp
     Source/Panels/ProjectHubLayer.h
+    Source/Panels/SavePromptPopup.cpp
+    Source/Panels/SavePromptPopup.h
     Source/Panels/SceneHierarchyPanel.cpp
     Source/Panels/SceneHierarchyPanel.h
     Source/Panels/ToolbarPanel.cpp
@@ -39,6 +43,8 @@ set(EDITOR_SOURCES
     Source/Panels/ViewportPanel.h
     Source/UI/AssetBrowserGrid.cpp
     Source/UI/AssetBrowserGrid.h
+    Source/UI/AssetField.cpp
+    Source/UI/AssetField.h
     Source/UI/AssetPickerPopup.cpp
     Source/UI/AssetPickerPopup.h
     Source/Utils/FileDialogs.cpp

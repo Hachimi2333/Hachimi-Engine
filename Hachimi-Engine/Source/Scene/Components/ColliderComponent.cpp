@@ -1,7 +1,7 @@
 #include "Scene/Components/ColliderComponent.h"
 
 #include "Core/Log.h"
-#include "Scene/Components/MeshComponent.h"
+#include "Scene/Components/MeshRendererComponent.h"
 #include "Serialization/EnumNames.h"
 
 #include <yaml-cpp/yaml.h>
@@ -35,13 +35,13 @@ namespace HachimiEngine
 
         void SizeForMeshPrimitive(entt::registry& registry, entt::entity entity, ColliderComponent& collider)
         {
-            const auto* mesh = registry.try_get<MeshComponent>(entity);
+            const auto* mesh = registry.try_get<MeshRendererComponent>(entity);
             if (mesh == nullptr)
             {
                 return;
             }
 
-            switch (mesh->PrimitiveType)
+            switch (mesh->Primitive)
             {
                 case PrimitiveMeshType::Sphere:
                     collider.ShapeType = ColliderComponent::ColliderShapeType::Sphere;

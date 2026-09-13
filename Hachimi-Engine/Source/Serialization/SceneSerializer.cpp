@@ -1,5 +1,6 @@
 #include "Serialization/SceneSerializer.h"
 
+#include "Asset/AssetDatabase.h"
 #include "Core/Log.h"
 #include "Scene/ComponentRegistry.h"
 #include "Scene/Components/IDComponent.h"
@@ -71,6 +72,8 @@ namespace HachimiEngine
     {
     }
 
+    AssetDatabase* SceneSerializer::s_AssetDatabase = nullptr;
+
     bool SceneSerializer::Serialize(const std::string& filepath)
     {
         YAML::Emitter out;
@@ -117,6 +120,8 @@ namespace HachimiEngine
             return false;
         }
 
+        // The file on disk now matches the scene, so the editor's unsaved-changes prompt clears.
+        m_Scene->ClearDirty();
         return true;
     }
 
@@ -151,7 +156,11 @@ namespace HachimiEngine
         const int formatVersion = data[FormatVersionKey].as<int>(0);
         if (formatVersion != CurrentFormatVersion)
         {
-            HE_CORE_ERROR("Scene '{}' uses format version {}; this build reads version {}",
+            // Refused rather than guessed at. Component references changed shape (materials and
+            // scripts are asset UUIDs now), so reading an older file as if it had this layout would
+            // silently drop those references.
+            HE_CORE_ERROR("Scene '{}' uses format version {}; this build reads version {}. "
+                          "Older scenes are not migrated: recreate the project or re-save the scene from a build that wrote it.",
                 filepath,
                 formatVersion,
                 CurrentFormatVersion);
@@ -192,20 +201,28 @@ namespace HachimiEngine
             }
         }
 
+        // Loading a scene is not an edit of it.
+        m_Scene->ClearDirty();
         return true;
     }
 
     void SceneSerializer::SerializeEntity(YAML::Emitter& out, Entity entity)
     {
+        const Scene& scene = *m_Scene;
+        SerializeEntity(out, scene, entity);
+    }
+
+    void SceneSerializer::SerializeEntity(YAML::Emitter& out, const Scene& scene, Entity entity)
+    {
         out << YAML::BeginMap;
 
         for (const ComponentDescriptor& descriptor : ComponentRegistry::GetDescriptors())
         {
-            descriptor.Serialize(out, m_Scene->GetRegistry(), entity.GetHandle());
+            descriptor.Serialize(out, scene.GetRegistry(), entity.GetHandle());
         }
 
         // Anything this build did not recognise is written back unchanged.
-        if (const auto* unknownBlocks = m_Scene->GetRegistry().try_get<UnknownComponentBlocks>(entity.GetHandle()))
+        if (const auto* unknownBlocks = scene.GetRegistry().try_get<UnknownComponentBlocks>(entity.GetHandle()))
         {
             for (const auto& [name, node] : unknownBlocks->Blocks)
             {
@@ -214,6 +231,118 @@ namespace HachimiEngine
         }
 
         out << YAML::EndMap;
+    }
+
+    std::string SceneSerializer::SerializeEntitiesToString(const Scene& scene, const std::vector<Entity>& entities)
+    {
+        YAML::Emitter out;
+        out << YAML::BeginMap;
+        out << YAML::Key << FormatVersionKey << YAML::Value << CurrentFormatVersion;
+        out << YAML::Key << EntitiesKey << YAML::Value << YAML::BeginSeq;
+
+        for (const Entity entity : entities)
+        {
+            if (entity)
+            {
+                SerializeEntity(out, scene, entity);
+            }
+        }
+
+        out << YAML::EndSeq;
+        out << YAML::EndMap;
+        return out.c_str();
+    }
+
+    size_t SceneSerializer::DeserializeEntitiesFromString(Scene& scene, const std::string& text)
+    {
+        YAML::Node data;
+        try
+        {
+            data = YAML::Load(text);
+        }
+        catch (const YAML::Exception& exception)
+        {
+            HE_CORE_ERROR("Stored entity snapshot is not valid YAML: {}", exception.what());
+            return 0;
+        }
+
+        const YAML::Node entities = data[EntitiesKey];
+        if (!entities || !entities.IsSequence())
+        {
+            return 0;
+        }
+
+        size_t created = 0;
+        SceneSerializer helper(nullptr);
+
+        for (const YAML::Node entityNode : entities)
+        {
+            const size_t before = scene.GetRegistry().view<IDComponent>().size();
+            helper.DeserializeEntity(entityNode, scene);
+            if (scene.GetRegistry().view<IDComponent>().size() > before)
+            {
+                ++created;
+            }
+        }
+        return created;
+    }
+
+    std::string SceneSerializer::SerializeComponentToString(const Scene& scene, Entity entity, entt::id_type typeId)
+    {
+        const ComponentDescriptor* descriptor = ComponentRegistry::Find(typeId);
+        if (descriptor == nullptr || !entity)
+        {
+            return {};
+        }
+
+        YAML::Emitter out;
+        out << YAML::BeginMap;
+        out << YAML::Key << FormatVersionKey << YAML::Value << CurrentFormatVersion;
+        out << YAML::Key << EntitiesKey << YAML::Value << YAML::BeginSeq;
+        SerializeEntity(out, scene, entity);
+        out << YAML::EndSeq;
+        out << YAML::EndMap;
+        return out.c_str();
+    }
+
+    bool SceneSerializer::DeserializeComponentFromString(Scene& scene, Entity entity, const std::string& text)
+    {
+        YAML::Node data;
+        try
+        {
+            data = YAML::Load(text);
+        }
+        catch (const YAML::Exception& exception)
+        {
+            HE_CORE_ERROR("Stored component snapshot is not valid YAML: {}", exception.what());
+            return false;
+        }
+
+        const YAML::Node entities = data[EntitiesKey];
+        if (!entities || !entities.IsSequence() || entities.size() == 0)
+        {
+            return false;
+        }
+
+        // The snapshot holds one entity, and only its component values are wanted: the entity the
+        // caller is restoring into keeps its own identity, hierarchy and other components.
+        bool restored = false;
+        const YAML::Node entityNode = entities[0];
+        for (const ComponentDescriptor& descriptor : ComponentRegistry::GetDescriptors())
+        {
+            if (descriptor.Required)
+            {
+                // Required components are already there and must not be touched.
+                continue;
+            }
+
+            if (descriptor.Deserialize(entityNode, scene.GetRegistry(), entity.GetHandle()))
+            {
+                restored = true;
+            }
+        }
+
+        return restored;
     }
 
     void SceneSerializer::DeserializeEntity(const YAML::Node& entityNode, Scene& scene)

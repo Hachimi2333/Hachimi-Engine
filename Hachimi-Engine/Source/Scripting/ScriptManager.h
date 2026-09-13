@@ -3,7 +3,6 @@
 #include "Core/Base.h"
 #include "Core/Memory.h"
 
-#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -13,6 +12,9 @@ namespace HachimiEngine
 
     // Registry of scripting language backends, keyed by file extension.
     // The registry is engine-wide; each running scene gets separate ScriptRuntime objects.
+    //
+    // Asset paths are not resolved here: the asset database owns the mapping from a script
+    // reference to its file, and ScriptWorld looks a script up before asking for a backend.
     class ScriptManager
     {
     public:
@@ -26,12 +28,6 @@ namespace HachimiEngine
         static bool IsScriptFile(const std::string& filePath);
 
         static const std::vector<Scope<ScriptEngine>>& GetEngines() { return s_Engines; }
-
-        // Script asset root: <Project>/Assets/Scripts.
-        static std::filesystem::path GetScriptsDirectory();
-
-        // Converts a serialized script path (relative to Assets/Scripts) to an absolute path.
-        static std::filesystem::path ResolveScriptPath(const std::string& relativePath);
 
     private:
         static std::vector<Scope<ScriptEngine>> s_Engines;

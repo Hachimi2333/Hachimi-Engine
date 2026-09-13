@@ -15,9 +15,9 @@ namespace HachimiEngine
         }
 
         m_Shader->Bind();
-        m_Shader->SetFloat4("u_AlbedoColor", m_AlbedoColor);
-        m_Shader->SetFloat("u_Roughness", m_Roughness);
-        m_Shader->SetFloat("u_Metallic", m_Metallic);
+        // Only the texture state belongs to the material program. The scalar surface values are
+        // pushed per draw from the RenderItem, so a draw never depends on the order in which
+        // these two writers ran.
         m_Shader->SetInt("u_HasAlbedoTexture", m_AlbedoTexture != nullptr ? 1 : 0);
 
         if (m_AlbedoTexture != nullptr)

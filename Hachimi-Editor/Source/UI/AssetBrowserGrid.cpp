@@ -1,6 +1,8 @@
 #include "UI/AssetBrowserGrid.h"
 
-#include "Asset/AssetManager.h"
+#include "Asset/AssetDatabase.h"
+#include "Asset/TextureCache.h"
+#include "Core/Log.h"
 #include "Core/Memory.h"
 #include "Renderer/Texture.h"
 #include "Utils/FileSystem.h"
@@ -27,6 +29,7 @@ namespace HachimiEngine
         constexpr const char* SceneGlyph = "\uE8A5";
         constexpr const char* ScriptGlyph = "\uE943";
         constexpr const char* ImageGlyph = "\uEB9F";
+        constexpr const char* MaterialGlyph = "\uE790";
         constexpr const char* FileGlyph = "\uE7C3";
 
         std::string GetLowerExtension(const std::filesystem::path& path)
@@ -37,15 +40,6 @@ namespace HachimiEngine
             return extension;
         }
 
-        bool IsImageExtension(const std::string& extension)
-        {
-            return extension == ".png"
-                || extension == ".jpg"
-                || extension == ".jpeg"
-                || extension == ".tga"
-                || extension == ".bmp";
-        }
-
         const char* GetFileGlyph(const std::filesystem::path& path)
         {
             const std::string extension = GetLowerExtension(path);
@@ -53,11 +47,16 @@ namespace HachimiEngine
             {
                 return SceneGlyph;
             }
+            if (extension == ".hmaterial")
+            {
+                return MaterialGlyph;
+            }
             if (extension == ".lua")
             {
                 return ScriptGlyph;
             }
-            if (IsImageExtension(extension))
+            if (extension == ".png" || extension == ".jpg" || extension == ".jpeg"
+                || extension == ".tga" || extension == ".bmp")
             {
                 return ImageGlyph;
             }
@@ -114,57 +113,58 @@ namespace HachimiEngine
 
         // Tracks in-flight thumbnail decodes so a texture is requested once while
         // the grid keeps drawing a placeholder glyph for it.
-        std::unordered_set<std::string>& GetPendingThumbnails()
+        std::unordered_set<UUID>& GetPendingThumbnails()
         {
-            static std::unordered_set<std::string> pending;
+            static std::unordered_set<UUID> pending;
             return pending;
         }
 
-        Ref<Texture2D> GetTextureThumbnail(const std::filesystem::path& path)
+        Ref<Texture2D> GetTextureThumbnail(const std::filesystem::path& path, const AssetBrowserGrid::Callbacks& callbacks)
         {
-            if (!IsImageExtension(GetLowerExtension(path)))
+            if (callbacks.Database == nullptr || callbacks.Textures == nullptr)
             {
                 return nullptr;
             }
 
-            const std::filesystem::path assetsDirectory = AssetManager::GetAssetsDirectory();
-            std::error_code errorCode;
-            const std::filesystem::path relativePath = std::filesystem::relative(path, assetsDirectory, errorCode);
-            if (errorCode)
+            const std::optional<AssetHandle> handle = callbacks.Database->GetHandleForPath(path);
+            if (!handle.has_value() || handle->Type != AssetType::Texture || !callbacks.Database->Contains(*handle))
             {
                 return nullptr;
             }
 
-            if (Ref<Texture2D> cached = AssetManager::GetCachedTexture(relativePath))
+            if (const Ref<Texture2D> cached = callbacks.Textures->GetCached(*handle))
             {
                 return cached;
             }
 
-            // Decoding runs on a worker thread; the texture appears through the
-            // cache once AssetManager::PumpCompletedRequests() has uploaded it.
-            const std::string key = relativePath.generic_string();
-            std::unordered_set<std::string>& pending = GetPendingThumbnails();
-            if (!pending.contains(key))
+            // Decoding runs on a worker thread; the texture appears through the cache once
+            // TextureCache::PumpCompletedRequests() has uploaded it.
+            std::unordered_set<UUID>& pending = GetPendingThumbnails();
+            if (!pending.contains(handle->ID))
             {
-                const uint64_t requestId = AssetManager::RequestTexture(relativePath,
-                    [key](const std::filesystem::path&, const Ref<Texture2D>& texture)
+                const AssetMeta* meta = callbacks.Database->GetMeta(*handle);
+                const TextureImportSettings settings = meta != nullptr ? meta->Texture : TextureImportSettings();
+
+                const uint64_t requestId = callbacks.Textures->Request(*handle, settings,
+                    [id = handle->ID](AssetHandle, const Ref<Texture2D>& texture)
                     {
                         if (texture != nullptr)
                         {
-                            GetPendingThumbnails().erase(key);
+                            GetPendingThumbnails().erase(id);
                         }
                     });
 
                 if (requestId != 0)
                 {
-                    pending.insert(key);
+                    pending.insert(handle->ID);
                 }
             }
 
             return nullptr;
         }
 
-        void DrawItemIcon(ImDrawList* drawList, const std::filesystem::path& path, bool isDirectory, const ImVec2& itemMin)
+        void DrawItemIcon(ImDrawList* drawList, const std::filesystem::path& path, bool isDirectory,
+                          const ImVec2& itemMin, const AssetBrowserGrid::Callbacks& callbacks)
         {
             const ImVec2 iconMin {
                 itemMin.x + (ItemSize.x - IconSize) * 0.5f,
@@ -181,11 +181,14 @@ namespace HachimiEngine
                 return;
             }
 
-            const Ref<Texture2D> thumbnail = GetTextureThumbnail(path);
-            if (thumbnail != nullptr)
+            if (AssetBrowserGrid::IsImagePath(path))
             {
-                DrawTextureThumbnail(drawList, thumbnail, iconMin, iconSize);
-                return;
+                const Ref<Texture2D> thumbnail = GetTextureThumbnail(path, callbacks);
+                if (thumbnail != nullptr)
+                {
+                    DrawTextureThumbnail(drawList, thumbnail, iconMin, iconSize);
+                    return;
+                }
             }
 
             DrawGlyph(drawList, GetFileGlyph(path), iconMin, iconSize, ImGui::GetColorU32(ImGuiCol_Text));
@@ -222,11 +225,20 @@ namespace HachimiEngine
         {
             constexpr float HorizontalPadding = 6.0f;
             const float availableWidth = ItemSize.x - HorizontalPadding * 2.0f;
-            const std::string label = TruncateLabel(FileSystem::GetFileName(path), availableWidth);
+            std::string label = FileSystem::GetFileName(path);
+
+            // A sidecar takes its asset's name without the extra extension: "Grid.png.meta" shows as
+            // "Grid.png", which is the file it belongs to.
+            if (path.extension() == ".meta")
+            {
+                label = path.stem().filename().string();
+            }
+
+            const std::string truncated = TruncateLabel(label, availableWidth);
 
             ImFont* font = ImGui::GetFont();
             const float fontSize = ImGui::GetFontSize();
-            const ImVec2 labelSize = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, label.c_str());
+            const ImVec2 labelSize = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, truncated.c_str());
 
             const float labelTop = itemMin.y + IconPadding + IconSize + (LabelAreaHeight - labelSize.y) * 0.5f;
             const ImVec2 labelPosition {
@@ -234,15 +246,22 @@ namespace HachimiEngine
                 labelTop
             };
 
-            drawList->AddText(font, fontSize, labelPosition, ImGui::GetColorU32(ImGuiCol_Text), label.c_str());
+            drawList->AddText(font, fontSize, labelPosition, ImGui::GetColorU32(ImGuiCol_Text), truncated.c_str());
         }
+    }
+
+    bool AssetBrowserGrid::IsImagePath(const std::filesystem::path& path)
+    {
+        const std::string extension = GetLowerExtension(path);
+        return extension == ".png" || extension == ".jpg" || extension == ".jpeg"
+            || extension == ".tga" || extension == ".bmp";
     }
 
     void AssetBrowserGrid::Draw(
         const std::vector<std::filesystem::path>& directories,
         const std::vector<std::filesystem::path>& files,
         std::filesystem::path& selectedPath,
-        std::filesystem::path& activatedPath)
+        const Callbacks& callbacks)
     {
         const ImGuiStyle& style = ImGui::GetStyle();
         const float availableWidth = ImGui::GetContentRegionAvail().x;
@@ -273,21 +292,47 @@ namespace HachimiEngine
                 ItemSize);
             const bool doubleClicked = clicked && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
 
-            if (clicked)
+            if (clicked && !wasSelected)
             {
                 selectedPath = path;
+                if (callbacks.OnSelectionChanged)
+                {
+                    callbacks.OnSelectionChanged(path);
+                }
+            }
+
+            // The context menu is filled by the caller, which owns what a file can do, and it is
+            // drawn here so it opens next to the item that was right-clicked.
+            if (callbacks.DrawContextMenu && ImGui::BeginPopupContextItem("##AssetItemMenu"))
+            {
+                callbacks.DrawContextMenu(path);
+                ImGui::EndPopup();
             }
 
             const ImVec2 itemMin = ImGui::GetItemRectMin();
-            DrawItemIcon(drawList, path, isDirectory, itemMin);
+            DrawItemIcon(drawList, path, isDirectory, itemMin, callbacks);
             DrawItemLabel(drawList, path, itemMin);
 
-            if (!isDirectory && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+            if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
             {
                 const std::string payloadPath = path.string();
                 ImGui::SetDragDropPayload(FilePayload, payloadPath.c_str(), payloadPath.size() + 1);
                 ImGui::TextUnformatted(FileSystem::GetFileName(path).c_str());
                 ImGui::EndDragDropSource();
+            }
+
+            // A directory is a drop target, which is how an asset is moved into a folder.
+            if (isDirectory && ImGui::BeginDragDropTarget())
+            {
+                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(FilePayload))
+                {
+                    const std::string droppedPath(static_cast<const char*>(payload->Data));
+                    if (callbacks.OnDrop && std::filesystem::path(droppedPath) != path)
+                    {
+                        callbacks.OnDrop(droppedPath, path);
+                    }
+                }
+                ImGui::EndDragDropTarget();
             }
 
             if (ImGui::BeginItemTooltip())
@@ -296,9 +341,9 @@ namespace HachimiEngine
                 ImGui::EndTooltip();
             }
 
-            if (doubleClicked)
+            if (doubleClicked && callbacks.OnActivate)
             {
-                activatedPath = path;
+                callbacks.OnActivate(path);
             }
 
             ImGui::PopID();
@@ -312,6 +357,27 @@ namespace HachimiEngine
         for (const auto& file : files)
         {
             drawItem(file, false);
+        }
+
+        // Empty space in the grid is a drop target too, meaning "move it into the folder shown".
+        // An invisible button covering the remaining area is used rather than a custom rect, because
+        // the custom-rect helper lives in ImGui's internal header.
+        const ImVec2 remaining = ImGui::GetContentRegionAvail();
+        if (remaining.x > 1.0f && remaining.y > 1.0f)
+        {
+            ImGui::InvisibleButton("##AssetBrowserGridDropZone", remaining);
+            if (ImGui::BeginDragDropTarget())
+            {
+                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(FilePayload))
+                {
+                    const std::string droppedPath(static_cast<const char*>(payload->Data));
+                    if (callbacks.OnDrop)
+                    {
+                        callbacks.OnDrop(droppedPath, std::filesystem::path(droppedPath).parent_path());
+                    }
+                }
+                ImGui::EndDragDropTarget();
+            }
         }
 
         ImGui::EndChild();

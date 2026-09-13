@@ -1,11 +1,13 @@
 #include "Project/Project.h"
 
+#include "Asset/AssetDatabase.h"
+#include "Asset/MaterialAsset.h"
 #include "Core/Log.h"
 #include "Renderer/MeshFactory.h"
 #include "Scene/Components/CameraComponent.h"
 #include "Scene/Components/ColliderComponent.h"
 #include "Scene/Components/LightComponent.h"
-#include "Scene/Components/MeshComponent.h"
+#include "Scene/Components/MeshRendererComponent.h"
 #include "Scene/Components/RigidbodyComponent.h"
 #include "Scene/Components/ScriptComponent.h"
 #include "Scene/Components/TagComponent.h"
@@ -85,10 +87,10 @@ return Rotator
             entity.Transform().Rotation = rotation;
             entity.Transform().Scale = scale;
 
-            auto& meshComponent = entity.AddComponent<MeshComponent>();
+            auto& meshComponent = entity.AddComponent<MeshRendererComponent>();
             meshComponent.Mesh = mesh;
-            meshComponent.PrimitiveType = primitiveType;
-            meshComponent.MaterialColor = color;
+            meshComponent.Primitive = primitiveType;
+            meshComponent.AlbedoColor = color;
             meshComponent.Roughness = roughness;
             meshComponent.Metallic = metallic;
             return entity;
@@ -279,8 +281,38 @@ return Rotator
             // A non-physical decorative cube driven by the bundled Lua template.
             Entity scriptedSpinner = CreateCubeEntity(*scene, "Scripted Spinner", { 3.5f, 2.0f, -2.5f }, Math::Vec3(0.8f), { 0.25f, 0.90f, 0.55f, 1.0f }, 0.25f, 0.5f);
             ScriptComponent::ScriptReference& rotator = scriptedSpinner.AddComponent<ScriptComponent>().Scripts.emplace_back();
-            rotator.Path = "Rotator.lua";
+            rotator.DisplayName = "Rotator.lua";
             rotator.Enabled = true;
+        }
+
+        // Every project ships with one material so a new scene has something to assign and the
+        // material editor has something to open. It is written before the asset database scans,
+        // so the id in its sidecar is what the database reads back.
+        void CreateDefaultMaterial(const std::filesystem::path& materialsDirectory)
+        {
+            FileSystem::CreateDirectories(materialsDirectory);
+
+            const std::filesystem::path materialPath =
+                materialsDirectory / (std::string("Default") + MaterialAsset::FileExtension);
+            if (FileSystem::Exists(materialPath))
+            {
+                return;
+            }
+
+            if (!FileSystem::WriteTextFile(materialPath, MaterialAsset::Serialize(MaterialAsset::Default())))
+            {
+                HE_CORE_ERROR("Failed to create the default material at {}", materialPath.string());
+            }
+        }
+    }
+
+    void Project::SetActiveScene(const Ref<Scene>& scene)
+    {
+        m_ActiveScene = scene;
+        if (m_ActiveScene != nullptr)
+        {
+            // A scene that was just created or loaded already matches what a save would produce.
+            m_ActiveScene->ClearDirty();
         }
     }
 
@@ -299,7 +331,7 @@ return Rotator
             return false;
         }
 
-        m_ActiveScene = scene;
+        SetActiveScene(scene);
         m_ActiveScenePath = scenePath;
         return true;
     }
@@ -350,6 +382,7 @@ return Rotator
         FileSystem::CreateDirectories(projectDirectory / "Assets" / "Scenes");
         FileSystem::CreateDirectories(projectDirectory / "Assets" / "Scripts");
         CreateDefaultLuaScript(projectDirectory / "Assets" / "Scripts");
+        CreateDefaultMaterial(projectDirectory / "Assets" / "Materials");
 
         const Ref<Scene> defaultScene = CreateRef<Scene>();
         ConfigureShowcaseScene(defaultScene);
@@ -365,7 +398,7 @@ return Rotator
         project->m_StartScenePath = startScenePath;
         project->m_ActiveScenePath = startScenePath;
         project->m_ProjectFilePath = projectDirectory / (name + ".hproj");
-        project->m_ActiveScene = defaultScene;
+        project->SetActiveScene(defaultScene);
 
         if (!sceneWritten)
         {

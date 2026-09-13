@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Asset/AssetHandle.h"
 #include "Scene/ComponentRegistry.h"
 
 #include <string>
@@ -11,10 +12,15 @@ namespace HachimiEngine
     {
         struct ScriptReference
         {
-            // Path relative to the project Assets/Scripts directory, for example
-            // "Rotator.lua" or "Player/Controller.lua". The backend language is
-            // resolved from the file extension by ScriptManager.
-            std::string Path;
+            // Script asset under Assets/Scripts. The handle is the reference; renaming or moving
+            // the .lua file keeps it working.
+            AssetHandle Script;
+
+            // File name without extension, kept in the scene so a reference whose asset is missing
+            // still says what it used to point at, and so the inspector can label it without a
+            // database lookup. Never used to resolve the file.
+            std::string DisplayName;
+
             bool Enabled = true;
         };
 

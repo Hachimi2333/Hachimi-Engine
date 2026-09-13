@@ -1,10 +1,14 @@
 #include "Scripting/ScriptWorld.h"
 
+#include "Asset/AssetDatabase.h"
 #include "Core/Log.h"
 #include "Scene/Scene.h"
 #include "Scripting/ScriptEngine.h"
 #include "Scripting/ScriptManager.h"
 #include "Scripting/ScriptRuntime.h"
+#include "Serialization/SceneSerializer.h"
+
+#include <filesystem>
 
 namespace HachimiEngine
 {
@@ -28,6 +32,10 @@ namespace HachimiEngine
             return;
         }
 
+        // The database owns the mapping from a script reference to its file; a runtime only needs
+        // the path it resolved to.
+        const AssetDatabase* database = SceneSerializer::GetAssetDatabase();
+
         auto scriptView = scene.GetRegistry().view<ScriptComponent, IDComponent>();
         for (const entt::entity entityHandle : scriptView)
         {
@@ -37,16 +45,36 @@ namespace HachimiEngine
             for (uint32_t slotIndex = 0; slotIndex < static_cast<uint32_t>(scriptComponent.Scripts.size()); ++slotIndex)
             {
                 const ScriptComponent::ScriptReference& script = scriptComponent.Scripts[slotIndex];
-                if (script.Path.empty())
+
+                if (!script.Enabled)
                 {
-                    HE_CORE_WARN("Entity '{}' has an empty script path in slot {}", GetEntityDisplayName(entity), slotIndex);
+                    HE_CORE_INFO("Skipped disabled script '{}' on entity '{}'", script.DisplayName, GetEntityDisplayName(entity));
                     continue;
                 }
 
-                ScriptEngine* engine = ScriptManager::GetEngineForFile(script.Path);
+                std::filesystem::path sourcePath;
+                if (script.Script.IsValid() && database != nullptr)
+                {
+                    sourcePath = database->GetAssetPath(script.Script);
+                }
+
+                if (sourcePath.empty())
+                {
+                    // A missing script is reported once per slot instead of silently producing an
+                    // entity that looks scripted but never runs.
+                    HE_CORE_ERROR("Script '{}' on entity '{}' is missing from the project; slot {} is not running",
+                        script.DisplayName.empty() ? "<unnamed>" : script.DisplayName,
+                        GetEntityDisplayName(entity),
+                        slotIndex);
+                    continue;
+                }
+
+                ScriptEngine* engine = ScriptManager::GetEngineForFile(sourcePath.string());
                 if (engine == nullptr)
                 {
-                    HE_CORE_WARN("No scripting backend registered for script '{}' on entity '{}'", script.Path, GetEntityDisplayName(entity));
+                    HE_CORE_WARN("No scripting backend registered for script '{}' on entity '{}'",
+                        sourcePath.string(),
+                        GetEntityDisplayName(entity));
                     continue;
                 }
 
@@ -75,13 +103,10 @@ namespace HachimiEngine
                     runtime = entry.Runtime.get();
                 }
 
-                if (!script.Enabled)
-                {
-                    HE_CORE_INFO("Skipped disabled script '{}' on entity '{}'", script.Path, GetEntityDisplayName(entity));
-                    continue;
-                }
-
-                runtime->CreateInstance(entity, slotIndex, script.Path, script.Enabled);
+                const std::string displayName = script.DisplayName.empty()
+                    ? sourcePath.stem().string()
+                    : script.DisplayName;
+                runtime->CreateInstance(entity, slotIndex, sourcePath, displayName);
             }
         }
 

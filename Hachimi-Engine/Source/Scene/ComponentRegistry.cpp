@@ -6,7 +6,7 @@
 #include "Scene/Components/ColliderComponent.h"
 #include "Scene/Components/IDComponent.h"
 #include "Scene/Components/LightComponent.h"
-#include "Scene/Components/MeshComponent.h"
+#include "Scene/Components/MeshRendererComponent.h"
 #include "Scene/Components/RelationshipComponent.h"
 #include "Scene/Components/RigidbodyComponent.h"
 #include "Scene/Components/ScriptComponent.h"
@@ -79,7 +79,7 @@ namespace HachimiEngine
         Register(MakeTagComponentDescriptor());
         Register(MakeTransformComponentDescriptor());
         Register(MakeRelationshipComponentDescriptor());
-        Register(MakeMeshComponentDescriptor());
+        Register(MakeMeshRendererComponentDescriptor());
         Register(MakeCameraComponentDescriptor());
         Register(MakeLightComponentDescriptor());
         Register(MakeRigidbodyComponentDescriptor());

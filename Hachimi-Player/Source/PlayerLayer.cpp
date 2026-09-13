@@ -1,15 +1,19 @@
 #include "PlayerLayer.h"
 
-#include "Asset/AssetManager.h"
+#include "Asset/AssetDatabase.h"
+#include "Asset/TextureCache.h"
 #include "Core/Application.h"
 #include "Core/Log.h"
 #include "Project/Project.h"
+#include "Renderer/MaterialResolver.h"
 #include "Renderer/RendererContext.h"
 #include "Renderer/SceneRenderer.h"
+#include "Renderer/ScreenPresenter.h"
 #include "Scene/Components/CameraComponent.h"
 #include "Scene/Components/TransformComponent.h"
 #include "Scene/Scene.h"
 #include "Serialization/ProjectSerializer.h"
+#include "Serialization/SceneSerializer.h"
 #include "Utils/FileSystem.h"
 #include "Utils/VirtualFileSystem.h"
 #include "Math/Math.h"
@@ -62,7 +66,17 @@ namespace HachimiEngine
             return;
         }
 
-        AssetManager::Init(m_Project->GetAssetsDirectory());
+        // The asset database scans the packaged content root: it reads the sidecars that shipped
+        // inside the package, so script and material references resolve exactly as they did in the
+        // editor. Nothing is written back.
+        AssetDatabase& assets = Application::Get().GetAssetDatabase();
+        TextureCache& textures = Application::Get().GetTextureCache();
+        assets.Refresh(m_Project->GetAssetsDirectory());
+        textures.Clear();
+        textures.SetDatabase(&assets);
+
+        m_Project->SetAssetDatabase(&assets);
+        SceneSerializer::SetAssetDatabase(&assets);
 
         const std::filesystem::path startScenePath = m_BuildInfo.StartScene.empty()
             ? m_Project->GetStartScenePath()
@@ -71,7 +85,6 @@ namespace HachimiEngine
         if (!m_Project->OpenScene(startScenePath))
         {
             HE_CLIENT_ERROR("Failed to load packaged start scene: {}", startScenePath.string());
-            AssetManager::Shutdown();
             Application::Get().Close();
             return;
         }
@@ -83,6 +96,7 @@ namespace HachimiEngine
         m_Scene->OnRuntimeStart();
 
         m_SceneRenderer = CreateScope<SceneRenderer>(Application::Get().GetRendererContext());
+        m_ScreenPresenter = CreateScope<ScreenPresenter>();
 
         HE_CLIENT_INFO("Started packaged game '{}' from {}", m_Project->GetName(), m_ContentRoot.string());
     }
@@ -94,12 +108,11 @@ namespace HachimiEngine
             m_Scene->OnRuntimeStop();
         }
 
-        // Release the scene and its texture resources before the asset manager
-        // shuts down.
+        // Release the scene and its resolved materials before the renderer context releases the
+        // meshes and textures they were built from.
         m_Scene = nullptr;
         m_Project = nullptr;
-
-        AssetManager::Shutdown();
+        Application::Get().GetRendererContext().GetMaterials().Clear();
     }
 
     void PlayerLayer::OnUpdate(Timestep timestep)
@@ -114,11 +127,13 @@ namespace HachimiEngine
 
     void PlayerLayer::OnRender()
     {
-        if (m_Scene == nullptr || m_SceneRenderer == nullptr)
+        if (m_Scene == nullptr || m_SceneRenderer == nullptr || m_ScreenPresenter == nullptr)
         {
             return;
         }
 
+        // The render target follows the window: the player draws the whole frame itself and has no
+        // UI panel to resize it.
         const Window& window = Application::Get().GetWindow();
         const uint32_t width = std::max(window.GetWidth(), 1u);
         const uint32_t height = std::max(window.GetHeight(), 1u);
@@ -159,5 +174,10 @@ namespace HachimiEngine
         }
 
         m_SceneRenderer->Render(m_Scene->BuildRenderView(desc), *m_Target);
+
+        // The Player owns the whole window and has no UI layer to composite the rendered image,
+        // so the tone-mapped frame goes straight into the back buffer. Render() leaves the
+        // default framebuffer bound, because resolving the target unbinds the display buffer.
+        m_ScreenPresenter->Present(m_Target->GetDisplayColorRendererID(), width, height);
     }
 }

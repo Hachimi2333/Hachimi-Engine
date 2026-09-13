@@ -19,6 +19,12 @@ A C++20 3D game engine and editor for Windows, built on OpenGL 4.6 Core and insp
 - Derived entity hierarchy (parent link only) with cycle-safe reparenting and subtree destruction
 - yaml-cpp scene (`.hscene`, versioned) and project (`.hproj`) serialization, with enumerators
   stored by name
+- Asset pipeline: an `AssetDatabase` indexes `Assets/`, every asset gets a UUID in a `<file>.meta`
+  sidecar, and components reference assets by that UUID rather than by path, so renaming or moving
+  a file keeps every reference working
+- Material assets (`Assets/Materials/*.hmaterial`) carrying an engine shader, a base colour and an
+  albedo texture reference; the editor can create and edit them
+- Texture import settings per asset (colour space, mipmaps, wrap mode, filter) stored in the sidecar
 - Console logging with dual loggers (engine and client)
 - Lua 5.4 scripting with a language-agnostic backend abstraction, ready for future script languages
 
@@ -48,6 +54,11 @@ A C++20 3D game engine and editor for Windows, built on OpenGL 4.6 Core and insp
 - ImGui Docking-based editor: Project Hub, Viewport, Scene Hierarchy, Inspector, Content Browser, Console
 - Scene Save / Save As writes back to the scene being edited, and the Inspector's component list
   is generated from the engine's component registry
+- Undo / redo over a command stack (Ctrl+Z / Ctrl+Y), with continuous edits such as a gizmo drag or
+  a typed name folded into one entry
+- Unsaved-changes prompt before closing the editor, switching scene or returning to the Project Hub
+- Content Browser file management: new folder, new material, rename, duplicate, delete (with the
+  referencing documents listed first) and drag-and-drop moving; sidecars travel with their asset
 - Game export pipeline: Build Settings popup, Windows_x64 builds, packaged `Data.hpak` assets, and a standalone `Hachimi-Player` runtime
 - Large-icon Content Browser grid with texture thumbnails and drag-and-drop to Inspector asset fields
 - Native File Dialog Extended system file dialogs
@@ -58,7 +69,7 @@ A C++20 3D game engine and editor for Windows, built on OpenGL 4.6 Core and insp
 
 ## Scripting
 
-Scripts are Lua 5.4 files under `Assets/Scripts`, attached to entities through the Inspector's `Script` component. The path is stored relative to `Assets/Scripts`, so `Player/Controller.lua` works for nested folders.
+Scripts are Lua 5.4 files under `Assets/Scripts`, attached to entities through the Inspector's `Script` component. The reference is the script's asset UUID, so moving or renaming the `.lua` file keeps the attachment; the panel shows the file name next to it.
 
 A script returns a module table with optional lifecycle callbacks:
 
@@ -265,6 +276,8 @@ Hachimi-Engine/          # Engine core (static library)
   Resources/Shaders/     # Engine-owned GLSL shaders
   Resources/Fonts/       # Editor UI font (Inter) and its license
   Source/                # Engine source
+  Source/Asset/          # Asset identity, sidecar metadata, asset database, texture cache, material assets
+  Source/Editor/         # Undoable edit commands, the command history and scene dirty state
   Source/Packaging/      # Game build settings, .hpak format, reader/writer
   Source/Renderer/       # Renderer context, pipeline, passes, views and resources
   Source/Scene/          # Component registry, components, entities, scene, systems
@@ -273,6 +286,7 @@ Hachimi-Editor/          # Editor client (executable)
   CMakeLists.txt
   Source/                # Editor source
   Source/Components/     # Inspector widgets, drawer registry and per-component drawers
+  Source/UI/             # Asset grid, asset picker and the shared asset field widget
 Hachimi-Player/          # Standalone game runtime used by exported builds
   CMakeLists.txt
   Source/                # Player source
@@ -295,6 +309,12 @@ project-owned one, and `Vendor/zstd/CMakeLists.txt` forwards to zstd's own proje
 `build/cmake/`. doctest keeps its upstream CMake project, which the root `CMakeLists.txt`
 adds like every other library.
 
+Everything a project owns lives under `<Project>/Assets`, and every asset file is accompanied by a
+`<file>.meta` sidecar carrying its UUID and, for textures, its import settings. The sidecar is what
+makes an asset reference stable: components and materials store UUIDs, so renaming or moving a file
+only changes the path the database resolves. Both files ship inside `Data.hpak`, so an exported game
+resolves the same references the editor did.
+
 Runtime asset access goes through `HachimiEngine::VirtualFileSystem`, a read-only
 mount table. Paths below a mount point are served from the mounted package (or
 loose-content overlay) and everything else falls back to the operating system, so
@@ -303,13 +323,18 @@ transparently.
 
 ## Extending the engine
 
-Three tables decide where new functionality goes, and all three are covered by tests that walk
-them rather than by a hand-written list:
+The tables below decide where new functionality goes, and the ones a test can walk are covered by
+tests that walk them rather than by a hand-written list:
 
 - **A component** is one header and one source under `Hachimi-Engine/Source/Scene/Components/`,
   plus a line in `ComponentRegistry::RegisterBuiltinComponents` and a drawer registered in
   `Hachimi-Editor/Source/Components/InspectorRegistry.cpp`. Entity creation, duplication, cloning,
   `.hscene` persistence and the inspector's component list all follow from the descriptor.
+- **A component property** that the inspector edits only needs a command factory in
+  `SceneCommands` and a `RecordEdit` call, which is what puts it on the undo stack.
+- **An asset kind** is an extension in `GetAssetTypeForExtension`, a default record in
+  `AssetMeta::MakeDefault`, a folder the editor puts it in (`GetPickerRootFor`) and, if it has an
+  editor, a case in the InspectorPanel's asset inspector.
 - **A simulation step** is a `SceneSystem` with a `ScenePhase`, attached with `Scene::AddSystem`.
   `Scene::OnUpdate` only drives the phases, so systems do not have to know about each other.
 - **A rendering effect** is a `RenderPass` added to the `SceneRenderer` pipeline, reading per-view
@@ -329,6 +354,8 @@ The following have reserved architecture slots but are not yet implemented:
 - External 3D model import (built-in meshes are used)
 - Log file output (console only)
 - Physics joints / character mover / mesh / heightfield colliders / physics debug draw / Box3D multithreading (basic rigid bodies and convex colliders are used)
+- Material texture channels beyond albedo (normal, emissive, AO, roughness, metallic) and alpha modes; the material asset holds the albedo channel today
+- Asset rename tracking from outside the editor: a `.meta` sidecar deleted by hand is regenerated with a new identity, which loses the references to it
 
 See `FUTURE.md` for the planned rendering effects and engine systems.
 

@@ -159,8 +159,16 @@ namespace HachimiEngine
         bool result = false;
         if (!ImGui::BeginPopupModal(m_Title.c_str(), &m_Open, ImGuiWindowFlags_NoSavedSettings))
         {
+            // The popup closed itself (Cancel, the close button, or Escape) since the last frame.
+            if (m_WasOpen)
+            {
+                m_Cancelled = true;
+            }
+            m_WasOpen = m_Open;
             return false;
         }
+
+        m_WasOpen = true;
 
         if (!FileSystem::IsDirectory(m_CurrentDirectory))
         {
@@ -203,7 +211,9 @@ namespace HachimiEngine
         }
 
         std::filesystem::path activatedPath;
-        AssetBrowserGrid::Draw(directories, files, m_GridSelectedPath, activatedPath);
+        AssetBrowserGrid::Callbacks callbacks;
+        callbacks.OnActivate = [&activatedPath](const std::filesystem::path& path) { activatedPath = path; };
+        AssetBrowserGrid::Draw(directories, files, m_GridSelectedPath, callbacks);
 
         if (!activatedPath.empty())
         {
@@ -214,6 +224,7 @@ namespace HachimiEngine
             else
             {
                 selectedPath = activatedPath;
+                m_SelectedPath = activatedPath;
                 result = true;
                 m_Open = false;
                 ImGui::CloseCurrentPopup();

@@ -8,7 +8,7 @@
 #include "Scene/Components/CameraComponent.h"
 #include "Scene/Components/IDComponent.h"
 #include "Scene/Components/LightComponent.h"
-#include "Scene/Components/MeshComponent.h"
+#include "Scene/Components/MeshRendererComponent.h"
 #include "Scene/Components/RelationshipComponent.h"
 #include "Scene/Components/TagComponent.h"
 #include "Scene/Components/TransformComponent.h"
@@ -44,8 +44,8 @@ namespace HachimiEngine
         lightEntity.Transform().Position = { 3.0f, 4.0f, 2.0f };
 
         Entity cubeEntity = CreateEntity("Cube");
-        auto& mesh = cubeEntity.AddComponent<MeshComponent>();
-        mesh.PrimitiveType = PrimitiveMeshType::Cube;
+        auto& mesh = cubeEntity.AddComponent<MeshRendererComponent>();
+        mesh.Primitive = PrimitiveMeshType::Cube;
         mesh.Mesh = MeshFactory::CreateCube();
     }
 
@@ -438,12 +438,12 @@ namespace HachimiEngine
 
         CollectLights(view.Lighting);
 
-        auto meshView = m_Registry.view<MeshComponent, TransformComponent>();
+        auto meshView = m_Registry.view<MeshRendererComponent, TransformComponent>();
         view.Items.reserve(meshView.size_hint());
 
         for (const entt::entity entity : meshView)
         {
-            const auto& [meshComponent, transformComponent] = meshView.get<MeshComponent, TransformComponent>(entity);
+            const auto& [meshComponent, transformComponent] = meshView.get<MeshRendererComponent, TransformComponent>(entity);
             if (!meshComponent.Visible || meshComponent.Mesh == nullptr)
             {
                 continue;
@@ -452,10 +452,12 @@ namespace HachimiEngine
             RenderItem item;
             item.Mesh = meshComponent.Mesh;
             item.Transform = GetWorldTransform(entity);
-            item.AlbedoColor = meshComponent.MaterialColor;
+            item.AlbedoColor = meshComponent.AlbedoColor;
             item.Roughness = meshComponent.Roughness;
             item.Metallic = meshComponent.Metallic;
-            item.Material = meshComponent.MaterialOverride;
+            // Only the reference travels: turning an asset into a shader and a texture needs a GL
+            // context, so it happens in the render pass, exactly like the GPU mesh does.
+            item.Material = meshComponent.Material;
             view.Items.push_back(std::move(item));
         }
 

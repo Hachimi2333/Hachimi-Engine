@@ -130,6 +130,18 @@ namespace HachimiEngine
         return OpenFileDialog(startPath, filters);
     }
 
+    std::filesystem::path FileDialogs::OpenAssetImportDialog(const std::filesystem::path& startPath)
+    {
+        constexpr std::array filters = {
+            nfdu8filteritem_t{ "All Hachimi Assets", "png,jpg,jpeg,tga,bmp,hmaterial,hscene,lua" },
+            nfdu8filteritem_t{ "Image files", "png,jpg,jpeg,tga,bmp" },
+            nfdu8filteritem_t{ "Hachimi Material", "hmaterial" },
+            nfdu8filteritem_t{ "Hachimi Scene", "hscene" },
+            nfdu8filteritem_t{ "Lua Script", "lua" }
+        };
+        return OpenFileDialog(startPath, filters);
+    }
+
     std::filesystem::path FileDialogs::OpenSceneFileDialog(const std::filesystem::path& startPath)
     {
         constexpr std::array filters = {

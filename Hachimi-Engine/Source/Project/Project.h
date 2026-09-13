@@ -10,6 +10,8 @@
 
 namespace HachimiEngine
 {
+    class AssetDatabase;
+
     // Describes one Hachimi project directory layout and its active scene.
     class Project
     {
@@ -25,6 +27,11 @@ namespace HachimiEngine
         const std::filesystem::path& GetAssetsDirectory() const { return m_AssetsDirectory; }
         void SetAssetsDirectory(const std::filesystem::path& directory) { m_AssetsDirectory = directory; }
 
+        // The project does not own the asset database: the application does, because a renderer
+        // pass needs it too. This is the pointer to the one instance that is currently loaded.
+        void SetAssetDatabase(AssetDatabase* database) { m_AssetDatabase = database; }
+        AssetDatabase* GetAssetDatabase() const { return m_AssetDatabase; }
+
         const std::filesystem::path& GetStartScenePath() const { return m_StartScenePath; }
         void SetStartScenePath(const std::filesystem::path& path) { m_StartScenePath = path; }
 
@@ -37,7 +44,7 @@ namespace HachimiEngine
         void SetProjectFilePath(const std::filesystem::path& path) { m_ProjectFilePath = path; }
 
         Ref<Scene> GetActiveScene() const { return m_ActiveScene; }
-        void SetActiveScene(const Ref<Scene>& scene) { m_ActiveScene = scene; }
+        void SetActiveScene(const Ref<Scene>& scene);
 
         GameBuildSettings& GetBuildSettings() { return m_BuildSettings; }
         const GameBuildSettings& GetBuildSettings() const { return m_BuildSettings; }
@@ -60,5 +67,6 @@ namespace HachimiEngine
         std::filesystem::path m_ProjectFilePath;
         GameBuildSettings m_BuildSettings;
         Ref<Scene> m_ActiveScene;
+        AssetDatabase* m_AssetDatabase = nullptr;
     };
 }

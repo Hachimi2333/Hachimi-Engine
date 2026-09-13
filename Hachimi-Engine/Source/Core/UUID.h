@@ -20,6 +20,8 @@ namespace HachimiEngine
         uint64_t GetValue() const { return m_UUID; }
         std::string ToString() const;
 
+        bool IsValid() const { return m_UUID != 0; }
+
         static UUID Invalid() { return UUID(0); }
 
     private:

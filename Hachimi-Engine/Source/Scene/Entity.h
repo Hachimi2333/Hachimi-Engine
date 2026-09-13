@@ -73,6 +73,10 @@ namespace HachimiEngine
 
         entt::entity GetHandle() const { return m_Handle.entity(); }
 
+        // The scene that owns this entity, so an editor command can be built from an entity alone
+        // instead of having to carry the scene alongside it.
+        Scene* GetScene() const { return m_Scene; }
+
         // The registry this entity lives in, for code that walks ComponentRegistry by type id
         // instead of naming each component type: the editor's component list and the scene
         // serializer both work that way.
@@ -83,6 +87,9 @@ namespace HachimiEngine
 
     private:
         entt::handle m_Handle;
+        // Kept as well as the handle because a handle knows its registry, not the Scene that owns
+        // it, and the editor needs the Scene for serialization and hierarchy queries.
+        Scene* m_Scene = nullptr;
 
         friend class Scene;
     };

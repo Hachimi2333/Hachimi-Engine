@@ -1,13 +1,13 @@
 #include "Panels/EditorMenuBar.h"
 
-#include "Asset/AssetManager.h"
+#include "Asset/AssetDatabase.h"
 #include "Core/Application.h"
 #include "Core/Log.h"
+#include "Editor/CommandHistory.h"
 #include "Panels/EditorContext.h"
 #include "Panels/EditorLayer.h"
 #include "Project/ProjectManager.h"
 #include "Utils/FileDialogs.h"
-#include "Utils/PlatformUtils.h"
 
 #include <imgui.h>
 
@@ -24,27 +24,64 @@ namespace HachimiEngine
 
         if (ImGui::BeginMenu("File"))
         {
+            if (ImGui::MenuItem("New Scene"))
+            {
+                owner->RequestAction("creating a new scene", [owner] { owner->CreateNewScene(); });
+            }
+            if (ImGui::MenuItem("New Material"))
+            {
+                owner->CreateNewMaterial();
+            }
+
+            ImGui::Separator();
+
             if (ImGui::MenuItem("Save Scene", "Ctrl+S"))
             {
-                SaveScene();
+                owner->SaveActiveScene();
             }
             if (ImGui::MenuItem("Save Scene As..."))
             {
-                SaveSceneAs();
+                owner->SaveSceneAsWithDialog();
             }
             if (ImGui::MenuItem("Open Scene..."))
             {
-                OpenScene(owner, context);
+                owner->OpenSceneWithDialog();
             }
-            if (ImGui::MenuItem("Import Texture..."))
+
+            ImGui::Separator();
+
+            if (ImGui::MenuItem("Import Asset..."))
             {
-                ImportTexture();
+                ImportAsset(*owner, context);
             }
 
             ImGui::Separator();
             if (ImGui::MenuItem("Return To Project Hub"))
             {
-                Application::Get().PopLayer(owner);
+                owner->RequestAction("returning to the project hub", [owner]
+                {
+                    Application::Get().PopLayer(owner);
+                });
+            }
+
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Edit"))
+        {
+            const bool canUndo = context.History != nullptr && context.History->CanUndo();
+            const bool canRedo = context.History != nullptr && context.History->CanRedo();
+
+            const std::string undoLabel = canUndo ? "Undo " + context.History->GetUndoName() : "Undo";
+            const std::string redoLabel = canRedo ? "Redo " + context.History->GetRedoName() : "Redo";
+
+            if (ImGui::MenuItem(undoLabel.c_str(), "Ctrl+Z", false, canUndo))
+            {
+                context.History->Undo();
+            }
+            if (ImGui::MenuItem(redoLabel.c_str(), "Ctrl+Y", false, canRedo))
+            {
+                context.History->Redo();
             }
 
             ImGui::EndMenu();
@@ -79,91 +116,55 @@ namespace HachimiEngine
             ImGui::EndMenu();
         }
 
+        // The scene name doubles as the unsaved-changes indicator, which is why it is drawn from
+        // the live dirty state rather than from a cached string.
+        const Ref<Project> project = ProjectManager::GetActiveProject();
+        if (project != nullptr)
+        {
+            const bool dirty = context.DirtyState != nullptr && context.DirtyState->IsDirty();
+            const std::string title = project->GetName()
+                + (dirty ? " *" : "")
+                + "  -  " + project->GetActiveScenePath().filename().string();
+
+            const float textWidth = ImGui::CalcTextSize(title.c_str()).x;
+            ImGui::SameLine(ImGui::GetWindowWidth() - textWidth - ImGui::GetStyle().ItemSpacing.x * 3.0f);
+            ImGui::TextDisabled("%s", title.c_str());
+        }
+
         ImGui::EndMainMenuBar();
     }
 
-    void EditorMenuBar::OpenScene(EditorLayer* owner, EditorContext& context)
+    void EditorMenuBar::ImportAsset(EditorLayer& layer, EditorContext& context)
     {
-        const Ref<Project> project = ProjectManager::GetActiveProject();
-        if (project == nullptr)
+        (void)layer;
+
+        if (context.Assets == nullptr)
         {
             return;
         }
 
-        const std::filesystem::path selectedScenePath =
-            FileDialogs::OpenSceneFileDialog(project->GetAssetsDirectory() / "Scenes");
-        if (selectedScenePath.empty())
-        {
-            return;
-        }
-
-        if (context.PlayState != EditorPlayState::Stopped)
-        {
-            owner->OnStop();
-        }
-
-        if (project->OpenScene(selectedScenePath))
-        {
-            context.ActiveScene = project->GetActiveScene();
-            context.EditorScene = nullptr;
-            context.SelectedEntity = {};
-            context.PlayState = EditorPlayState::Stopped;
-            HE_CLIENT_INFO("Opened scene {}", selectedScenePath.string());
-        }
-    }
-
-    void EditorMenuBar::SaveScene()
-    {
-        const Ref<Project> project = ProjectManager::GetActiveProject();
-        if (project == nullptr)
-        {
-            return;
-        }
-
-        // Writes back to the scene that is actually being edited, not to the start scene.
-        if (project->SaveActiveScene())
-        {
-            HE_CLIENT_INFO("Saved scene {}", project->GetActiveScenePath().string());
-        }
-        else
-        {
-            HE_CLIENT_ERROR("Failed to save the active scene");
-        }
-    }
-
-    void EditorMenuBar::SaveSceneAs()
-    {
-        const Ref<Project> project = ProjectManager::GetActiveProject();
-        if (project == nullptr)
-        {
-            return;
-        }
-
-        const std::filesystem::path selectedPath = FileDialogs::SaveFileDialog(
-            project->GetAssetsDirectory() / "Scenes",
-            project->GetActiveScenePath().filename().string());
+        const std::filesystem::path selectedPath = FileDialogs::OpenAssetImportDialog(
+            context.Assets->GetAssetsDirectory());
         if (selectedPath.empty())
         {
             return;
         }
 
-        if (project->SaveActiveSceneAs(selectedPath))
-        {
-            HE_CLIENT_INFO("Saved scene as {}", selectedPath.string());
-        }
-        else
-        {
-            HE_CLIENT_ERROR("Failed to save the scene as {}", selectedPath.string());
-        }
-    }
+        // Importing into the content root keeps the menu entry predictable; the content browser's
+        // own toolbar imports into the folder the user is browsing.
+        AssetHandle imported;
+        const AssetWriteResult result = context.Assets->ImportAsset(
+            selectedPath,
+            context.Assets->GetAssetsDirectory(),
+            imported);
 
-    void EditorMenuBar::ImportTexture()
-    {
-        const std::filesystem::path selectedTexturePath =
-            FileDialogs::OpenTextureImportDialog(AssetManager::GetAssetsDirectory());
-        if (!selectedTexturePath.empty())
+        if (result != AssetWriteResult::Success)
         {
-            AssetManager::ImportTexture(selectedTexturePath);
+            HE_CLIENT_ERROR("Import failed: {}", ToString(result));
+            return;
         }
+
+        context.SelectAsset(imported, context.Assets->GetAssetPath(imported));
+        HE_CLIENT_INFO("Imported {}", context.SelectedAssetPath.string());
     }
 }

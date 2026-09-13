@@ -21,6 +21,20 @@ namespace HachimiEngine
         bool IsOpen() const { return m_Open; }
         void Close() { m_Open = false; }
 
+        // True once the picker was dismissed without a selection, e.g. through Cancel or the close
+        // button. Reading it clears the flag, so a panel can drop the field slot it was holding for
+        // the picker instead of leaving it armed for the next one.
+        bool ConsumeCancelled()
+        {
+            const bool cancelled = m_Cancelled;
+            m_Cancelled = false;
+            return cancelled;
+        }
+
+        // The file the user activated, valid after Draw() returned true. Drawers that resolve the
+        // selection themselves read it here instead of keeping it in the panel.
+        const std::filesystem::path& GetSelectedPath() const { return m_SelectedPath; }
+
         // Returns true when a file was selected. selectedPath is only written in that case.
         bool Draw(std::filesystem::path& selectedPath);
 
@@ -32,11 +46,16 @@ namespace HachimiEngine
 
     private:
         bool m_Open = false;
+        bool m_Cancelled = false;
+        // Tracks the popup's own visibility, so closing it from outside Draw() is recognised as a
+        // cancellation on the next frame.
+        bool m_WasOpen = false;
         std::string m_Title;
         std::filesystem::path m_RootDirectory;
         std::vector<std::string> m_AllowedExtensions;
         std::filesystem::path m_CurrentDirectory;
         std::vector<std::filesystem::path> m_BackHistory;
         std::filesystem::path m_GridSelectedPath;
+        std::filesystem::path m_SelectedPath;
     };
 }

@@ -6,6 +6,7 @@ namespace HachimiEngine
 {
     Entity::Entity(entt::entity entityHandle, Scene* scene)
         : m_Handle(scene->m_Registry, entityHandle)
+        , m_Scene(scene)
     {
     }
 

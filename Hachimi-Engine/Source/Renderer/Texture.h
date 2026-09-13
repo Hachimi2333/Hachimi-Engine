@@ -8,6 +8,22 @@
 
 namespace HachimiEngine
 {
+    // How a texture is addressed outside the 0..1 range and how it is sampled. These are the
+    // renderer's own names rather than the asset layer's, so the renderer keeps no dependency on
+    // AssetMeta; the texture cache is the one place that translates between the two vocabularies.
+    enum class TextureAddressMode
+    {
+        Repeat = 0,
+        Clamp = 1,
+        MirroredRepeat = 2
+    };
+
+    enum class TextureSamplingFilter
+    {
+        Nearest = 0,
+        Linear = 1
+    };
+
     struct TextureSpecification
     {
         uint32_t Width = 1;
@@ -15,6 +31,8 @@ namespace HachimiEngine
         uint32_t Channels = 4;
         bool SRGB = true;
         bool GenerateMips = true;
+        TextureAddressMode Address = TextureAddressMode::Repeat;
+        TextureSamplingFilter Filter = TextureSamplingFilter::Linear;
     };
 
     // Base class for GPU texture resources.
@@ -36,8 +54,11 @@ namespace HachimiEngine
     {
     public:
         static Ref<Texture2D> Create(const TextureSpecification& specification);
-        // Uploads pre-decoded pixels. Always succeeds for a valid image, which is
-        // what the asynchronous loading path uses on the main thread.
+        // Uploads pre-decoded pixels under an explicit specification, which is how texture
+        // import settings (colour space, mipmaps, wrap, filter) reach the GPU. Always succeeds
+        // for a valid image; the async loading path uses it on the main thread.
+        static Ref<Texture2D> Create(const TextureSpecification& specification, const DecodedImage& image);
+        // Uploads pre-decoded pixels with default settings.
         static Ref<Texture2D> Create(const DecodedImage& image);
         // Returns nullptr when the file is missing or cannot be decoded, so
         // callers can fall back to an untextured material.

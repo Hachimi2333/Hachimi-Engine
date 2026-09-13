@@ -1,10 +1,10 @@
 #pragma once
 
+#include "Asset/AssetHandle.h"
 #include "Core/Base.h"
 #include "Core/Memory.h"
 #include "Renderer/EnvironmentSettings.h"
 #include "Renderer/Lighting.h"
-#include "Renderer/Material.h"
 #include "Renderer/MeshData.h"
 #include "Math/Math.h"
 
@@ -24,9 +24,11 @@ namespace HachimiEngine
         float Roughness = 0.6f;
         float Metallic = 0.05f;
 
-        // Optional explicit material. It supplies the shader and the albedo texture; the
-        // parameters above stay authoritative for the values they cover.
-        Ref<Material> Material;
+        // Optional material asset, carried as a reference rather than a resolved object: turning
+        // it into a shader and a texture needs the asset database and a GL context, which the
+        // render pass has and the scene extraction deliberately does not. This is why building a
+        // RenderView stays pure data and works in a headless test.
+        AssetHandle Material;
     };
 
     // Everything the renderer needs for one frame.

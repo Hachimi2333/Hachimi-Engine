@@ -1,11 +1,14 @@
 #include "Panels/SceneHierarchyPanel.h"
 
+#include "Components/InspectorWidgets.h"
+#include "Editor/CommandHistory.h"
+#include "Editor/SceneCommands.h"
 #include "Panels/EditorContext.h"
 #include "Renderer/MeshFactory.h"
 #include "Scene/Components/CameraComponent.h"
 #include "Scene/Components/IDComponent.h"
 #include "Scene/Components/LightComponent.h"
-#include "Scene/Components/MeshComponent.h"
+#include "Scene/Components/MeshRendererComponent.h"
 #include "Scene/Components/RelationshipComponent.h"
 #include "Scene/Components/TransformComponent.h"
 #include "Scene/Scene.h"
@@ -71,7 +74,7 @@ namespace HachimiEngine
 
         if (ImGui::IsItemClicked())
         {
-            context.SelectedEntity = entity;
+            context.SelectEntity(entity);
         }
 
         DrawEntityContextMenu(context, entity);
@@ -91,21 +94,48 @@ namespace HachimiEngine
         const std::string popupName = "EntityContext##" + entity.GetUUID().ToString();
         if (ImGui::BeginPopupContextItem(popupName.c_str()))
         {
-            context.SelectedEntity = entity;
+            context.SelectEntity(entity);
 
             if (ImGui::MenuItem("Delete Entity"))
             {
-                context.ActiveScene->DestroyEntity(entity);
+                // Through the history, so both the panel and the Inspector delete the same way and
+                // the delete can be undone with the whole subtree.
+                if (context.History != nullptr)
+                {
+                    RecordEdit(context.History, SceneCommands::MakeDestroyEntity(*context.ActiveScene, entity));
+                }
+                else
+                {
+                    context.ActiveScene->DestroyEntity(entity);
+                }
+
                 if (context.SelectedEntity == entity)
                 {
-                    context.SelectedEntity = {};
+                    context.SelectEntity({});
                 }
                 ImGui::CloseCurrentPopup();
             }
 
             if (ImGui::MenuItem("Duplicate Entity"))
             {
-                context.ActiveScene->DuplicateEntity(entity);
+                Entity duplicate;
+                if (context.History != nullptr)
+                {
+                    if (Scope<EditorCommand> command =
+                            SceneCommands::MakeDuplicateEntity(*context.ActiveScene, entity, duplicate))
+                    {
+                        RecordEdit(context.History, std::move(command));
+                    }
+                }
+                else
+                {
+                    duplicate = context.ActiveScene->DuplicateEntity(entity);
+                }
+
+                if (duplicate)
+                {
+                    context.SelectEntity(duplicate);
+                }
                 ImGui::CloseCurrentPopup();
             }
 
@@ -117,38 +147,26 @@ namespace HachimiEngine
     {
         if (ImGui::MenuItem("Create Empty Entity"))
         {
-            context.ActiveScene->CreateEntity("Empty Entity");
+            context.SelectEntity(context.ActiveScene->CreateEntity("Empty Entity"));
         }
         if (ImGui::MenuItem("Create Cube"))
         {
-            Entity entity = context.ActiveScene->CreateEntity("Cube");
-            auto& mesh = entity.AddComponent<MeshComponent>();
-            mesh.PrimitiveType = PrimitiveMeshType::Cube;
-            mesh.Mesh = MeshFactory::CreateCube();
-            context.SelectedEntity = entity;
+            context.SelectEntity(CreatePrimitive(context, "Cube", PrimitiveMeshType::Cube));
         }
         if (ImGui::MenuItem("Create Sphere"))
         {
-            Entity entity = context.ActiveScene->CreateEntity("Sphere");
-            auto& mesh = entity.AddComponent<MeshComponent>();
-            mesh.PrimitiveType = PrimitiveMeshType::Sphere;
-            mesh.Mesh = MeshFactory::CreateSphere();
-            context.SelectedEntity = entity;
+            context.SelectEntity(CreatePrimitive(context, "Sphere", PrimitiveMeshType::Sphere));
         }
         if (ImGui::MenuItem("Create Plane"))
         {
-            Entity entity = context.ActiveScene->CreateEntity("Plane");
-            auto& mesh = entity.AddComponent<MeshComponent>();
-            mesh.PrimitiveType = PrimitiveMeshType::Plane;
-            mesh.Mesh = MeshFactory::CreatePlane();
-            context.SelectedEntity = entity;
+            context.SelectEntity(CreatePrimitive(context, "Plane", PrimitiveMeshType::Plane));
         }
         if (ImGui::MenuItem("Create Point Light"))
         {
             Entity entity = context.ActiveScene->CreateEntity("Point Light");
             auto& light = entity.AddComponent<LightComponent>();
             light.Type = LightComponent::LightType::Point;
-            context.SelectedEntity = entity;
+            context.SelectEntity(entity);
         }
         if (ImGui::MenuItem("Create Directional Light"))
         {
@@ -156,13 +174,20 @@ namespace HachimiEngine
             auto& light = entity.AddComponent<LightComponent>();
             light.Type = LightComponent::LightType::Directional;
             light.Intensity = 1.4f;
-            context.SelectedEntity = entity;
+            context.SelectEntity(entity);
         }
         if (ImGui::MenuItem("Create Camera"))
         {
             Entity entity = context.ActiveScene->CreateEntity("Camera");
             entity.AddComponent<CameraComponent>();
-            context.SelectedEntity = entity;
+            context.SelectEntity(entity);
         }
+    }
+
+    Entity SceneHierarchyPanel::CreatePrimitive(EditorContext& context, const char* name, PrimitiveMeshType primitive)
+    {
+        Entity entity = context.ActiveScene->CreateEntity(name);
+        entity.AddComponent<MeshRendererComponent>().SetPrimitive(primitive);
+        return entity;
     }
 }

@@ -19,6 +19,11 @@ namespace HachimiEngine
         static Ref<Project> CreateProject(const std::string& name, const std::filesystem::path& directory);
         static Ref<Project> OpenProject(const std::filesystem::path& projectFilePath);
 
+        // Loads the project's start scene, creating one when the file is missing. Kept separate
+        // from OpenProject because a scene resolves its material and script references, which
+        // needs the asset database to have scanned the project first.
+        static bool EnsureStartScene(const Ref<Project>& project);
+
         static Ref<Project> GetActiveProject() { return s_ActiveProject; }
         static void SetActiveProject(const Ref<Project>& project) { s_ActiveProject = project; }
 

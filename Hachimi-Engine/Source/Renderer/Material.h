@@ -8,7 +8,12 @@
 
 namespace HachimiEngine
 {
-    // Simple PBR-ish surface parameters consumed by the scene shader.
+    // PBR-ish surface parameters consumed by the scene shader.
+    //
+    // A Material is the GPU-side result of resolving a material asset: a program plus its albedo
+    // texture. The scalar values are kept so the resolver can report what the asset said, but the
+    // per-draw values the shader sees come from the RenderItem, which lets an entity override
+    // individual channels of a shared material.
     class Material
     {
     public:

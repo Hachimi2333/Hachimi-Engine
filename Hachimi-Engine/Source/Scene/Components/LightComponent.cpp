@@ -32,7 +32,12 @@ namespace HachimiEngine
 
         void AddDefault(entt::registry& registry, entt::entity entity)
         {
-            registry.emplace<LightComponent>(entity);
+            // Guarded rather than overwriting: "add the default" must never discard the values a
+            // component already has.
+            if (!registry.all_of<LightComponent>(entity))
+            {
+                registry.emplace<LightComponent>(entity);
+            }
         }
 
         void Remove(entt::registry& registry, entt::entity entity)

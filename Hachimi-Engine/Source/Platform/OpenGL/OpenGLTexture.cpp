@@ -21,17 +21,35 @@ namespace HachimiEngine
             return 1 + static_cast<uint32_t>(std::floor(std::log2(static_cast<float>(largestDimension))));
         }
 
-        void ApplyTextureParameters(uint32_t rendererID, bool useMipmaps)
+        void ApplyTextureParameters(uint32_t rendererID, const TextureSpecification& specification)
         {
-            glTextureParameteri(rendererID, GL_TEXTURE_MIN_FILTER, useMipmaps ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
-            glTextureParameteri(rendererID, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTextureParameteri(rendererID, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTextureParameteri(rendererID, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            const GLenum minFilter = specification.GenerateMips
+                ? (specification.Filter == TextureSamplingFilter::Nearest ? GL_NEAREST_MIPMAP_NEAREST : GL_LINEAR_MIPMAP_LINEAR)
+                : (specification.Filter == TextureSamplingFilter::Nearest ? GL_NEAREST : GL_LINEAR);
+            const GLenum magFilter = specification.Filter == TextureSamplingFilter::Nearest ? GL_NEAREST : GL_LINEAR;
 
-            // Anisotropic filtering reduces blur and shimmer on grazing surfaces.
-            float maxAnisotropy = 1.0f;
-            glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &maxAnisotropy);
-            glTextureParameterf(rendererID, GL_TEXTURE_MAX_ANISOTROPY, std::min(maxAnisotropy, 8.0f));
+            GLenum address = GL_REPEAT;
+            switch (specification.Address)
+            {
+                case TextureAddressMode::Clamp: address = GL_CLAMP_TO_EDGE; break;
+                case TextureAddressMode::MirroredRepeat: address = GL_MIRRORED_REPEAT; break;
+                case TextureAddressMode::Repeat:
+                default: address = GL_REPEAT; break;
+            }
+
+            glTextureParameteri(rendererID, GL_TEXTURE_MIN_FILTER, static_cast<GLint>(minFilter));
+            glTextureParameteri(rendererID, GL_TEXTURE_MAG_FILTER, static_cast<GLint>(magFilter));
+            glTextureParameteri(rendererID, GL_TEXTURE_WRAP_S, static_cast<GLint>(address));
+            glTextureParameteri(rendererID, GL_TEXTURE_WRAP_T, static_cast<GLint>(address));
+
+            // Anisotropic filtering reduces blur and shimmer on grazing surfaces. A nearest
+            // filter is a deliberate pixel-art choice, so it is left alone.
+            if (specification.Filter != TextureSamplingFilter::Nearest)
+            {
+                float maxAnisotropy = 1.0f;
+                glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &maxAnisotropy);
+                glTextureParameterf(rendererID, GL_TEXTURE_MAX_ANISOTROPY, std::min(maxAnisotropy, 8.0f));
+            }
         }
     }
 
@@ -51,7 +69,7 @@ namespace HachimiEngine
             static_cast<GLsizei>(specification.Width),
             static_cast<GLsizei>(specification.Height));
 
-        ApplyTextureParameters(m_RendererID, specification.GenerateMips);
+        ApplyTextureParameters(m_RendererID, specification);
     }
 
     OpenGLTexture2D::OpenGLTexture2D(const std::string& path)
@@ -98,16 +116,17 @@ namespace HachimiEngine
         m_Specification.GenerateMips = true;
 
         const uint32_t mipLevelCount = CalculateMipLevelCount(m_Specification.Width, m_Specification.Height);
+        const GLenum internalFormat = m_Specification.SRGB ? GL_SRGB8_ALPHA8 : GL_RGBA8;
 
         glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
         glTextureStorage2D(
             m_RendererID,
             static_cast<GLsizei>(mipLevelCount),
-            GL_SRGB8_ALPHA8,
+            internalFormat,
             static_cast<GLsizei>(image.Width),
             static_cast<GLsizei>(image.Height));
 
-        ApplyTextureParameters(m_RendererID, true);
+        ApplyTextureParameters(m_RendererID, m_Specification);
 
         SetData(const_cast<uint8_t*>(image.Pixels.data()), static_cast<uint32_t>(image.Pixels.size()));
     }

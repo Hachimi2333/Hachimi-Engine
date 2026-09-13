@@ -3,14 +3,18 @@
 #include "Core/Input.h"
 #include "Core/KeyCodes.h"
 #include "Core/MouseButtonCodes.h"
+#include "Editor/CommandHistory.h"
+#include "Editor/SceneCommands.h"
+#include "Editor/SceneDirtyState.h"
 #include "Panels/EditorContext.h"
 #include "Renderer/PostProcessPass.h"
 #include "Renderer/RenderCommand.h"
 #include "Renderer/RendererContext.h"
 #include "Renderer/SceneRenderer.h"
-#include "Scene/Components/MeshComponent.h"
+#include "Scene/Components/MeshRendererComponent.h"
 #include "Scene/Components/RelationshipComponent.h"
 #include "Scene/Components/TransformComponent.h"
+#include "Scene/Entity.h"
 #include "Scene/Scene.h"
 #include "Viewport/SelectionIndicators.h"
 #include "Math/Math.h"
@@ -99,12 +103,12 @@ namespace HachimiEngine
 
             for (const Entity entity : context.ActiveScene->GetAllEntities())
             {
-                if (!entity.HasComponent<MeshComponent>() || !entity.HasComponent<TransformComponent>())
+                if (!entity.HasComponent<MeshRendererComponent>() || !entity.HasComponent<TransformComponent>())
                 {
                     continue;
                 }
 
-                const auto& mesh = entity.GetComponent<MeshComponent>();
+                const auto& mesh = entity.GetComponent<MeshRendererComponent>();
                 if (!mesh.Visible || mesh.Mesh == nullptr || mesh.Mesh->GetDrawMode() != MeshDrawMode::Triangles)
                 {
                     continue;
@@ -241,7 +245,7 @@ namespace HachimiEngine
                 && !ImGuizmo::IsOver()
                 && !ImGuizmo::IsUsingAny())
             {
-                context.SelectedEntity = PickEntity(context, imageMin, imageMax);
+                context.SelectEntity(PickEntity(context, imageMin, imageMax));
             }
         }
 
@@ -283,13 +287,23 @@ namespace HachimiEngine
     {
         if (!context.SelectedEntity || context.ActiveScene == nullptr)
         {
+            m_GizmoHistory = nullptr;
             return;
         }
 
         Entity selected = context.SelectedEntity;
         if (!selected.HasComponent<TransformComponent>())
         {
+            m_GizmoHistory = nullptr;
             return;
+        }
+
+        // A drag that is still running is the same undo entry as the drag that started it, so the
+        // history is only re-targeted when the manipulated entity changes.
+        if (m_GizmoHistory == nullptr || !(m_GizmoEntity == selected))
+        {
+            m_GizmoEntity = selected;
+            m_GizmoHistory = context.History;
         }
 
         Math::Mat4 worldTransform = context.ActiveScene->GetWorldTransform(selected.GetHandle());
@@ -347,9 +361,31 @@ namespace HachimiEngine
             rotationRadians = Math::EulerAngles(rotation);
 
             auto& transform = selected.Transform();
+            const Math::Vec3 beforePosition = transform.Position;
+            const Math::Vec3 beforeRotation = transform.Rotation;
+            const Math::Vec3 beforeScale = transform.Scale;
+
             transform.Position = translation;
             transform.Rotation = Math::Degrees(rotationRadians);
             transform.Scale = scale;
+
+            // The command's own TryMerge folds every frame of the drag into one entry, so a drag is
+            // one Ctrl+Z rather than one per frame.
+            if (m_GizmoHistory != nullptr
+                && (beforePosition != transform.Position || beforeRotation != transform.Rotation
+                    || beforeScale != transform.Scale))
+            {
+                if (Scope<EditorCommand> command =
+                        SceneCommands::MakeSetTransform(selected, beforePosition, beforeRotation, beforeScale))
+                {
+                    command->Apply(*context.ActiveScene);
+                    m_GizmoHistory->ExecuteMerged(std::move(command));
+                }
+            }
+            else if (context.DirtyState != nullptr)
+            {
+                context.DirtyState->MarkDirty();
+            }
         }
     }
 }

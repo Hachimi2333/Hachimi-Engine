@@ -83,16 +83,17 @@ Build-system notes:
 
 - Automated agents must verify changes by configuring with CMake and building both Debug
   and Release, then running `Tests.exe` and confirming it exits with code 0.
-- Test suites live in `Tests/`, one directory per subsystem (`Core/`, `Math/`, `Packaging/`,
-  `Renderer/`, `Scene/`, `Serialization/`, `Utils/`), and are written with doctest (see
+- Test suites live in `Tests/`, one directory per subsystem (`Asset/`, `Core/`, `Editor/`, `Math/`,
+  `Packaging/`, `Renderer/`, `Scene/`, `Serialization/`, `Utils/`), and are written with doctest (see
   `Vendor/doctest`). Shared fixtures live in `Tests/Support/`. Use `-ts=<suite>` to run one
   category, `-tc=<pattern>` for single cases and `--list-test-cases` to list them.
-- Every suite must stay headless: no window and no OpenGL context. Geometry lives in the
-  CPU-side `MeshData`, so constructing a `Scene` needs no context and the ECS, the scene
-  serializer and the runtime are all testable here. What stays interactive is only the code
-  that creates a GPU resource (`MeshLibrary::GetOrCreate`, `VertexArray::Create`,
-  `Texture2D::Create`, `Shader::Create`, a `Framebuffer`). New engine code that can be
-  exercised without a window should come with a suite under `Tests/`.
+- Every suite must stay headless: no window and no OpenGL context. Geometry lives in the CPU-side
+  `MeshData`, a material asset is a YAML document holding references, and the asset database only
+  reads and writes files, so constructing a `Scene`, editing a material and scanning a project all
+  need no context. What stays interactive is only the code that creates a GPU resource
+  (`MeshLibrary::GetOrCreate`, `MaterialResolver::Resolve`, `VertexArray::Create`,
+  `Texture2D::Create`, `Shader::Create`, a `Framebuffer`). New engine code that can be exercised
+  without a window should come with a suite under `Tests/`.
 - A test case owns the state it touches: mount and unmount the virtual file system itself
   (see `ScopedArchiveMount`) and never call `JobSystem::Shutdown()`, which `Tests/Main.cpp`
   owns.
@@ -150,6 +151,18 @@ Build-system notes:
   offsets with `static_assert` and `Tests/Renderer/FrameUniformsTests.cpp`.
 - Changing the `.hscene` layout means bumping `SceneSerializer::CurrentFormatVersion`. The loader
   refuses every other version instead of parsing it as if it had this layout.
+- Assets are referenced by `AssetHandle` (an asset UUID plus its kind), never by a path string. The
+  path is only how `AssetDatabase` finds the bytes, which is what makes renaming or moving a file
+  keep every reference working. A component stores the handle; the resolved GPU object is built on
+  the render path, so serialization and the scene stay free of the asset and renderer layers.
+- An asset's identity lives in a `<file>.meta` sidecar next to it, written and moved by
+  `AssetDatabase`. Never write or delete a sidecar by hand, and route every file operation the
+  editor offers through the database, or the records and the index drift apart.
+- A new asset kind is taught to the pipeline by its extension in `GetAssetTypeForExtension`, its
+  default record in `AssetMeta::MakeDefault`, and, if it has an editor, a case in the Inspector's
+  asset inspector. The database then scans, indexes and packages it without further changes.
+- `MeshRendererComponent`'s serialized key is still `"MeshComponent"`: it is a format identifier,
+  not a display label, and renaming it would invalidate every scene for no benefit.
 
 ## Project Scope
 

@@ -9,21 +9,21 @@ namespace HachimiEngine
         return CreateRef<OpenGLTexture2D>(specification);
     }
 
-    Ref<Texture2D> Texture2D::Create(const DecodedImage& image)
+    Ref<Texture2D> Texture2D::Create(const TextureSpecification& specification, const DecodedImage& image)
     {
         if (!image.IsValid())
         {
             return nullptr;
         }
 
-        TextureSpecification specification;
-        specification.Width = image.Width;
-        specification.Height = image.Height;
-        specification.Channels = 4;
-        specification.SRGB = true;
-        specification.GenerateMips = true;
+        // The image supplies the dimensions; everything else stays as the caller asked for it,
+        // which is what carries import settings (sRGB, mipmaps, wrap, filter) to the GPU.
+        TextureSpecification resolved = specification;
+        resolved.Width = image.Width;
+        resolved.Height = image.Height;
+        resolved.Channels = 4;
 
-        Ref<Texture2D> texture = CreateRef<OpenGLTexture2D>(specification);
+        Ref<Texture2D> texture = CreateRef<OpenGLTexture2D>(resolved);
         if (texture->GetRendererID() == 0)
         {
             return nullptr;
@@ -32,6 +32,11 @@ namespace HachimiEngine
         texture->SetData(const_cast<uint8_t*>(image.Pixels.data()),
             static_cast<uint32_t>(image.Pixels.size()));
         return texture;
+    }
+
+    Ref<Texture2D> Texture2D::Create(const DecodedImage& image)
+    {
+        return Create(TextureSpecification(), image);
     }
 
     Ref<Texture2D> Texture2D::Create(const std::string& path)

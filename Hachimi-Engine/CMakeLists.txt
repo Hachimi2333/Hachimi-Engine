@@ -1,9 +1,15 @@
 # Hachimi-Engine core static library.
 
 set(ENGINE_SOURCES
-    Source/Asset/Asset.h
-    Source/Asset/AssetManager.cpp
-    Source/Asset/AssetManager.h
+    Source/Asset/AssetDatabase.cpp
+    Source/Asset/AssetDatabase.h
+    Source/Asset/AssetHandle.h
+    Source/Asset/AssetMeta.cpp
+    Source/Asset/AssetMeta.h
+    Source/Asset/MaterialAsset.cpp
+    Source/Asset/MaterialAsset.h
+    Source/Asset/TextureCache.cpp
+    Source/Asset/TextureCache.h
     Source/Asset/TextureImporter.cpp
     Source/Asset/TextureImporter.h
     Source/Core/Application.cpp
@@ -28,6 +34,13 @@ set(ENGINE_SOURCES
     Source/Core/UUID.h
     Source/Core/Window.cpp
     Source/Core/Window.h
+    Source/Editor/CommandHistory.cpp
+    Source/Editor/CommandHistory.h
+    Source/Editor/EditorCommand.h
+    Source/Editor/SceneCommands.cpp
+    Source/Editor/SceneCommands.h
+    Source/Editor/SceneDirtyState.cpp
+    Source/Editor/SceneDirtyState.h
     Source/Events/ApplicationEvent.h
     Source/Events/Event.h
     Source/Events/EventDispatcher.h
@@ -101,6 +114,8 @@ set(ENGINE_SOURCES
     Source/Renderer/Lighting.h
     Source/Renderer/Material.cpp
     Source/Renderer/Material.h
+    Source/Renderer/MaterialResolver.cpp
+    Source/Renderer/MaterialResolver.h
     Source/Renderer/Mesh.cpp
     Source/Renderer/Mesh.h
     Source/Renderer/MeshData.cpp
@@ -134,6 +149,8 @@ set(ENGINE_SOURCES
     Source/Renderer/SceneRenderer.h
     Source/Renderer/SceneRenderTarget.cpp
     Source/Renderer/SceneRenderTarget.h
+    Source/Renderer/ScreenPresenter.cpp
+    Source/Renderer/ScreenPresenter.h
     Source/Renderer/Shader.cpp
     Source/Renderer/Shader.h
     Source/Renderer/ShadowMap.cpp
@@ -149,6 +166,7 @@ set(ENGINE_SOURCES
     Source/Renderer/VertexArray.h
     Source/Scene/ComponentRegistry.cpp
     Source/Scene/ComponentRegistry.h
+    Source/Scene/Components/AssetHandleSerialization.h
     Source/Scene/Components/CameraComponent.cpp
     Source/Scene/Components/CameraComponent.h
     Source/Scene/Components/ColliderComponent.cpp
@@ -157,8 +175,8 @@ set(ENGINE_SOURCES
     Source/Scene/Components/IDComponent.h
     Source/Scene/Components/LightComponent.cpp
     Source/Scene/Components/LightComponent.h
-    Source/Scene/Components/MeshComponent.cpp
-    Source/Scene/Components/MeshComponent.h
+    Source/Scene/Components/MeshRendererComponent.cpp
+    Source/Scene/Components/MeshRendererComponent.h
     Source/Scene/Components/RelationshipComponent.cpp
     Source/Scene/Components/RelationshipComponent.h
     Source/Scene/Components/RigidbodyComponent.cpp

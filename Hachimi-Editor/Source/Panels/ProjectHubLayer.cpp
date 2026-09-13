@@ -10,11 +10,13 @@
 #include <imgui.h>
 
 #include <cstdio>
+#include <utility>
 
 namespace HachimiEngine
 {
-    ProjectHubLayer::ProjectHubLayer()
+    ProjectHubLayer::ProjectHubLayer(std::filesystem::path projectFile)
         : Layer("ProjectHubLayer")
+        , m_StartupProjectFile(std::move(projectFile))
     {
     }
 
@@ -22,6 +24,14 @@ namespace HachimiEngine
     {
         ProjectManager::Init();
         std::snprintf(m_ProjectLocation, sizeof(m_ProjectLocation), "%s", PlatformUtils::GetDefaultProjectsDirectory().string().c_str());
+
+        // "--project" hands the editor a project to open, so a launch from the command line or a
+        // shortcut does not have to go through the hub.
+        if (!m_StartupProjectFile.empty())
+        {
+            OpenProject(m_StartupProjectFile);
+            m_StartupProjectFile.clear();
+        }
     }
 
     void ProjectHubLayer::OnImGuiRender()

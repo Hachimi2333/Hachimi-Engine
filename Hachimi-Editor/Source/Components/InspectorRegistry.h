@@ -1,23 +1,34 @@
 #pragma once
 
 #include "Scene/Entity.h"
+#include "UI/AssetField.h"
+
+#include <entt/entt.hpp>
 
 namespace HachimiEngine
 {
     struct EditorContext;
-    class AssetPickerPopup;
 
     // Everything a component drawer may touch beyond the entity itself.
+    //
+    // The drawer owns no UI state: the picker, the pending field and the assigned slot all live
+    // here, so opening or cancelling a modal stays the panel's business and a drawer is a plain
+    // function with no lifetime.
     struct InspectorDrawContext
     {
         EditorContext& Context;
 
-        // Asset picker owned by the panel. Drawers never own UI state, so closing or resetting
-        // the picker stays the panel's business.
-        AssetPickerPopup& AssetPicker;
+        AssetFieldState& AssetFields;
 
-        // Slot inside the component that an open asset picker is choosing a path for, or -1.
-        int& PendingAssetPickerSlot;
+        // Slot the field being drawn occupies, set by the drawer before it calls DrawAssetField.
+        uint32_t NextAssetFieldSlot = 0;
+
+        // Asset the panel resolved from an open picker this frame, for drawers whose field is not
+        // the generic asset slot - a script inside a list, for example.
+        AssetHandle AssignedAsset;
+
+        // True when AssignedAsset is set, so a drawer knows to consume it.
+        bool HasAssignedAsset = false;
     };
 
     using ComponentDrawFn = void (*)(Entity entity, InspectorDrawContext& context);
