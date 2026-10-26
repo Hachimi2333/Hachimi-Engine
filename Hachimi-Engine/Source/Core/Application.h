@@ -18,13 +18,13 @@ namespace HachimiEngine
     class Application
     {
     public:
-        Application(const WindowProps& props = WindowProps());
+        Application(const WindowProps& props = WindowProps(), bool enableImGui = true);
         virtual ~Application();
 
         Application(const Application&) = delete;
         Application& operator=(const Application&) = delete;
 
-        void Run();
+        void Run(bool startupProfile = false);
         void Close();
 
         void PushLayer(const Ref<Layer>& layer) { m_LayerStack.PushLayer(layer); }

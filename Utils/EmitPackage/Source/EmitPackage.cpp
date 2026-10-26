@@ -9,6 +9,11 @@
 
 #include "Core/JobSystem.h"
 #include "Core/Log.h"
+#include "Asset/AssetDatabase.h"
+#include "Packaging/ProjectPackager.h"
+#include "Project/Project.h"
+#include "Serialization/ProjectSerializer.h"
+#include "Serialization/SceneSerializer.h"
 #include "Packaging/PackageFormat.h"
 #include "Packaging/PackageWriter.h"
 #include "Utils/FileSystem.h"
@@ -27,7 +32,7 @@ namespace
 {
     void PrintUsage()
     {
-        std::printf("Usage: EmitPackage.exe <output.hpak>\n"
+        std::printf("Usage: EmitPackage.exe <output.hpak> [--project <project.hproj>]\n"
                     "\n"
                     "Writes a smoke-test game package: BuildInfo.yaml, Project.hproj, a scene,\n"
                     "a Lua script, synthetic texture bytes and the engine's shaders and fonts.\n"
@@ -56,7 +61,7 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    if (argc != 2)
+    if (argc != 2 && !(argc == 4 && std::string(argv[2]) == "--project"))
     {
         PrintUsage();
         return 1;
@@ -66,6 +71,33 @@ int main(int argc, char** argv)
 
     Log::Init();
     JobSystem::Init();
+
+    if (argc == 4)
+    {
+        auto projectToExport = HE::CreateRef<HE::Project>();
+        HE::ProjectSerializer serializer(projectToExport);
+        HE::AssetDatabase assets;
+        bool success = serializer.Deserialize(argv[3]);
+        if (success) success = assets.Refresh(projectToExport->GetAssetsDirectory());
+        if (success)
+        {
+            projectToExport->SetAssetDatabase(&assets);
+            const auto report = HE::ProjectPackager::Export(projectToExport,
+                HE::PlatformUtils::GetExecutableDirectory() / "Hachimi-Player.exe");
+            success = report.Success;
+            if (success)
+            {
+                std::error_code error;
+                std::filesystem::copy_file(report.PackagePath, packagePath,
+                    std::filesystem::copy_options::overwrite_existing, error);
+                success = !error;
+            }
+            HE_CLIENT_INFO("{}", report.Message);
+        }
+        HE::JobSystem::Shutdown();
+        HE::Log::Shutdown();
+        return success ? 0 : 1;
+    }
 
     const std::string buildInfo =
         "ProductName: Hachimi Smoke Test\n"
@@ -81,6 +113,7 @@ int main(int argc, char** argv)
         "StartScene: Assets/Scenes/Default.hscene\n";
 
     const std::string scene =
+        "FormatVersion: " + std::to_string(HE::SceneSerializer::CurrentFormatVersion) + "\n"
         "Scene: Default\n"
         "Environment:\n"
         "  ShowSkybox: true\n"
@@ -134,6 +167,8 @@ int main(int argc, char** argv)
             writer.AddFile(std::filesystem::path("Assets") / "Fonts" / FileSystem::GetFileName(font), font);
             ++runtimeFileCount;
         }
+
+        writer.AddFile("Environment/Default.henv", exeDirectory / "Environment" / "Default.henv");
 
         // Synthetic texture bytes give the package a stored (already compressed) entry.
         const std::vector<uint8_t> texture = MakeRandomBytes(4096 * 3 + 5, 7);

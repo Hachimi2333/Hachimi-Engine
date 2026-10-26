@@ -113,6 +113,10 @@ set(ENGINE_SOURCES
     Source/Renderer/DebugDraw.h
     Source/Renderer/EditorCamera.cpp
     Source/Renderer/EditorCamera.h
+    Source/Renderer/EnvironmentMapData.cpp
+    Source/Renderer/EnvironmentMapDataIO.cpp
+    Source/Renderer/EnvironmentMapData.h
+    Source/Core/StartupTimer.h
     Source/Renderer/EnvironmentMap.cpp
     Source/Renderer/EnvironmentMap.h
     Source/Renderer/EnvironmentSettings.h

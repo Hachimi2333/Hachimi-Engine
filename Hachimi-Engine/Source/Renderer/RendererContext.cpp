@@ -44,6 +44,7 @@ namespace HachimiEngine
         }
 
         Renderer::Init();
+        m_Initialized = true;
 
         m_Shaders = CreateScope<ShaderLibrary>();
         m_MeshLibrary = CreateScope<MeshLibrary>();
@@ -62,7 +63,8 @@ namespace HachimiEngine
 
         m_GridMesh = MeshFactory::CreateGrid();
         m_SkyboxMesh = MeshFactory::CreateCube(2.0f);
-        m_ShadowMap = ShadowMap::Create(ShadowMapResolution, ShadowMapResolution);        m_EnvironmentMap = CreateRef<EnvironmentMap>(128);
+        m_ShadowMap = ShadowMap::Create(ShadowMapResolution, ShadowMapResolution);
+        m_EnvironmentMap = CreateRef<EnvironmentMap>();
 
         m_PostProcessPass = CreateScope<PostProcessPass>();
         m_DebugDraw = CreateScope<DebugDraw>();

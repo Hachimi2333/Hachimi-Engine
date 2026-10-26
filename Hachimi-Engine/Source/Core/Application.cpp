@@ -6,6 +6,7 @@
 #include "Core/JobSystem.h"
 #include "Core/Log.h"
 #include "Core/Time.h"
+#include "Core/StartupTimer.h"
 #include "Core/Timestep.h"
 #include "Events/ApplicationEvent.h"
 #include "Events/EventDispatcher.h"
@@ -21,7 +22,7 @@ namespace HachimiEngine
 {
     Application* Application::s_Instance = nullptr;
 
-    Application::Application(const WindowProps& props)
+    Application::Application(const WindowProps& props, bool enableImGui)
     {
         HE_CORE_ASSERT(s_Instance == nullptr);
         s_Instance = this;
@@ -30,14 +31,23 @@ namespace HachimiEngine
         // asset loading.
         JobSystem::Init();
 
-        m_Window = Window::Create(props);
+        {
+            StartupTimer timer("Window and OpenGL");
+            m_Window = Window::Create(props);
+        }
         m_Window->SetEventCallback([this](Event& event) { OnEvent(event); });
 
         RenderCommand::Init();
         RenderCommand::SetClearColor({ 0.08f, 0.08f, 0.10f, 1.0f });
 
+        RenderCommand::Clear();
+        m_Window->SwapBuffers();
+
         m_RendererContext = CreateScope<RendererContext>();
-        m_RendererContext->Init();
+        {
+            StartupTimer timer("Renderer resources");
+            m_RendererContext->Init();
+        }
 
         // The asset services are application-wide and the renderer only borrows them, so a pass
         // can resolve an asset handle without reaching for a global.
@@ -49,8 +59,12 @@ namespace HachimiEngine
 
         ScriptManager::Init();
 
-        m_ImGuiLayer = CreateRef<ImGuiLayer>();
-        PushOverlay(m_ImGuiLayer);
+        if (enableImGui)
+        {
+            StartupTimer timer("ImGui");
+            m_ImGuiLayer = CreateRef<ImGuiLayer>();
+            PushOverlay(m_ImGuiLayer);
+        }
     }
 
     Application::~Application()
@@ -76,7 +90,7 @@ namespace HachimiEngine
         s_Instance = nullptr;
     }
 
-    void Application::Run()
+    void Application::Run(bool startupProfile)
     {
         using Clock = std::chrono::steady_clock;
 
@@ -117,11 +131,16 @@ namespace HachimiEngine
                 // before ImGui renders on top.
                 m_LayerStack.Render();
 
-                m_ImGuiLayer->Begin();
-                m_LayerStack.RenderImGui();
-                m_ImGuiLayer->End();
+                if (m_ImGuiLayer != nullptr)
+                {
+                    m_ImGuiLayer->Begin();
+                    m_LayerStack.RenderImGui();
+                    m_ImGuiLayer->End();
+                }
 
                 m_Window->SwapBuffers();
+                StartupTimer::FirstFrame();
+                if (startupProfile) Close();
             }
         }
     }

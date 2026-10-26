@@ -8,11 +8,11 @@ namespace HachimiEngine
 {
     class TextureCube;
 
-    // Procedural sky environment with CPU-generated diffuse and specular IBL cubemaps.
+    // GPU textures uploaded from the build-time baked sky environment.
     class EnvironmentMap
     {
     public:
-        explicit EnvironmentMap(uint32_t resolution = 128);
+        EnvironmentMap();
         ~EnvironmentMap() = default;
 
         void BindSkybox(uint32_t slot) const;
@@ -30,15 +30,6 @@ namespace HachimiEngine
         uint32_t GetPrefilteredMipLevelCount() const;
 
     private:
-        void GenerateSkybox();
-        void GenerateIrradianceMap();
-        void GeneratePrefilteredMap();
-
-        static Math::Vec3 EvaluateSky(Math::Vec3 direction);
-        static Math::Vec3 CubeMapFaceDirection(uint32_t faceIndex, float u, float v);
-
-    private:
-        uint32_t m_Resolution = 128;
         Ref<TextureCube> m_Skybox;
         Ref<TextureCube> m_Irradiance;
         Ref<TextureCube> m_Prefiltered;

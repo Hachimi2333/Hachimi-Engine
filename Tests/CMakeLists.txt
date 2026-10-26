@@ -24,6 +24,7 @@ set(TEST_SOURCES
     Core/TimeTests.cpp
     Core/LayerStackTests.cpp
     Core/UUIDTests.cpp
+    Renderer/EnvironmentMapDataTests.cpp
     Editor/CommandHistoryTests.cpp
     Math/MathTests.cpp
     Packaging/BuildSettingsTests.cpp

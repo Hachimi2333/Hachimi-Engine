@@ -230,6 +230,12 @@ namespace HachimiEngine
             return result;
         }
 
+        const auto environmentPath = HE::PlatformUtils::GetExecutableDirectory() / "Environment" / "Default.henv";
+        if (!writer.AddFile("Environment/Default.henv", environmentPath))
+        {
+            result.Message = "Cannot export: baked environment resource is missing";
+            return result;
+        }
         AddOptionalEngineFonts(writer);
 
         if (!writer.Finalize(result.Report))

@@ -12,6 +12,8 @@
 #include "Packaging/PackageReader.h"
 #include "Packaging/ProjectPackager.h"
 #include "Project/Project.h"
+#include "Renderer/EnvironmentMapData.h"
+#include "Utils/VirtualFileSystem.h"
 #include "Serialization/ProjectSerializer.h"
 #include "Support/TestWorkspace.h"
 #include "Utils/FileSystem.h"
@@ -93,6 +95,19 @@ TEST_CASE("ProjectPackager writes the game folder, the player copy and a readabl
         INFO("entry: ", entry);
         CHECK(reader.HasEntry(entry));
     }
+
+    struct OwnedMount
+    {
+        ~OwnedMount() { HE::VirtualFileSystem::UnmountAll(); }
+    } mount;
+    REQUIRE(VirtualFileSystem::MountArchive(result.PackagePath, expectedOutput));
+    std::vector<uint8_t> environmentBytes;
+    REQUIRE(VirtualFileSystem::ReadBinaryFile(expectedOutput / EnvironmentMapData::ResourcePath, environmentBytes));
+    EnvironmentMapData environment;
+    std::string environmentError;
+    REQUIRE(EnvironmentMapData::Deserialize(environmentBytes, environment, environmentError));
+    CHECK(environment.Resolution == 128);
+    VirtualFileSystem::UnmountAll();
 
     // The engine shaders travel with every exported game.
     CHECK_FALSE(reader.EnumerateEntries("Shaders", false).empty());

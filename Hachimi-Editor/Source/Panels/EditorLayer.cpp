@@ -5,6 +5,7 @@
 #include "Asset/TextureCache.h"
 #include "Core/Application.h"
 #include "Core/Log.h"
+#include "Core/StartupTimer.h"
 #include "Core/Input.h"
 #include "Core/KeyCodes.h"
 #include "Events/EventDispatcher.h"
@@ -94,14 +95,15 @@ namespace HachimiEngine
         // references it carries, which needs the identity sidecars to be readable.
         AssetDatabase& assets = application.GetAssetDatabase();
         TextureCache& textures = application.GetTextureCache();
-        assets.Refresh(project->GetAssetsDirectory());
+        { StartupTimer timer("Asset scan"); assets.Refresh(project->GetAssetsDirectory()); }
         textures.Clear();
         textures.SetDatabase(&assets);
 
         project->SetAssetDatabase(&assets);
         SceneSerializer::SetAssetDatabase(&assets);
 
-        if (!ProjectManager::EnsureStartScene(project))
+        const auto loadScene = [&] { StartupTimer timer("Scene load"); return ProjectManager::EnsureStartScene(project); };
+        if (!loadScene())
         {
             HE_CLIENT_ERROR("Could not open the start scene of project '{}'", project->GetName());
         }

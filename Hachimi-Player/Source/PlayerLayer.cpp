@@ -4,6 +4,7 @@
 #include "Asset/TextureCache.h"
 #include "Core/Application.h"
 #include "Core/Log.h"
+#include "Core/StartupTimer.h"
 #include "Project/Project.h"
 #include "Renderer/MaterialResolver.h"
 #include "Renderer/RendererContext.h"
@@ -60,7 +61,7 @@ namespace HachimiEngine
         // editor. Nothing is written back.
         AssetDatabase& assets = Application::Get().GetAssetDatabase();
         TextureCache& textures = Application::Get().GetTextureCache();
-        assets.Refresh(m_Project->GetAssetsDirectory());
+        { StartupTimer timer("Asset scan"); assets.Refresh(m_Project->GetAssetsDirectory()); }
         textures.Clear();
         textures.SetDatabase(&assets);
 
@@ -71,7 +72,8 @@ namespace HachimiEngine
             ? m_Project->GetStartScenePath()
             : m_ContentRoot / m_BuildInfo.StartScene;
 
-        if (!m_Project->OpenScene(startScenePath))
+        const auto loadScene = [&] { StartupTimer timer("Scene load"); return m_Project->OpenScene(startScenePath); };
+        if (!loadScene())
         {
             HE_CLIENT_ERROR("Failed to load packaged start scene: {}", startScenePath.string());
             Application::Get().Close();

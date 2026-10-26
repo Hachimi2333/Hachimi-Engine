@@ -20,7 +20,7 @@ namespace HachimiEngine
         : Application(WindowProps(
             buildInfo.ProductName.empty() ? "Hachimi-Player" : buildInfo.ProductName,
             std::max(buildInfo.WindowWidth, 320u),
-            std::max(buildInfo.WindowHeight, 240u)))
+            std::max(buildInfo.WindowHeight, 240u)), false)
     {
         m_Window->SetVSync(buildInfo.VSync);
         HE_CLIENT_INFO("Hachimi-Player started");

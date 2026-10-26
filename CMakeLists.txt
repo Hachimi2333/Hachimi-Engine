@@ -126,7 +126,10 @@ add_custom_target(copy_runtime_resources ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${PROJECT_SOURCE_DIR}/Hachimi-Engine/Resources/Fonts"
         "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Assets/Fonts"
-    COMMENT "Copying shaders and fonts next to the executables"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_BINARY_DIR}/Generated/Environment"
+        "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Environment"
+    COMMENT "Copying runtime resources next to the executables"
     VERBATIM
 )
 
@@ -253,3 +256,5 @@ add_subdirectory(Hachimi-Player)
 enable_testing()
 add_subdirectory(Tests)
 add_subdirectory(Utils/EmitPackage)
+
+add_subdirectory(Utils/BakeEnvironment)
