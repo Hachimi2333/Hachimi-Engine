@@ -5,10 +5,12 @@
 #include "Core/Memory.h"
 #include "Editor/EditorCommand.h"
 #include "Math/Math.h"
+#include "Scripting/ScriptFields.h"
 
 #include <entt/entt.hpp>
 
 #include <string>
+#include <vector>
 
 namespace HachimiEngine
 {
@@ -56,6 +58,13 @@ namespace HachimiEngine
         Scope<EditorCommand> MakeSetMeshMaterial(Entity entity, AssetHandle material);
         Scope<EditorCommand> MakeSetScriptReference(Entity entity, uint32_t slotIndex, AssetHandle script,
                                                     const std::string& displayName);
+
+        // The field list of one script slot. Both sides are captured by the caller because a field
+        // table edit can add, remove, rename and retype rows: snapshotting the whole list keeps one
+        // command for all of them instead of one per kind of change.
+        Scope<EditorCommand> MakeSetScriptFields(Entity entity, uint32_t slotIndex,
+                                                 const std::vector<ScriptField>& before,
+                                                 const std::vector<ScriptField>& after);
 
         // Attaching and detaching components. Both go through ComponentRegistry, so a newly
         // registered component is undoable without a change here.

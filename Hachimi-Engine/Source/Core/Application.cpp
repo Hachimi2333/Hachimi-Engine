@@ -5,6 +5,7 @@
 #include "Core/Assert.h"
 #include "Core/JobSystem.h"
 #include "Core/Log.h"
+#include "Core/Time.h"
 #include "Core/Timestep.h"
 #include "Events/ApplicationEvent.h"
 #include "Events/EventDispatcher.h"
@@ -54,6 +55,8 @@ namespace HachimiEngine
 
     Application::~Application()
     {
+        // Sessions detach while the application, asset services and GL context are still alive.
+        m_LayerStack.Clear();
         ScriptManager::Shutdown();
 
         // Texture objects hold GL handles, so they are released while the context is still
@@ -84,7 +87,13 @@ namespace HachimiEngine
             const auto now = Clock::now();
             const float deltaTime = std::chrono::duration<float>(now - lastFrameTime).count();
             lastFrameTime = now;
-            const Timestep timestep(deltaTime);
+
+            // The clock clamps and scales the frame time once, here, and layers below are handed the
+            // clamped value rather than the raw one: a hitch - a breakpoint, a shader compile, a
+            // window drag - must not reach gameplay as one enormous delta. Gameplay reads
+            // Time::GetDeltaTime(), which carries the time scale on top of the same clamped frame.
+            Time::Get().Advance(deltaTime);
+            const Timestep timestep(Time::Get().GetUnscaledDeltaTime());
 
             // Deliver completed background reads and GPU-upload finished texture
             // decodes on the main thread, where OpenGL calls are legal.

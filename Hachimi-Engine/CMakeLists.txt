@@ -19,6 +19,8 @@ set(ENGINE_SOURCES
     Source/Core/EntryPoint.h
     Source/Core/Input.cpp
     Source/Core/Input.h
+    Source/Core/InputMap.cpp
+    Source/Core/InputMap.h
     Source/Core/JobSystem.cpp
     Source/Core/JobSystem.h
     Source/Core/KeyCodes.h
@@ -29,6 +31,8 @@ set(ENGINE_SOURCES
     Source/Core/Log.h
     Source/Core/Memory.h
     Source/Core/MouseButtonCodes.h
+    Source/Core/Time.cpp
+    Source/Core/Time.h
     Source/Core/Timestep.h
     Source/Core/UUID.cpp
     Source/Core/UUID.h
@@ -41,6 +45,8 @@ set(ENGINE_SOURCES
     Source/Editor/SceneCommands.h
     Source/Editor/SceneDirtyState.cpp
     Source/Editor/SceneDirtyState.h
+    Source/Editor/ScenePhysicsCommands.cpp
+    Source/Editor/ScenePhysicsCommands.h
     Source/Events/ApplicationEvent.h
     Source/Events/Event.h
     Source/Events/EventDispatcher.h
@@ -63,8 +69,13 @@ set(ENGINE_SOURCES
     Source/Packaging/PackageWriter.h
     Source/Packaging/ProjectPackager.cpp
     Source/Packaging/ProjectPackager.h
+    Source/Physics/PhysicsBodyKey.h
+    Source/Physics/PhysicsEvents.h
     Source/Physics/PhysicsMath.h
+    Source/Physics/PhysicsQuery.h
     Source/Physics/PhysicsSettings.h
+    Source/Physics/PhysicsTaskScheduler.cpp
+    Source/Physics/PhysicsTaskScheduler.h
     Source/Physics/PhysicsWorld.cpp
     Source/Physics/PhysicsWorld.h
     Source/Platform/GLFW/GLFWWindow.cpp
@@ -132,6 +143,8 @@ set(ENGINE_SOURCES
     Source/Renderer/Passes/OpaquePass.h
     Source/Renderer/Passes/SkyboxPass.cpp
     Source/Renderer/Passes/SkyboxPass.h
+    Source/Renderer/PhysicsDebugDraw.cpp
+    Source/Renderer/PhysicsDebugDraw.h
     Source/Renderer/PostProcessPass.cpp
     Source/Renderer/PostProcessPass.h
     Source/Renderer/RenderCommand.h
@@ -189,8 +202,13 @@ set(ENGINE_SOURCES
     Source/Scene/Components/TransformComponent.h
     Source/Scene/Entity.cpp
     Source/Scene/Entity.h
+    Source/Scene/Events/PhysicsSceneEvents.h
     Source/Scene/Scene.cpp
     Source/Scene/Scene.h
+    Source/Scene/SceneRuntime.cpp
+    Source/Scene/SceneRuntime.h
+    Source/Renderer/SceneRuntimePresentation.h
+    Source/Renderer/SceneRuntimeRendering.cpp
     Source/Scene/SceneSystem.h
     Source/Scene/Systems/PhysicsSystem.cpp
     Source/Scene/Systems/PhysicsSystem.h
@@ -200,11 +218,24 @@ set(ENGINE_SOURCES
     Source/Scripting/Lua/LuaScriptBindings.h
     Source/Scripting/Lua/LuaScriptEngine.cpp
     Source/Scripting/Lua/LuaScriptEngine.h
+    Source/Scripting/Lua/LuaScriptRequire.cpp
+    Source/Scripting/Lua/LuaScriptRequire.h
     Source/Scripting/Lua/LuaScriptRuntime.cpp
     Source/Scripting/Lua/LuaScriptRuntime.h
     Source/Scripting/ScriptEngine.h
+    Source/Scripting/ScriptErrorLocation.cpp
+    Source/Scripting/ScriptErrorLocation.h
+    Source/Scripting/ScriptFields.cpp
+    Source/Scripting/ScriptFields.h
     Source/Scripting/ScriptManager.cpp
     Source/Scripting/ScriptManager.h
+    Source/Scripting/ScriptCommandQueue.cpp
+    Source/Scripting/ScriptCommandQueue.h
+    Source/Scripting/ScriptEntity.cpp
+    Source/Scripting/ScriptEntity.h
+    Source/Scripting/ScriptPhysicsEvent.h
+    Source/Scripting/Lua/LuaPhysicsBindings.cpp
+    Source/Scripting/Lua/LuaPhysicsBindings.h
     Source/Scripting/ScriptRuntime.h
     Source/Scripting/ScriptWorld.cpp
     Source/Scripting/ScriptWorld.h
@@ -225,6 +256,7 @@ set(ENGINE_SOURCES
 )
 
 add_library(Hachimi-Engine STATIC ${ENGINE_SOURCES})
+set_target_properties(Hachimi-Engine PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 add_library(HachimiEngine::Engine ALIAS Hachimi-Engine)
 
 # Source/ is public: the editor, the player and the tests all include engine headers

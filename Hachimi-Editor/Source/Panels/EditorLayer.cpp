@@ -5,6 +5,8 @@
 #include "Asset/TextureCache.h"
 #include "Core/Application.h"
 #include "Core/Log.h"
+#include "Core/Input.h"
+#include "Core/KeyCodes.h"
 #include "Events/EventDispatcher.h"
 #include "Panels/EditorShortcuts.h"
 #include "Project/ProjectManager.h"
@@ -52,6 +54,7 @@ namespace HachimiEngine
             ImGui::DockBuilderDockWindow("Game", dockMain);
             ImGui::DockBuilderDockWindow("Scene Hierarchy", dockLeft);
             ImGui::DockBuilderDockWindow("Inspector", dockRight);
+            ImGui::DockBuilderDockWindow("Physics", dockRight);
             ImGui::DockBuilderDockWindow("Content Browser", dockBottom);
             ImGui::DockBuilderDockWindow("Console", dockConsole);
             ImGui::DockBuilderDockWindow("Package Inspector", dockConsole);
@@ -103,6 +106,7 @@ namespace HachimiEngine
             HE_CLIENT_ERROR("Could not open the start scene of project '{}'", project->GetName());
         }
 
+        m_Input = InputMap::LoadProject(project->GetAssetsDirectory());
         m_Context.Assets = &assets;
         m_Context.Textures = &textures;
         m_Context.DirtyState = &m_DirtyState;
@@ -123,10 +127,7 @@ namespace HachimiEngine
 
     void EditorLayer::OnDetach()
     {
-        if (m_Context.ActiveScene != nullptr && m_Context.PlayState != EditorPlayState::Stopped)
-        {
-            m_Context.ActiveScene->OnRuntimeStop();
-        }
+        OnStop();
 
         m_ConsolePanel.UnregisterCallbacks();
 
@@ -162,15 +163,20 @@ namespace HachimiEngine
     {
         // Do not move the camera while the user is typing into an ImGui input field.
         // ViewportHovered is updated by the previous frame's viewport panel layout.
-        if (!ImGui::GetIO().WantCaptureKeyboard)
+        if (!m_Context.IsPlaying() && !ImGui::GetIO().WantCaptureKeyboard)
         {
             m_Context.Camera.OnUpdate(timestep, m_Context.ViewportHovered && !ImGuizmo::IsUsingAny());
         }
 
-        // Scene simulation only advances while the playback toolbar is in Play mode.
-        if (m_Context.ActiveScene != nullptr && m_Context.PlayState == EditorPlayState::Playing)
+        if (m_Runtime != nullptr)
         {
-            m_Context.ActiveScene->OnUpdate(timestep);
+            if (Input::IsKeyPressed(Key::Escape)) m_Context.GameInputReleased = true;
+            const bool capture = m_Context.PlayState == EditorPlayState::Playing
+                && m_Context.GameFocused && !m_Context.GameInputReleased;
+            auto& window = Application::Get().GetWindow();
+            window.SetCursorMode(capture ? Window::CursorMode::Disabled : Window::CursorMode::Normal);
+            m_Runtime->SetInputEnabled(capture);
+            m_Runtime->Update(timestep);
         }
 
         // Thumbnails and any other deferred texture work. The upload has to happen on the main
@@ -190,6 +196,8 @@ namespace HachimiEngine
 
         if (m_Context.PlayState == EditorPlayState::Paused)
         {
+            m_Runtime->SetPaused(false);
+            m_Context.GameInputReleased = false;
             m_Context.PlayState = EditorPlayState::Playing;
             m_Context.FocusGamePanel = true;
             return;
@@ -200,20 +208,26 @@ namespace HachimiEngine
             return;
         }
 
+        const UUID selectedUUID = m_Context.SelectedEntity ? m_Context.SelectedEntity.GetUUID() : UUID::Invalid();
         // Clone the editor scene so Play mode edits are discarded when stopping.
         m_Context.EditorScene = m_Context.ActiveScene;
         m_Context.ActiveScene = m_Context.EditorScene->Clone();
-        m_Context.ActiveScene->OnRuntimeStart();
+        m_Runtime = CreateScope<SceneRuntime>(Application::Get().GetRendererContext(), &m_Input);
+        if (!m_Runtime->Attach(m_Context.ActiveScene))
+        {
+            m_Context.ActiveScene = m_Context.EditorScene;
+            m_Context.EditorScene.reset();
+            m_Runtime.reset();
+            return;
+        }
+        m_Context.Runtime = m_Runtime.get();
+        m_Context.GameInputReleased = false;
 
         // The clone is a different scene object, so undo works on it and never rewinds an edit the
         // user made before pressing Play.
         BindActiveScene(m_Context.ActiveScene);
 
-        if (m_Context.SelectedEntity)
-        {
-            const UUID selectedUUID = m_Context.SelectedEntity.GetUUID();
-            m_Context.SelectEntity(m_Context.ActiveScene->GetEntityByUUID(selectedUUID));
-        }
+        m_Context.SelectEntity(m_Context.ActiveScene->GetEntityByUUID(selectedUUID));
 
         m_Context.PlayState = EditorPlayState::Playing;
         m_Context.FocusGamePanel = true;
@@ -222,15 +236,15 @@ namespace HachimiEngine
 
     void EditorLayer::OnPause()
     {
-        if (m_Context.PlayState == EditorPlayState::Playing)
-        {
-            m_Context.PlayState = EditorPlayState::Paused;
-        }
-        else if (m_Context.PlayState == EditorPlayState::Paused)
-        {
-            m_Context.PlayState = EditorPlayState::Playing;
-            m_Context.FocusGamePanel = true;
-        }
+        if (m_Runtime == nullptr) return;
+        m_Runtime->SetPaused(true);
+        m_Context.PlayState = EditorPlayState::Paused;
+        Application::Get().GetWindow().SetCursorMode(Window::CursorMode::Normal);
+    }
+
+    void EditorLayer::OnStep()
+    {
+        if (m_Runtime != nullptr) m_Runtime->Step();
     }
 
     void EditorLayer::OnStop()
@@ -242,10 +256,12 @@ namespace HachimiEngine
 
         m_Context.PlayState = EditorPlayState::Stopped;
 
-        if (m_Context.ActiveScene != nullptr)
-        {
-            m_Context.ActiveScene->OnRuntimeStop();
-        }
+        Application::Get().GetWindow().SetCursorMode(Window::CursorMode::Normal);
+        if (m_Runtime != nullptr) m_Runtime->Detach();
+        m_Context.Runtime = nullptr;
+        m_Runtime.reset();
+        m_Context.GameFocused = false;
+        m_Context.GameInputReleased = false;
 
         if (m_Context.EditorScene != nullptr)
         {
@@ -278,6 +294,7 @@ namespace HachimiEngine
         m_InspectorPanel.Draw(m_Context);
         m_ContentBrowserPanel.Draw(this, m_Context);
         m_ConsolePanel.Draw();
+        m_PhysicsSettingsPanel.Draw(m_Context);
         m_PackageInspectorPanel.Draw(this, m_Context);
         m_BuildSettingsPanel.Draw(this, m_Context);
 
@@ -586,8 +603,8 @@ namespace HachimiEngine
     void EditorLayer::DrawDockSpace()
     {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
-        // Versioned dock space ID gives the new Toolbar/Game panels a clean default layout.
-        const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpaceV2");
+        // Versioned dock space ID gives the new Toolbar/Game/Physics panels a clean default layout.
+        const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpaceV3");
 
         // Build the layout once, before the dock space is submitted for this frame. A menu-triggered reset is
         // deferred here because dock builder calls must happen before the dock space is submitted.

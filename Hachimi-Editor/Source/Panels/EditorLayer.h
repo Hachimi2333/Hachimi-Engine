@@ -12,11 +12,13 @@
 #include "Panels/GamePanel.h"
 #include "Panels/InspectorPanel.h"
 #include "Panels/PackageInspectorPanel.h"
+#include "Panels/PhysicsSettingsPanel.h"
 #include "Panels/SavePromptPopup.h"
 #include "Panels/SceneHierarchyPanel.h"
 #include "Panels/ToolbarPanel.h"
 #include "Panels/ViewportPanel.h"
 #include "Renderer/EditorCamera.h"
+#include "Scene/SceneRuntime.h"
 
 #include <filesystem>
 #include <functional>
@@ -42,6 +44,7 @@ namespace HachimiEngine
         // Playback controls used by the toolbar panel.
         void OnPlay();
         void OnPause();
+        void OnStep();
         void OnStop();
 
         // Rebuilds the default docking layout at the start of the next frame.
@@ -76,6 +79,8 @@ namespace HachimiEngine
 
     private:
         EditorContext m_Context;
+        InputMap m_Input;
+        Scope<SceneRuntime> m_Runtime;
         ViewportPanel m_ViewportPanel;
         GamePanel m_GamePanel;
         SceneHierarchyPanel m_SceneHierarchyPanel;
@@ -83,6 +88,7 @@ namespace HachimiEngine
         ContentBrowserPanel m_ContentBrowserPanel;
         ConsolePanel m_ConsolePanel;
         PackageInspectorPanel m_PackageInspectorPanel;
+        PhysicsSettingsPanel m_PhysicsSettingsPanel;
         EditorMenuBar m_MenuBar;
         BuildSettingsPanel m_BuildSettingsPanel;
         ToolbarPanel m_ToolbarPanel;

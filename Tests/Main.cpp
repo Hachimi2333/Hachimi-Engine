@@ -19,6 +19,7 @@
 
 #include "Core/JobSystem.h"
 #include "Core/Log.h"
+#include "Scripting/ScriptManager.h"
 #include "Support/TestWorkspace.h"
 #include "Utils/VirtualFileSystem.h"
 
@@ -26,6 +27,7 @@ int main(int argc, char** argv)
 {
     HE::Log::Init();
     HE::JobSystem::Init();
+    HE::ScriptManager::Init();
     HE::VirtualFileSystem::ResetStatistics();
 
     doctest::Context context;
@@ -36,6 +38,7 @@ int main(int argc, char** argv)
     // before the systems it was built with.
     HE::Tests::DestroyWorkspace();
     HE::VirtualFileSystem::UnmountAll();
+    HE::ScriptManager::Shutdown();
     HE::JobSystem::Shutdown();
     HE::Log::Shutdown();
 

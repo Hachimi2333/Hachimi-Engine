@@ -32,6 +32,9 @@ namespace HachimiEngine
             return;
         }
 
+        scene.GetDispatcher().sink<SceneCollisionEvent>().connect<&ScriptWorld::OnCollision>(*this);
+        scene.GetDispatcher().sink<SceneTriggerEvent>().connect<&ScriptWorld::OnTrigger>(*this);
+
         // The database owns the mapping from a script reference to its file; a runtime only needs
         // the path it resolved to.
         const AssetDatabase* database = SceneSerializer::GetAssetDatabase();
@@ -121,9 +124,35 @@ namespace HachimiEngine
         }
 
         for (RuntimeEntry& entry : m_Runtimes)
-        {
+            entry.Runtime->PollHotReload(scene.GetTime().GetUnscaledDeltaTime(), scene);
+        for (const auto& event : m_Events)
+            for (RuntimeEntry& entry : m_Runtimes)
+                entry.Runtime->OnPhysicsEvent(event, scene);
+        m_Events.clear();
+        for (RuntimeEntry& entry : m_Runtimes)
             entry.Runtime->Update(timestep, scene);
-        }
+    }
+
+    void ScriptWorld::OnFixedUpdate(Timestep timestep, Scene& scene)
+    {
+        if (!m_IsRunning) return;
+        for (RuntimeEntry& entry : m_Runtimes) entry.Runtime->FixedUpdate(timestep, scene);
+    }
+
+    void ScriptWorld::OnCollision(const SceneCollisionEvent& event)
+    {
+        for (const auto& begin : event.Begins)
+            m_Events.push_back({ ScriptPhysicsEvent::Kind::CollisionEnter, begin.EntityKeyA, begin.EntityKeyB, begin.Point, begin.Normal, begin.Impulse });
+        for (const auto& end : event.Ends)
+            m_Events.push_back({ ScriptPhysicsEvent::Kind::CollisionExit, end.EntityKeyA, end.EntityKeyB });
+    }
+
+    void ScriptWorld::OnTrigger(const SceneTriggerEvent& event)
+    {
+        for (const auto& begin : event.Begins)
+            m_Events.push_back({ ScriptPhysicsEvent::Kind::TriggerEnter, begin.SensorEntityKey, begin.OtherEntityKey });
+        for (const auto& end : event.Ends)
+            m_Events.push_back({ ScriptPhysicsEvent::Kind::TriggerExit, end.SensorEntityKey, end.OtherEntityKey });
     }
 
     void ScriptWorld::OnRuntimeStop(Scene& scene)
@@ -138,6 +167,9 @@ namespace HachimiEngine
             entry.Runtime->Shutdown(scene);
         }
 
+        scene.GetDispatcher().sink<SceneCollisionEvent>().disconnect<&ScriptWorld::OnCollision>(*this);
+        scene.GetDispatcher().sink<SceneTriggerEvent>().disconnect<&ScriptWorld::OnTrigger>(*this);
+        m_Events.clear();
         m_Runtimes.clear();
         m_IsRunning = false;
     }

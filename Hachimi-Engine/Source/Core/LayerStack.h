@@ -13,6 +13,7 @@ namespace HachimiEngine
     public:
         LayerStack() = default;
         ~LayerStack();
+        void Clear();
 
         void PushLayer(const Ref<Layer>& layer);
         void PushOverlay(const Ref<Layer>& overlay);

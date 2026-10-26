@@ -33,6 +33,8 @@ namespace HachimiEngine
         // Stable name, used by diagnostics and by Scene::FindSystem.
         virtual std::string_view GetName() const = 0;
         virtual ScenePhase GetPhase() const = 0;
+        virtual bool RunsInPhase(ScenePhase phase) const { return GetPhase() == phase; }
+        virtual void OnFixedUpdate(Scene& scene, Timestep timestep) { OnUpdate(scene, timestep); }
 
         // Called once when the system is added. Begin work that needs the whole scene here.
         virtual void OnAttach(Scene& scene) { (void)scene; }

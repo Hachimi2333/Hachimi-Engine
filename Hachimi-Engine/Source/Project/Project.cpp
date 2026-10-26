@@ -2,6 +2,7 @@
 
 #include "Asset/AssetDatabase.h"
 #include "Asset/MaterialAsset.h"
+#include "Core/InputMap.h"
 #include "Core/Log.h"
 #include "Renderer/MeshFactory.h"
 #include "Scene/Components/CameraComponent.h"
@@ -68,6 +69,22 @@ return Rotator
             }
 
             file << DefaultRotatorScript;
+        }
+
+        // Writes the input bindings a new project starts with. A project that already has one is
+        // left alone: the file is a document the user is expected to edit, not a generated artifact.
+        void CreateDefaultInputMap(const std::filesystem::path& assetsDirectory)
+        {
+            const std::filesystem::path inputPath = assetsDirectory / "Input.hinput";
+            if (FileSystem::Exists(inputPath))
+            {
+                return;
+            }
+
+            if (!FileSystem::WriteTextFile(inputPath, InputMap::MakeDefault().SaveToText()))
+            {
+                HE_CORE_ERROR("Failed to create the default input map: {}", inputPath.string());
+            }
         }
 
         Entity CreateMeshEntity(
@@ -383,6 +400,7 @@ return Rotator
         FileSystem::CreateDirectories(projectDirectory / "Assets" / "Scripts");
         CreateDefaultLuaScript(projectDirectory / "Assets" / "Scripts");
         CreateDefaultMaterial(projectDirectory / "Assets" / "Materials");
+        CreateDefaultInputMap(projectDirectory / "Assets");
 
         const Ref<Scene> defaultScene = CreateRef<Scene>();
         ConfigureShowcaseScene(defaultScene);

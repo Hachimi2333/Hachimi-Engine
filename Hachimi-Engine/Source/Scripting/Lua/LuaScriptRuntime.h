@@ -21,6 +21,9 @@ namespace HachimiEngine
         void CreateInstance(Entity entity, uint32_t slotIndex, const std::filesystem::path& sourcePath,
                             const std::string& displayName) override;
         void Update(Timestep timestep, Scene& scene) override;
+        void FixedUpdate(Timestep timestep, Scene& scene) override;
+        void OnPhysicsEvent(const ScriptPhysicsEvent& event, Scene& scene) override;
+        void PollHotReload(float unscaledDelta, Scene& scene) override;
         void Shutdown(Scene& scene) override;
 
     private:

@@ -28,8 +28,11 @@ namespace HachimiEngine
         // Version 1 was the pre-registry format, which stored enumerators as integers and keyed
         // hierarchy children by UUID; it is deliberately not readable. Version 2 stored components
         // through the registry but referenced materials and scripts by inline values and path
-        // strings. Version 3 references assets by UUID.
-        static constexpr int CurrentFormatVersion = 3;
+        // strings. Version 3 references assets by UUID. Version 4 adds the physics settings that
+        // only exist for the runtime - the contact-event toggle and the worker count, plus script
+        // fields on a script component - so a version 3 file would silently load with them at their
+        // defaults.
+        static constexpr int CurrentFormatVersion = 4;
 
         explicit SceneSerializer(const Ref<Scene>& scene);
 

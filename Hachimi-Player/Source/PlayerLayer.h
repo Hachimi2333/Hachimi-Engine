@@ -14,6 +14,7 @@ namespace HachimiEngine
     class Scene;
     class SceneRenderer;
     class ScreenPresenter;
+    class SceneRuntime;
 
     // Runtime layer for a packaged game: loads the project straight out of the
     // game package and drives scene simulation plus rendering for the lifetime of
@@ -35,9 +36,7 @@ namespace HachimiEngine
         PackageBuildInfo m_BuildInfo;
         std::filesystem::path m_ContentRoot;
         Ref<Project> m_Project;
-        Ref<Scene> m_Scene;
-        Scope<SceneRenderer> m_SceneRenderer;
-        Scope<SceneRenderTarget> m_Target;
+        Scope<SceneRuntime> m_Runtime;
         Scope<ScreenPresenter> m_ScreenPresenter;
     };
 }

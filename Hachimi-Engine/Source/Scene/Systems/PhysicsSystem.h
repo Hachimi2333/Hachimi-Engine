@@ -27,6 +27,11 @@ namespace HachimiEngine
         const PhysicsWorld* GetWorld() const { return m_World.get(); }
 
     private:
+        // Turns the world's event queue into the scene events, once per step. Called from OnUpdate
+        // right after the step, which is the only moment the queue is known to describe the latest
+        // simulated state.
+        void PublishEvents(Scene& scene) const;
+
         Scope<PhysicsWorld> m_World;
     };
 }

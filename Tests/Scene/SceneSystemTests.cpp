@@ -7,6 +7,7 @@
 #include <doctest/doctest.h>
 
 #include "Core/Memory.h"
+#include "Core/Time.h"
 #include "Core/Timestep.h"
 #include "Scene/Scene.h"
 #include "Scene/SceneSystem.h"
@@ -82,6 +83,13 @@ TEST_SUITE("Scene")
 
         CHECK(attachCount == 5);
 
+        // The fixed phase runs while the scene is running, and only then, and how many times it runs
+        // comes from the clock the runtime was given: Scene::OnUpdate never invents time of its own.
+        // FixedStepTests covers that arithmetic; this case is about the order of the phases.
+        Time clock;
+        scene.OnRuntimeStart(clock);
+
+        clock.Advance(1.0f / 60.0f);
         scene.OnUpdate(Timestep(1.0f / 60.0f));
 
         REQUIRE(log.size() == 5);
@@ -90,6 +98,8 @@ TEST_SUITE("Scene")
         CHECK(log[2] == "fixed");
         CHECK(log[3] == "update");
         CHECK(log[4] == "late");
+
+        scene.OnRuntimeStop();
     }
 
     TEST_CASE("a removed system stops running and is detached once")

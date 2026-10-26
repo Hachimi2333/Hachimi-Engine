@@ -3,6 +3,7 @@
 #include "Core/Base.h"
 #include "Core/LayerStack.h"
 #include "Core/Memory.h"
+#include "Core/Time.h"
 #include "Core/Window.h"
 #include "Events/ApplicationEvent.h"
 
@@ -36,6 +37,10 @@ namespace HachimiEngine
         bool HasOverlay(Layer* overlay) const { return m_LayerStack.ContainsOverlay(overlay); }
 
         Window& GetWindow() { return *m_Window; }
+        // The application frame clock. Gameplay reads its scene's independent session clock;
+        // this clock measures and clamps the delta handed to layers.
+        Time& GetTime() { return Time::Get(); }
+        const Time& GetTime() const { return Time::Get(); }
         // Renderer-side GPU resources and frame-independent render state. Valid from the
         // constructor until the destructor, and only while a GL context is current.
         RendererContext& GetRendererContext() { return *m_RendererContext; }

@@ -20,6 +20,9 @@ set(TEST_SOURCES
     Asset/AssetDatabaseTests.cpp
     Asset/MaterialAssetTests.cpp
     Core/JobSystemTests.cpp
+    Core/InputMapTests.cpp
+    Core/TimeTests.cpp
+    Core/LayerStackTests.cpp
     Core/UUIDTests.cpp
     Editor/CommandHistoryTests.cpp
     Math/MathTests.cpp
@@ -29,13 +32,27 @@ set(TEST_SOURCES
     Packaging/PackageReaderTests.cpp
     Packaging/PackageWriterTests.cpp
     Packaging/ProjectPackagerTests.cpp
+    Physics/PhysicsDebugDrawTests.cpp
+    Physics/PhysicsEventsTests.cpp
+    Physics/PhysicsQueryTests.cpp
+    Physics/PhysicsTaskSchedulerTests.cpp
     Renderer/FrameUniformsTests.cpp
     Renderer/MeshFactoryTests.cpp
     Renderer/RenderPipelineTests.cpp
     Scene/ComponentRegistryTests.cpp
+    Scene/FixedStepTests.cpp
     Scene/RenderViewTests.cpp
     Scene/SceneSystemTests.cpp
+    Scene/SceneRuntimeTests.cpp
     Scene/SceneTests.cpp
+    Support/ScriptTestScene.h
+    Scripting/ScriptCommandQueueTests.cpp
+    Scripting/LuaPhysicsBindingTests.cpp
+    Scripting/ScriptLifecycleTests.cpp
+    Scripting/LuaRequireTests.cpp
+    Scripting/LuaScriptFieldTests.cpp
+    Scripting/ScriptErrorLocationTests.cpp
+    Scripting/ScriptFieldTests.cpp
     Serialization/ProjectSerializerTests.cpp
     Serialization/SceneSerializerTests.cpp
     Utils/AsyncFileReadTests.cpp

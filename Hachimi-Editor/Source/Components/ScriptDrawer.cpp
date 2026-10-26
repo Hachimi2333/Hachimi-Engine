@@ -2,6 +2,7 @@
 
 #include "Asset/AssetDatabase.h"
 #include "Components/InspectorWidgets.h"
+#include "Components/ScriptFieldsInspector.h"
 #include "Core/Log.h"
 #include "Editor/CommandHistory.h"
 #include "Editor/SceneCommands.h"
@@ -15,6 +16,7 @@
 #include <imgui.h>
 
 #include <cstdio>
+#include <vector>
 
 namespace HachimiEngine
 {
@@ -85,6 +87,38 @@ namespace HachimiEngine
 
                 ImGui::EndTable();
             }
+
+            // The fields belong to the reference, so they are drawn inside the slot's ID scope: two
+            // slots on one entity must not share widget ids, and the value column has to line up
+            // with the rows above it.
+            const bool playing = context.Context.IsPlaying();
+            if (ImGui::TreeNodeEx("Fields", ImGuiTreeNodeFlags_DefaultOpen, "Fields (%d)",
+                    static_cast<int>(reference.Fields.size())))
+            {
+                // The whole list is captured, because a field table edit can change its shape as
+                // well as one value, and one command for the slot is one undo step.
+                const std::vector<ScriptField> before = reference.Fields;
+                if (DrawScriptFieldsInspector(reference.Fields, playing))
+                {
+                    if (playing)
+                    {
+                        // A running scene is the throwaway clone: its edits must not reach the
+                        // scene being edited, so they are neither recorded nor marked as unsaved.
+                    }
+                    else if (history != nullptr)
+                    {
+                        RecordEdit(history, SceneCommands::MakeSetScriptFields(entity, slotIndex, before,
+                            reference.Fields));
+                    }
+                    else if (context.Context.DirtyState != nullptr)
+                    {
+                        context.Context.DirtyState->MarkDirty();
+                    }
+                }
+
+                ImGui::TreePop();
+            }
+
             ImGui::PopID();
 
             ImGui::Separator();

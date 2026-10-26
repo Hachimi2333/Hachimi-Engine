@@ -350,6 +350,73 @@ namespace HachimiEngine
             std::string m_AfterName;
         };
 
+        // One script slot's field list. The whole list travels in both directions: a value drag, a
+        // rename and an added row are all the same edit to the drawer, and a list is small enough
+        // that snapshotting it is cheaper than a command per kind of change.
+        class SetScriptFieldsCommand final : public EditorCommand
+        {
+        public:
+            SetScriptFieldsCommand(UUID entityId, uint32_t slotIndex, std::vector<ScriptField> before,
+                                   std::vector<ScriptField> after)
+                : m_EntityId(entityId)
+                , m_SlotIndex(slotIndex)
+                , m_Before(std::move(before))
+                , m_After(std::move(after))
+            {
+            }
+
+            std::string_view GetName() const override { return "Edit Script Field"; }
+
+            void Apply(Scene& scene) override { Write(scene, m_After); }
+            void Revert(Scene& scene) override { Write(scene, m_Before); }
+
+            // A dragged number and a name being typed report an edit every frame, so both fold into
+            // the entry on top. A changed type or an added row is a different edit and stays its
+            // own undo step.
+            bool TryMerge(const EditorCommand& next) override
+            {
+                const auto* other = dynamic_cast<const SetScriptFieldsCommand*>(&next);
+                if (other == nullptr || other->m_EntityId != m_EntityId || other->m_SlotIndex != m_SlotIndex
+                    || other->m_After.size() != m_After.size())
+                {
+                    return false;
+                }
+
+                for (size_t index = 0; index < m_After.size(); ++index)
+                {
+                    if (ScriptFields::GetType(other->m_After[index].DefaultValue)
+                        != ScriptFields::GetType(m_After[index].DefaultValue))
+                    {
+                        return false;
+                    }
+                }
+
+                m_After = other->m_After;
+                return true;
+            }
+
+        private:
+            void Write(Scene& scene, const std::vector<ScriptField>& fields)
+            {
+                Entity entity = FindEntity(scene, m_EntityId);
+                if (!entity || !entity.HasComponent<ScriptComponent>())
+                {
+                    return;
+                }
+
+                auto& scripts = entity.GetComponent<ScriptComponent>().Scripts;
+                if (m_SlotIndex < scripts.size())
+                {
+                    scripts[m_SlotIndex].Fields = fields;
+                }
+            }
+
+            UUID m_EntityId;
+            uint32_t m_SlotIndex = 0;
+            std::vector<ScriptField> m_Before;
+            std::vector<ScriptField> m_After;
+        };
+
         class AddComponentCommand final : public EditorCommand
         {
         public:
@@ -672,6 +739,23 @@ namespace HachimiEngine
 
         return CreateScope<SetScriptReferenceCommand>(entity.GetUUID(), slotIndex, scripts[slotIndex].Script,
             scripts[slotIndex].DisplayName, script, displayName);
+    }
+
+    Scope<EditorCommand> SceneCommands::MakeSetScriptFields(Entity entity, uint32_t slotIndex,
+                                                             const std::vector<ScriptField>& before,
+                                                             const std::vector<ScriptField>& after)
+    {
+        if (!entity || !entity.HasComponent<ScriptComponent>())
+        {
+            return nullptr;
+        }
+
+        if (slotIndex >= entity.GetComponent<ScriptComponent>().Scripts.size() || before == after)
+        {
+            return nullptr;
+        }
+
+        return CreateScope<SetScriptFieldsCommand>(entity.GetUUID(), slotIndex, before, after);
     }
 
     Scope<EditorCommand> SceneCommands::MakeAddComponent(Entity entity, entt::id_type typeId)

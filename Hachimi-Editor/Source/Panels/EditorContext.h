@@ -20,6 +20,7 @@ namespace HachimiEngine
     class CommandHistory;
     class SceneDirtyState;
     class TextureCache;
+    class SceneRuntime;
 
     // Runtime simulation state controlled by the viewport playback toolbar.
     enum class EditorPlayState
@@ -50,6 +51,9 @@ namespace HachimiEngine
         // ActiveScene is the live scene being edited; EditorScene holds the pre-play scene.
         Ref<Scene> ActiveScene;
         Ref<Scene> EditorScene;
+        SceneRuntime* Runtime = nullptr;
+        bool GameFocused = false;
+        bool GameInputReleased = false;
         Entity SelectedEntity;
 
         // Selected content-browser asset, if any. The inspector shows one or the other, never both.
@@ -74,6 +78,13 @@ namespace HachimiEngine
 
         bool FocusGamePanel = false;
         bool FocusViewportPanel = false;
+
+        // Physics debug view, toggled from the View menu and drawn by the viewport's overlay. The
+        // colliders are what the toggle is for; the other two are the diagnostics that cost a pass
+        // over the world and explain a simulation that looks wrong.
+        bool ShowPhysicsColliders = false;
+        bool ShowPhysicsBounds = false;
+        bool ShowPhysicsContacts = false;
 
         ImGuizmo::OPERATION GizmoOperation = ImGuizmo::TRANSLATE;
         EditorPlayState PlayState = EditorPlayState::Stopped;

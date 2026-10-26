@@ -16,6 +16,8 @@
 #include "Scene/Components/TransformComponent.h"
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
+#include "Scene/Systems/PhysicsSystem.h"
+#include "Physics/PhysicsWorld.h"
 #include "Viewport/SelectionIndicators.h"
 #include "Math/Math.h"
 
@@ -71,19 +73,14 @@ namespace HachimiEngine
             return outDistance > epsilon;
         }
 
-        // Finds the closest mesh entity under the mouse cursor using a CPU ray cast.
-        Entity PickEntity(const EditorContext& context, const ImVec2& imageMin, const ImVec2& imageMax)
+        bool BuildMouseRay(const EditorContext& context, const ImVec2& imageMin, const ImVec2& imageMax,
+            Math::Vec3& rayOrigin, Math::Vec3& rayDirection)
         {
-            if (context.ActiveScene == nullptr)
-            {
-                return {};
-            }
-
             const float imageWidth = imageMax.x - imageMin.x;
             const float imageHeight = imageMax.y - imageMin.y;
             if (imageWidth <= 0.0f || imageHeight <= 0.0f)
             {
-                return {};
+                return false;
             }
 
             const ImVec2 mousePosition = ImGui::GetIO().MousePos;
@@ -94,9 +91,29 @@ namespace HachimiEngine
 
             const Math::Vec4 nearClip = inverseViewProjection * Math::Vec4(ndcX, ndcY, -1.0f, 1.0f);
             const Math::Vec4 farClip = inverseViewProjection * Math::Vec4(ndcX, ndcY, 1.0f, 1.0f);
-            const Math::Vec3 rayOrigin = Math::Vec3(nearClip.x, nearClip.y, nearClip.z) / nearClip.w;
+            rayOrigin = Math::Vec3(nearClip.x, nearClip.y, nearClip.z) / nearClip.w;
             const Math::Vec3 farPoint = Math::Vec3(farClip.x, farClip.y, farClip.z) / farClip.w;
-            const Math::Vec3 rayDirection = Math::Normalize(farPoint - rayOrigin);
+            rayDirection = Math::Normalize(farPoint - rayOrigin);
+
+            return true;
+        }
+
+        Entity PickEntity(const EditorContext& context, const ImVec2& imageMin, const ImVec2& imageMax)
+        {
+            if (context.ActiveScene == nullptr) return {};
+            Math::Vec3 rayOrigin, rayDirection;
+            if (!BuildMouseRay(context, imageMin, imageMax, rayOrigin, rayDirection)) return {};
+            // Play picks colliders from the live world; editing retains the mesh triangle path.
+            if (context.IsPlaying())
+            {
+                auto* system = context.ActiveScene->FindSystem<PhysicsSystem>();
+                if (system != nullptr && system->GetWorld() != nullptr)
+                {
+                    RayCastResult hit;
+                    return system->GetWorld()->RayCast(rayOrigin, rayDirection, 10000.0f, hit)
+                        ? context.ActiveScene->GetEntityByKey(hit.EntityKey) : Entity {};
+                }
+            }
 
             Entity closestEntity;
             float closestDistance = FLT_MAX;
@@ -195,11 +212,12 @@ namespace HachimiEngine
 
         const RenderView view = context.ActiveScene->BuildRenderView(context.Camera, true);
 
-        // The selection gizmos are editor-only and must be tone mapped with the scene, so
-        // they are drawn as an overlay inside the scene pass.
-        m_SceneRenderer->Render(view, *m_Target, [&context, this]
+        // The selection gizmos and the physics view are editor-only and must be tone mapped with the
+        // scene, so they are drawn as an overlay inside the scene pass.
+        m_SceneRenderer->Render(view, *m_Target, [&context, this, &view]
         {
             DrawSelectionIndicators(context, m_Renderer->GetDebugDraw());
+            m_PhysicsOverlay.Draw(context, m_Renderer->GetDebugDraw(), view.ViewProjection);
         });
     }
 
@@ -250,7 +268,7 @@ namespace HachimiEngine
         }
 
         const ImGuiIO& io = ImGui::GetIO();
-        if (context.ViewportHovered && !ImGuizmo::IsUsingAny())
+        if (!context.IsPlaying() && context.ViewportHovered && !ImGuizmo::IsUsingAny())
         {
             if (io.MouseWheel != 0.0f)
             {

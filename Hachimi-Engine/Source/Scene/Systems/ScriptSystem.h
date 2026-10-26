@@ -25,6 +25,11 @@ namespace HachimiEngine
         std::string_view GetName() const override { return "Scripts"; }
         ScenePhase GetPhase() const override { return ScenePhase::Update; }
 
+        bool RunsInPhase(ScenePhase phase) const override
+        {
+            return phase == ScenePhase::FixedUpdate || phase == ScenePhase::Update;
+        }
+        void OnFixedUpdate(Scene& scene, Timestep timestep) override;
         void OnAttach(Scene& scene) override;
         void OnUpdate(Scene& scene, Timestep timestep) override;
         void OnDetach(Scene& scene) override;

@@ -33,6 +33,11 @@ namespace HachimiEngine
         m_Impl->World->OnUpdate(timestep, scene);
     }
 
+    void ScriptSystem::OnFixedUpdate(Scene& scene, Timestep timestep)
+    {
+        if (m_Impl->World != nullptr) m_Impl->World->OnFixedUpdate(timestep, scene);
+    }
+
     void ScriptSystem::OnDetach(Scene& scene)
     {
         if (m_Impl->World != nullptr)

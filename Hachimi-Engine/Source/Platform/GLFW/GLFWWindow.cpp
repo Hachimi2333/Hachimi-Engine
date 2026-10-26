@@ -61,6 +61,8 @@ namespace HachimiEngine
     void GLFWWindow::OnUpdate()
     {
         glfwPollEvents();
+        // Sample after polling so gameplay sees this frame's buttons, cursor and wheel together.
+        Input::UpdateFrame();
     }
 
     void GLFWWindow::SwapBuffers()
@@ -72,6 +74,82 @@ namespace HachimiEngine
     {
         glfwSwapInterval(enabled ? 1 : 0);
         m_Data.VSync = enabled;
+    }
+
+    void GLFWWindow::SetCursorMode(CursorMode mode)
+    {
+        if (m_Data.CurrentCursorMode == mode) return;
+        Input::s_HasPreviousMousePosition = false;
+        m_Data.CurrentCursorMode = mode;
+
+        if (m_Window == nullptr)
+        {
+            return;
+        }
+
+        int glfwMode = GLFW_CURSOR_NORMAL;
+        switch (mode)
+        {
+            case CursorMode::Normal:
+                glfwMode = GLFW_CURSOR_NORMAL;
+                break;
+            case CursorMode::Hidden:
+                glfwMode = GLFW_CURSOR_HIDDEN;
+                break;
+            case CursorMode::Disabled:
+                glfwMode = GLFW_CURSOR_DISABLED;
+                break;
+        }
+
+        glfwSetInputMode(m_Window, GLFW_CURSOR, glfwMode);
+    }
+
+    void GLFWWindow::SetFullscreen(bool fullscreen)
+    {
+        if (m_Window == nullptr || m_Data.Fullscreen == fullscreen)
+        {
+            return;
+        }
+
+        if (fullscreen)
+        {
+            glfwGetWindowPos(m_Window, &m_Data.WindowedX, &m_Data.WindowedY);
+            m_Data.WindowedWidth = m_Data.Width;
+            m_Data.WindowedHeight = m_Data.Height;
+
+            GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+            if (monitor == nullptr)
+            {
+                HE_CORE_WARN("Cannot switch to full screen: no primary monitor was reported");
+                return;
+            }
+
+            const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+            if (mode == nullptr)
+            {
+                HE_CORE_WARN("Cannot switch to full screen: the monitor reported no video mode");
+                return;
+            }
+
+            glfwSetWindowMonitor(m_Window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+        }
+        else
+        {
+            const uint32_t width = m_Data.WindowedWidth > 0 ? m_Data.WindowedWidth : m_Data.Width;
+            const uint32_t height = m_Data.WindowedHeight > 0 ? m_Data.WindowedHeight : m_Data.Height;
+            glfwSetWindowMonitor(m_Window, nullptr, m_Data.WindowedX, m_Data.WindowedY, static_cast<int>(width), static_cast<int>(height), 0);
+        }
+
+        m_Data.Fullscreen = fullscreen;
+    }
+
+    void GLFWWindow::SetTitle(const std::string& title)
+    {
+        m_Data.Title = title;
+        if (m_Window != nullptr)
+        {
+            glfwSetWindowTitle(m_Window, title.c_str());
+        }
     }
 
     void GLFWWindow::InstallCallbacks() const
@@ -155,6 +233,8 @@ namespace HachimiEngine
         glfwSetScrollCallback(m_Window, [](GLFWwindow* window, double xOffset, double yOffset)
         {
             auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+            Input::OnScrolled(static_cast<float>(yOffset));
+
             MouseScrolledEvent event(static_cast<float>(xOffset), static_cast<float>(yOffset));
             data.EventCallback(event);
         });
@@ -162,6 +242,8 @@ namespace HachimiEngine
         glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xPosition, double yPosition)
         {
             auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+            Input::OnCursorMoved(static_cast<float>(xPosition), static_cast<float>(yPosition));
+
             MouseMovedEvent event(static_cast<float>(xPosition), static_cast<float>(yPosition));
             data.EventCallback(event);
         });
@@ -169,13 +251,16 @@ namespace HachimiEngine
 
     void GLFWWindow::Shutdown()
     {
+        // Input loses its handle first: the callbacks below are uninstalled with the window, and a
+        // poll that ran in between would otherwise read a destroyed one.
+        Input::InvalidateGLFWWindow(m_Window);
+
         if (m_Window != nullptr)
         {
             glfwDestroyWindow(m_Window);
             m_Window = nullptr;
         }
 
-        Input::SetGLFWWindow(nullptr);
         glfwTerminate();
     }
 }

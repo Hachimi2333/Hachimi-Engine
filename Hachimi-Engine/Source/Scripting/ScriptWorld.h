@@ -7,6 +7,7 @@
 #include "Scene/Components/IDComponent.h"
 #include "Scene/Entity.h"
 #include "Scripting/ScriptRuntime.h"
+#include "Scene/Events/PhysicsSceneEvents.h"
 
 #include <vector>
 
@@ -23,6 +24,7 @@ namespace HachimiEngine
     public:
         void OnRuntimeStart(Scene& scene);
         void OnUpdate(Timestep timestep, Scene& scene);
+        void OnFixedUpdate(Timestep timestep, Scene& scene);
         void OnRuntimeStop(Scene& scene);
 
         bool IsRunning() const { return m_IsRunning; }
@@ -35,6 +37,9 @@ namespace HachimiEngine
         };
 
     private:
+        void OnCollision(const SceneCollisionEvent& event);
+        void OnTrigger(const SceneTriggerEvent& event);
+        std::vector<ScriptPhysicsEvent> m_Events;
         std::vector<RuntimeEntry> m_Runtimes;
         bool m_IsRunning = false;
     };

@@ -4,7 +4,9 @@
 
 namespace HachimiEngine
 {
-    LayerStack::~LayerStack()
+    LayerStack::~LayerStack() { Clear(); }
+
+    void LayerStack::Clear()
     {
         for (auto it = m_Overlays.rbegin(); it != m_Overlays.rend(); ++it)
         {
@@ -14,6 +16,8 @@ namespace HachimiEngine
         {
             (*it)->OnDetach();
         }
+        m_Overlays.clear();
+        m_Layers.clear();
     }
 
     void LayerStack::PushLayer(const Ref<Layer>& layer)

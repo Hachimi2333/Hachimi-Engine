@@ -8,6 +8,7 @@
 #include "Scene/Components/CameraComponent.h"
 #include "Scene/Components/TransformComponent.h"
 #include "Scene/Scene.h"
+#include "Scene/SceneRuntime.h"
 #include "Math/Math.h"
 
 #include <glad/gl.h>
@@ -44,39 +45,17 @@ namespace HachimiEngine
         const uint32_t width = static_cast<uint32_t>(context.GameViewportSize.x);
         const uint32_t height = static_cast<uint32_t>(context.GameViewportSize.y);
 
-        m_Target->Resize(width, height);
-
         const float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
-
-        SceneRenderDesc desc;
-        desc.DrawGrid = false;
-
-        // Render from the primary scene camera, falling back to the editor camera.
-        const Entity primaryCamera = context.ActiveScene->GetPrimaryCameraEntity();
-        if (primaryCamera
-            && primaryCamera.HasComponent<TransformComponent>()
-            && primaryCamera.HasComponent<CameraComponent>())
+        if (context.Runtime != nullptr)
         {
-            const auto& cameraComponent = primaryCamera.GetComponent<CameraComponent>();
-            const Math::Mat4 cameraWorld = context.ActiveScene->GetWorldTransform(primaryCamera.GetHandle());
-            desc.View = Math::Inverse(cameraWorld);
-            desc.CameraPosition = Math::Vec3(cameraWorld[3].x, cameraWorld[3].y, cameraWorld[3].z);
-            desc.Projection = Math::Perspective(
-                Math::Radians(cameraComponent.FieldOfView),
-                aspectRatio,
-                cameraComponent.NearClip,
-                cameraComponent.FarClip);
+            context.Runtime->Resize(width, height);
+            context.Runtime->Render(context.Runtime->BuildPrimaryCameraView(aspectRatio));
         }
         else
         {
-            desc.View = context.Camera.GetViewMatrix();
-            desc.CameraPosition = context.Camera.GetPosition();
-            desc.Projection = Math::Perspective(Math::Radians(context.Camera.GetFieldOfView()), aspectRatio, 0.1f, 1000.0f);
+            m_Target->Resize(width, height);
+            m_SceneRenderer->Render(SceneRuntime::BuildPrimaryCameraView(*context.ActiveScene, aspectRatio), *m_Target);
         }
-
-        const RenderView view = context.ActiveScene->BuildRenderView(desc);
-
-        m_SceneRenderer->Render(view, *m_Target);
     }
 
     void GamePanel::Draw(EditorContext& context)
@@ -85,9 +64,14 @@ namespace HachimiEngine
         ImGui::SetNextWindowSize(ImVec2(1280.0f, 720.0f), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("Game"))
         {
+            context.GameFocused = false;
             ImGui::End();
             return;
         }
+
+        context.GameFocused = ImGui::IsWindowFocused();
+        if (context.GameFocused && ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            context.GameInputReleased = false;
 
         const ImVec2 availableSize = ImGui::GetContentRegionAvail();
         const ImVec2 viewportSize(
@@ -95,11 +79,12 @@ namespace HachimiEngine
             std::max(availableSize.y, 0.0f));
         context.GameViewportSize = { viewportSize.x, viewportSize.y };
 
-        if (m_Target != nullptr && m_Target->GetDisplayColorRendererID() != 0 && viewportSize.x > 0.0f && viewportSize.y > 0.0f)
+        SceneRenderTarget* target = context.Runtime != nullptr ? &context.Runtime->GetTarget() : m_Target.get();
+        if (target != nullptr && target->GetDisplayColorRendererID() != 0 && viewportSize.x > 0.0f && viewportSize.y > 0.0f)
         {
             // UVs are flipped vertically for the OpenGL framebuffer texture.
             ImGui::Image(
-                static_cast<ImTextureID>(m_Target->GetDisplayColorRendererID()),
+                static_cast<ImTextureID>(target->GetDisplayColorRendererID()),
                 viewportSize,
                 ImVec2(0.0f, 1.0f),
                 ImVec2(1.0f, 0.0f));

@@ -7,33 +7,22 @@
 #include "Project/Project.h"
 #include "Renderer/MaterialResolver.h"
 #include "Renderer/RendererContext.h"
-#include "Renderer/SceneRenderer.h"
 #include "Renderer/ScreenPresenter.h"
-#include "Scene/Components/CameraComponent.h"
-#include "Scene/Components/TransformComponent.h"
 #include "Scene/Scene.h"
+#include "Scene/SceneRuntime.h"
 #include "Serialization/ProjectSerializer.h"
 #include "Serialization/SceneSerializer.h"
-#include "Utils/FileSystem.h"
 #include "Utils/VirtualFileSystem.h"
-#include "Math/Math.h"
 
 #include <algorithm>
 
 namespace HachimiEngine
 {
-    namespace
-    {
-        constexpr uint32_t DefaultWindowWidth = 1600;
-        constexpr uint32_t DefaultWindowHeight = 900;
-    }
-
     PlayerLayer::PlayerLayer(PackageBuildInfo buildInfo, std::filesystem::path contentRoot)
         : Layer("PlayerLayer")
         , m_BuildInfo(std::move(buildInfo))
         , m_ContentRoot(std::move(contentRoot))
     {
-        m_Target = CreateScope<SceneRenderTarget>(DefaultWindowWidth, DefaultWindowHeight);
     }
 
     PlayerLayer::~PlayerLayer() = default;
@@ -89,13 +78,15 @@ namespace HachimiEngine
             return;
         }
 
-        m_Scene = m_Project->GetActiveScene();
+        const InputMap input = InputMap::LoadProject(m_Project->GetAssetsDirectory());
+        m_Runtime = CreateScope<SceneRuntime>(Application::Get().GetRendererContext(), &input);
+        if (!m_Runtime->Attach(m_Project->GetActiveScene()))
+        {
+            Application::Get().Close();
+            return;
+        }
+        Application::Get().GetWindow().SetCursorMode(Window::CursorMode::Disabled);
 
-        const Window& window = Application::Get().GetWindow();
-        m_Scene->SetViewportSize(window.GetWidth(), window.GetHeight());
-        m_Scene->OnRuntimeStart();
-
-        m_SceneRenderer = CreateScope<SceneRenderer>(Application::Get().GetRendererContext());
         m_ScreenPresenter = CreateScope<ScreenPresenter>();
 
         HE_CLIENT_INFO("Started packaged game '{}' from {}", m_Project->GetName(), m_ContentRoot.string());
@@ -103,81 +94,27 @@ namespace HachimiEngine
 
     void PlayerLayer::OnDetach()
     {
-        if (m_Scene != nullptr)
-        {
-            m_Scene->OnRuntimeStop();
-        }
-
-        // Release the scene and its resolved materials before the renderer context releases the
-        // meshes and textures they were built from.
-        m_Scene = nullptr;
-        m_Project = nullptr;
+        Application::Get().GetWindow().SetCursorMode(Window::CursorMode::Normal);
+        if (m_Runtime != nullptr) m_Runtime->Detach();
+        m_Runtime.reset();
+        m_ScreenPresenter.reset();
+        m_Project.reset();
         Application::Get().GetRendererContext().GetMaterials().Clear();
     }
 
     void PlayerLayer::OnUpdate(Timestep timestep)
     {
-        if (m_Scene == nullptr)
-        {
-            return;
-        }
-
-        m_Scene->OnUpdate(timestep);
+        if (m_Runtime != nullptr) m_Runtime->Update(timestep);
     }
 
     void PlayerLayer::OnRender()
     {
-        if (m_Scene == nullptr || m_SceneRenderer == nullptr || m_ScreenPresenter == nullptr)
-        {
-            return;
-        }
-
-        // The render target follows the window: the player draws the whole frame itself and has no
-        // UI panel to resize it.
+        if (m_Runtime == nullptr || !m_Runtime->IsRunning() || m_ScreenPresenter == nullptr) return;
         const Window& window = Application::Get().GetWindow();
         const uint32_t width = std::max(window.GetWidth(), 1u);
         const uint32_t height = std::max(window.GetHeight(), 1u);
-        m_Target->Resize(width, height);
-        m_Scene->SetViewportSize(width, height);
-
-        const float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
-
-        SceneRenderDesc desc;
-        desc.DrawGrid = false;
-
-        const Entity primaryCamera = m_Scene->GetPrimaryCameraEntity();
-        if (primaryCamera
-            && primaryCamera.HasComponent<TransformComponent>()
-            && primaryCamera.HasComponent<CameraComponent>())
-        {
-            const auto& cameraComponent = primaryCamera.GetComponent<CameraComponent>();
-            const Math::Mat4 cameraWorld = m_Scene->GetWorldTransform(primaryCamera.GetHandle());
-            desc.View = Math::Inverse(cameraWorld);
-            desc.CameraPosition = Math::Vec3(cameraWorld[3].x, cameraWorld[3].y, cameraWorld[3].z);
-            desc.Projection = Math::Perspective(
-                Math::Radians(cameraComponent.FieldOfView),
-                aspectRatio,
-                cameraComponent.NearClip,
-                cameraComponent.FarClip);
-        }
-        else
-        {
-            static bool warnedOnce = false;
-            if (!warnedOnce)
-            {
-                HE_CORE_WARN("Packaged scene has no primary camera; using a fallback camera");
-                warnedOnce = true;
-            }
-            desc.CameraPosition = { 0.0f, 6.0f, 12.0f };
-            desc.View = Math::LookAt(desc.CameraPosition, Math::Vec3(0.0f), Math::Vec3(0.0f, 1.0f, 0.0f));
-            desc.Projection = Math::Perspective(Math::Radians(45.0f), aspectRatio, 0.1f, 1000.0f);
-        }
-
-        m_SceneRenderer->Render(m_Scene->BuildRenderView(desc), *m_Target);
-
-        // The Player owns the whole window and has no UI layer to composite the rendered image,
-        // so the tone-mapped frame goes straight into the back buffer. Render() leaves the
-        // default framebuffer bound, because resolving the target unbinds the display buffer.
-        m_ScreenPresenter->Present(m_Target->GetDisplayColorRendererID(), width, height);
+        m_Runtime->Resize(width, height);
+        m_Runtime->Render(m_Runtime->BuildPrimaryCameraView(static_cast<float>(width) / static_cast<float>(height)));
+        m_ScreenPresenter->Present(m_Runtime->GetTarget().GetDisplayColorRendererID(), width, height);
     }
 }

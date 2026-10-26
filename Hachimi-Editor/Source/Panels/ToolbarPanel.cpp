@@ -48,7 +48,7 @@ namespace HachimiEngine
         ImGui::EndDisabled();
 
         ImGui::SameLine();
-        ImGui::BeginDisabled(context.PlayState == EditorPlayState::Stopped);
+        ImGui::BeginDisabled(context.PlayState != EditorPlayState::Playing);
         if (ImGui::Button("Pause"))
         {
             owner->OnPause();
@@ -62,6 +62,12 @@ namespace HachimiEngine
             owner->OnStop();
         }
         ImGui::EndDisabled();
+
+        if (context.PlayState == EditorPlayState::Paused)
+        {
+            ImGui::SameLine();
+            if (ImGui::Button("Step")) owner->OnStep();
+        }
 
         ImGui::End();
     }

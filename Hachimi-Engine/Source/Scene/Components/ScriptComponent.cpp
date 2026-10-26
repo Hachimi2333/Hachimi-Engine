@@ -60,6 +60,12 @@ namespace HachimiEngine
                 AssetHandles::Emit(out, "Script", reference.Script);
                 out << YAML::Key << "Path" << YAML::Value << reference.DisplayName;
                 out << YAML::Key << "Enabled" << YAML::Value << reference.Enabled;
+                // A slot without fields keeps the file it had before script fields existed.
+                if (!reference.Fields.empty())
+                {
+                    out << YAML::Key << "Fields" << YAML::Value;
+                    ScriptFields::EmitList(out, reference.Fields);
+                }
                 out << YAML::EndMap;
             }
             out << YAML::EndSeq;
@@ -88,6 +94,7 @@ namespace HachimiEngine
                     ScriptComponent::ScriptReference reference;
                     reference.DisplayName = referenceNode["Path"].as<std::string>("");
                     reference.Enabled = referenceNode["Enabled"].as<bool>(true);
+                    reference.Fields = ScriptFields::ReadList(referenceNode["Fields"]);
                     reference.Script = AssetHandles::Read(referenceNode["Script"], AssetType::Script);
 
                     if (reference.Script.IsValid())

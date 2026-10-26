@@ -1,6 +1,8 @@
 #include "Scripting/Lua/LuaScriptBindings.h"
 
 #include "Core/Input.h"
+#include "Scripting/ScriptEntity.h"
+#include "Scripting/Lua/LuaPhysicsBindings.h"
 #include "Core/KeyCodes.h"
 #include "Core/Log.h"
 #include "Core/MouseButtonCodes.h"
@@ -15,112 +17,6 @@ namespace HachimiEngine
 {
     namespace
     {
-        // Small Lua-facing wrapper around an ECS entity. It intentionally exposes
-        // a safe subset of Entity; scene mutation stays out of the scripting API
-        // until deferred command queues are implemented.
-        class ScriptEntity
-        {
-        public:
-            ScriptEntity(Entity entity, Scene* scene)
-                : m_Entity(entity)
-                , m_Scene(scene)
-            {
-            }
-
-            std::string GetName() const
-            {
-                if (!m_Entity.HasComponent<TagComponent>())
-                {
-                    return {};
-                }
-                return m_Entity.GetComponent<TagComponent>().Tag;
-            }
-
-            void SetName(const std::string& name)
-            {
-                if (m_Entity.HasComponent<TagComponent>())
-                {
-                    m_Entity.GetComponent<TagComponent>().Tag = name;
-                }
-            }
-
-            std::string GetUUID() const
-            {
-                return m_Entity ? m_Entity.GetUUID().ToString() : std::string();
-            }
-
-            Math::Vec3 GetPosition() const
-            {
-                return m_Entity.HasComponent<TransformComponent>() ? m_Entity.Transform().Position : Math::Vec3(0.0f);
-            }
-
-            void SetPosition(const Math::Vec3& position)
-            {
-                if (m_Entity.HasComponent<TransformComponent>())
-                {
-                    m_Entity.Transform().Position = position;
-                }
-            }
-
-            Math::Vec3 GetRotation() const
-            {
-                return m_Entity.HasComponent<TransformComponent>() ? m_Entity.Transform().Rotation : Math::Vec3(0.0f);
-            }
-
-            void SetRotation(const Math::Vec3& rotation)
-            {
-                if (m_Entity.HasComponent<TransformComponent>())
-                {
-                    m_Entity.Transform().Rotation = rotation;
-                }
-            }
-
-            Math::Vec3 GetScale() const
-            {
-                return m_Entity.HasComponent<TransformComponent>() ? m_Entity.Transform().Scale : Math::Vec3(1.0f);
-            }
-
-            void SetScale(const Math::Vec3& scale)
-            {
-                if (m_Entity.HasComponent<TransformComponent>())
-                {
-                    m_Entity.Transform().Scale = scale;
-                }
-            }
-
-            Math::Vec3 GetWorldPosition() const
-            {
-                if (!m_Entity || m_Scene == nullptr || !m_Entity.HasComponent<TransformComponent>())
-                {
-                    return Math::Vec3(0.0f);
-                }
-
-                const Math::Vec4 worldOrigin = m_Scene->GetWorldTransform(m_Entity.GetHandle()) * Math::Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-                return Math::Vec3(worldOrigin);
-            }
-
-            void Translate(const Math::Vec3& delta)
-            {
-                if (m_Entity.HasComponent<TransformComponent>())
-                {
-                    m_Entity.Transform().Position += delta;
-                }
-            }
-
-            // Adds an Euler-angle delta in degrees.
-            void Rotate(const Math::Vec3& eulerDelta)
-            {
-                if (m_Entity.HasComponent<TransformComponent>())
-                {
-                    m_Entity.Transform().Rotation += eulerDelta;
-                }
-            }
-
-        private:
-            Entity m_Entity;
-            Scene* m_Scene = nullptr;
-        };
-
         void BindKeyConstants(sol::table& keyTable)
         {
 #define HE_BIND_LUA_KEY(name) keyTable[#name] = Key::name
@@ -293,9 +189,15 @@ namespace HachimiEngine
         }
     }
 
-    void AttachLuaScriptInstance(sol::table& moduleTable, Entity entity, Scene& scene)
+    void AttachLuaScriptInstance(sol::table& moduleTable, Entity entity, Scene& scene, sol::state& state,
+                                 sol::table& fieldsTable)
     {
+        // `self` is the module table itself: the callbacks are called as module:OnUpdate(dt), so
+        // the engine-provided names have to live next to the module's own functions.
         moduleTable["entity"] = ScriptEntity(entity, &scene);
+        moduleTable["scene"] = state["HE"]["Scene"];
+        moduleTable["time"] = state["HE"]["Time"];
+        moduleTable["fields"] = fieldsTable;
     }
 
     void RegisterLuaBindings(sol::state& state, Scene& scene, sol::table& timeTable)
@@ -336,6 +238,16 @@ namespace HachimiEngine
             return sol::as_returns(std::array<float, 2> { position.first, position.second });
         });
 
+        input.set_function("GetActionPressed", [&scene](const std::string& name) { auto* map = scene.GetInputMap(); return map && map->GetActionPressed(name); });
+        input.set_function("GetActionHeld", [&scene](const std::string& name) { auto* map = scene.GetInputMap(); return map && map->GetActionHeld(name); });
+        input.set_function("GetActionReleased", [&scene](const std::string& name) { auto* map = scene.GetInputMap(); return map && map->GetActionReleased(name); });
+        input.set_function("GetAxis", [&scene](const std::string& name) { auto* map = scene.GetInputMap(); return map ? map->GetAxis(name) : 0.0f; });
+        timeTable.set_function("SetTimeScale", [&scene, timeTable](float scale) mutable
+        {
+            scene.GetTime().SetTimeScale(scale);
+            timeTable["TimeScale"] = scene.GetTime().GetTimeScale();
+        });
+
         sol::table key = state.create_table();
         he["Key"] = key;
         BindKeyConstants(key);
@@ -372,10 +284,31 @@ namespace HachimiEngine
             "SetScale", &ScriptEntity::SetScale,
             "GetWorldPosition", &ScriptEntity::GetWorldPosition,
             "Translate", &ScriptEntity::Translate,
-            "Rotate", &ScriptEntity::Rotate);
+            "Rotate", &ScriptEntity::Rotate,
+            "IsPending", &ScriptEntity::IsPending,
+            "IsValid", &ScriptEntity::IsValid,
+            "HasComponent", &ScriptEntity::HasComponent,
+            "AddComponent", &ScriptEntity::AddComponent,
+            "RemoveComponent", &ScriptEntity::RemoveComponent,
+            "Destroy", &ScriptEntity::Destroy,
+            "SetParent", &ScriptEntity::SetParent,
+            "ClearParent", &ScriptEntity::ClearParent);
+
+        RegisterLuaPhysicsBindings(state, he, scene);
 
         sol::table sceneTable = state.create_table();
         he["Scene"] = sceneTable;
+        sceneTable.set_function("CreateEntity", [&scene](sol::object first, sol::optional<std::string> name)
+        {
+            // Both HE.Scene.CreateEntity(name) and self.scene:CreateEntity(name) are accepted.
+            const std::string label = first.is<std::string>() ? first.as<std::string>() : name.value_or("Entity");
+            return ScriptEntity(scene.GetScriptCommands().CreateEntity(label), &scene);
+        });
+        sceneTable.set_function("DestroyEntity", [](sol::object first, sol::optional<ScriptEntity> target)
+        {
+            if (first.is<ScriptEntity>()) first.as<ScriptEntity>().Destroy();
+            else if (target) target->Destroy();
+        });
         sceneTable.set_function("GetName", [&scene]()
         {
             return scene.GetName();

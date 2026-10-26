@@ -3,6 +3,7 @@
 #include "Asset/AssetHandle.h"
 #include "Core/Timestep.h"
 #include "Scene/Entity.h"
+#include "Scripting/ScriptPhysicsEvent.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -27,6 +28,13 @@ namespace HachimiEngine
 
         // Advances every live instance by one frame.
         virtual void Update(Timestep timestep, Scene& scene) = 0;
+
+        // Callback contract: OnCreate; FixedUpdate(dt) per physics step; collision/trigger
+        // enter/exit before OnUpdate(dt); OnDestroy on removal/stop. A successful reload calls
+        // OnDestroy, OnCreate, OnReload, preserving fields. Errors retry on later invocations.
+        virtual void FixedUpdate(Timestep timestep, Scene& scene) = 0;
+        virtual void OnPhysicsEvent(const ScriptPhysicsEvent& event, Scene& scene) = 0;
+        virtual void PollHotReload(float unscaledDelta, Scene& scene) = 0;
 
         // Calls OnDestroy on every live instance, then releases the VM state.
         virtual void Shutdown(Scene& scene) = 0;

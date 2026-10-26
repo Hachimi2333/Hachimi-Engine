@@ -28,6 +28,15 @@ namespace HachimiEngine
     public:
         using EventCallbackFn = std::function<void(Event&)>;
 
+        // How the cursor behaves inside the window. Play mode captures it (Disabled) so mouse-look
+        // has no screen edge; the editor releases it so panel clicks keep working.
+        enum class CursorMode
+        {
+            Normal = 0,
+            Hidden,
+            Disabled
+        };
+
         virtual ~Window() = default;
 
         virtual void OnUpdate() = 0;
@@ -39,6 +48,16 @@ namespace HachimiEngine
         virtual void SetEventCallback(const EventCallbackFn& callback) = 0;
         virtual void SetVSync(bool enabled) = 0;
         virtual bool IsVSync() const = 0;
+
+        virtual void SetCursorMode(CursorMode mode) = 0;
+        virtual CursorMode GetCursorMode() const = 0;
+
+        // Switches between the windowed size and a full-screen mode, remembering the windowed
+        // placement so leaving full screen restores it.
+        virtual void SetFullscreen(bool fullscreen) = 0;
+        virtual bool IsFullscreen() const = 0;
+
+        virtual void SetTitle(const std::string& title) = 0;
 
         virtual void* GetNativeWindow() const = 0;
 

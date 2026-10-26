@@ -2,6 +2,7 @@
 
 #include "Core/Base.h"
 #include "Core/Memory.h"
+#include "Core/Time.h"
 #include "Core/Timestep.h"
 #include "Core/UUID.h"
 #include "Physics/PhysicsSettings.h"
@@ -10,6 +11,7 @@
 #include "Renderer/RenderView.h"
 #include "Scene/Entity.h"
 #include "Scene/SceneSystem.h"
+#include "Scripting/ScriptCommandQueue.h"
 #include "Math/Math.h"
 
 #include <entt/entt.hpp>
@@ -20,6 +22,8 @@
 
 namespace HachimiEngine
 {
+    class InputMap;
+
     // Camera and options for one extracted frame. The scene turns this into a RenderView;
     // the caller decides which SceneRenderer and which render target consume it.
     struct SceneRenderDesc
@@ -39,7 +43,7 @@ namespace HachimiEngine
     {
     public:
         Scene();
-        ~Scene() = default;
+        ~Scene();
 
         Entity CreateEntity(const std::string& name = "Entity");
         void DestroyEntity(Entity entity);
@@ -50,6 +54,10 @@ namespace HachimiEngine
         Ref<Scene> Clone() const;
 
         Entity GetEntityByUUID(UUID uuid);
+        // Resolves the key a physics query returns. A key that no longer names a live entity - the
+        // entity was destroyed after the query ran - resolves to an empty Entity rather than a
+        // stale handle.
+        Entity GetEntityByKey(uint64_t entityKey);
         Entity GetPrimaryCameraEntity();
 
         std::vector<Entity> GetAllEntities();
@@ -69,11 +77,35 @@ namespace HachimiEngine
         // Attaches the systems a running scene needs - physics and scripting - and detaches them
         // again on stop. Both are independent, so a scene without a physics world still runs its
         // scripts.
-        void OnRuntimeStart();
+        //
+        // The clock is passed in rather than reached for globally: the fixed step the simulation
+        // runs at is the scene's PhysicsSettings::FixedTimeStep, and a test can hand in its own
+        // Time to drive frame-by-frame without touching the process-wide instance.
+        void OnRuntimeStart(Time& clock = Time::Get());
         void OnRuntimeStop();
         bool IsRuntimeRunning() const { return m_RuntimeRunning; }
         // Advances every attached system, phase by phase.
-        void OnUpdate(Timestep timestep);
+        //
+        // The delta is the frame's *unscaled* time. While the runtime is running the fixed update
+        // phase runs once per owed fixed step, the update phase receives the time-scaled delta, and
+        // rendering interpolates by GetInterpolationAlpha(). A scene that is not running keeps the
+        // plain behaviour the editor relies on: one pass per phase, no fixed steps at all.
+        void OnUpdate(Timestep unscaledDelta);
+        void Step();
+        Time& GetTime() { return *m_Clock; }
+        const Time& GetTime() const { return *m_Clock; }
+        ScriptCommandQueue& GetScriptCommands() { return m_ScriptCommands; }
+        void SetInputMap(const InputMap* input) { m_InputMap = input; }
+        const InputMap* GetInputMap() const { return m_InputMap; }
+
+        // Fixed step the runtime is stepping at. Zero while the runtime is stopped.
+        float GetFixedDeltaTime() const;
+        // How far the frame sits between the last simulated state and the next one, in [0, 1).
+        // Exactly 1 when the scene is not running, which makes interpolation a no-op.
+        float GetInterpolationAlpha() const;
+        // Drops the time owed to the fixed update phase. Called when the runtime starts and stops,
+        // so a scene never resumes with a step debt from a previous run.
+        void ResetFixedStep();
 
         // Simulation steps. Presentation order is phase order; within a phase, insertion order.
         // Systems are attached and detached outside OnUpdate.
@@ -119,12 +151,32 @@ namespace HachimiEngine
         const entt::registry& GetRegistry() const { return m_Registry; }
         const std::unordered_map<UUID, entt::entity>& GetEntityMap() const { return m_EntityMap; }
 
+        // Where simulation events are published. Systems and the script layer subscribe, and the
+        // scene owns the dispatcher so that neither has to know about the other.
+        //
+        // Events are triggered immediately, from inside the phase that produced them: a physics
+        // event reaches its handlers before the update phase runs, which is what lets a handler
+        // trust that nothing has moved since the step it is being told about.
+        entt::dispatcher& GetDispatcher() { return m_Dispatcher; }
+        const entt::dispatcher& GetDispatcher() const { return m_Dispatcher; }
+
     private:
         void DestroyChildren(entt::entity entity);
         void CollectLights(LightingEnvironment& outLighting) const;
 
+        // Runs every system of one phase. Scene::OnUpdate calls it once per phase, and once more per
+        // fixed step.
+        void RunPhase(ScenePhase phase, Timestep timestep);
+
         // Composes the parent chain, guarding against a malformed or over-long one.
         Math::Mat4 GetWorldTransformRecursive(entt::entity entity, size_t depth) const;
+        // Same, for a local transform that differs from the stored one - the interpolated one.
+        Math::Mat4 GetWorldTransformRecursive(entt::entity entity, const Math::Mat4& localTransform, size_t depth) const;
+
+        // World transform a render item uses: the stored one, or the blend between the last two
+        // simulated states for a dynamic rigid body that has been stepped.
+        Math::Mat4 GetInterpolatedWorldTransform(entt::entity entity, const TransformComponent& transform) const;
+        Math::Mat4 GetWorldTransform(entt::entity entity, const TransformComponent& transform) const;
 
         // True when making parentUUID the parent of child would close a loop.
         bool WouldCreateCycle(entt::entity child, UUID parentUUID) const;
@@ -138,6 +190,9 @@ namespace HachimiEngine
     private:
         entt::registry m_Registry;
         std::unordered_map<UUID, entt::entity> m_EntityMap;
+        entt::dispatcher m_Dispatcher;
+        ScriptCommandQueue m_ScriptCommands;
+        const InputMap* m_InputMap = nullptr;
 
         // Derived from RelationshipComponent::Parent. Rebuilt on demand after any hierarchy
         // change rather than mirrored on every edit.
@@ -155,6 +210,10 @@ namespace HachimiEngine
         // The systems OnRuntimeStart attached, so stopping detaches exactly those.
         std::vector<SceneSystem*> m_RuntimeSystems;
         bool m_RuntimeRunning = false;
+        bool m_RenderCurrentTransform = false;
+
+        // Frame clock the fixed update phase consumes steps from. Only read while running.
+        Time* m_Clock = &Time::Get();
 
         friend class Entity;
         friend class SceneSerializer;

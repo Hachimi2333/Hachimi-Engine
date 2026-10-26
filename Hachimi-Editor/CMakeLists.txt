@@ -9,6 +9,8 @@ set(EDITOR_SOURCES
     Source/Components/PhysicsDrawers.cpp
     Source/Components/RenderingDrawers.cpp
     Source/Components/ScriptDrawer.cpp
+    Source/Components/ScriptFieldsInspector.cpp
+    Source/Components/ScriptFieldsInspector.h
     Source/Components/TransformDrawer.cpp
     Source/EditorApplication.cpp
     Source/EditorApplication.h
@@ -31,6 +33,10 @@ set(EDITOR_SOURCES
     Source/Panels/InspectorPanel.h
     Source/Panels/PackageInspectorPanel.cpp
     Source/Panels/PackageInspectorPanel.h
+    Source/Panels/PhysicsDebugOverlay.cpp
+    Source/Panels/PhysicsDebugOverlay.h
+    Source/Panels/PhysicsSettingsPanel.cpp
+    Source/Panels/PhysicsSettingsPanel.h
     Source/Panels/ProjectHubLayer.cpp
     Source/Panels/ProjectHubLayer.h
     Source/Panels/SavePromptPopup.cpp

@@ -10,6 +10,7 @@
 #include "Scene/Components/LightComponent.h"
 #include "Scene/Components/MeshRendererComponent.h"
 #include "Scene/Components/RelationshipComponent.h"
+#include "Scene/Components/RigidbodyComponent.h"
 #include "Scene/Components/TagComponent.h"
 #include "Scene/Components/TransformComponent.h"
 #include "Scene/Systems/PhysicsSystem.h"
@@ -47,6 +48,11 @@ namespace HachimiEngine
         auto& mesh = cubeEntity.AddComponent<MeshRendererComponent>();
         mesh.Primitive = PrimitiveMeshType::Cube;
         mesh.Mesh = MeshFactory::CreateCube();
+    }
+
+    Scene::~Scene()
+    {
+        OnRuntimeStop();
     }
 
     Entity Scene::CreateEntity(const std::string& name)
@@ -258,6 +264,19 @@ namespace HachimiEngine
         return Entity(it->second, this);
     }
 
+    Entity Scene::GetEntityByKey(uint64_t entityKey)
+    {
+        // Keys are registry handles, which EnTT recycles after a destroy, so validity rather than
+        // reachability is the check that matters here.
+        const entt::entity handle = static_cast<entt::entity>(entityKey);
+        if (!m_Registry.valid(handle))
+        {
+            return {};
+        }
+
+        return Entity(handle, this);
+    }
+
     Entity Scene::GetPrimaryCameraEntity()
     {
         auto view = m_Registry.view<CameraComponent>();
@@ -296,11 +315,16 @@ namespace HachimiEngine
         HE_CORE_VERIFY(m_Registry.valid(entity));
         HE_CORE_VERIFY(m_Registry.all_of<TransformComponent>(entity));
 
+        return GetWorldTransformRecursive(entity, m_Registry.get<TransformComponent>(entity).GetTransform(), depth);
+    }
+
+    Math::Mat4 Scene::GetWorldTransformRecursive(entt::entity entity, const Math::Mat4& localTransform, size_t depth) const
+    {
         // A parent chain longer than the guard is a malformed file rather than a deep scene, and
         // recursing into it would overflow the stack.
         HE_CORE_VERIFY(depth < MaxHierarchyDepth);
 
-        Math::Mat4 transform = m_Registry.get<TransformComponent>(entity).GetTransform();
+        Math::Mat4 transform = localTransform;
 
         const auto* relationship = m_Registry.try_get<RelationshipComponent>(entity);
         if (relationship != nullptr && relationship->Parent != UUID::Invalid())
@@ -321,7 +345,7 @@ namespace HachimiEngine
         m_ViewportHeight = height;
     }
 
-    void Scene::OnRuntimeStart()
+    void Scene::OnRuntimeStart(Time& clock)
     {
         if (m_RuntimeRunning)
         {
@@ -330,6 +354,12 @@ namespace HachimiEngine
         }
 
         m_RuntimeRunning = true;
+        m_Clock = &clock;
+        ResetFixedStep();
+
+        // The clock's fixed step is the one the fixed update phase consumes, so it is set from the
+        // scene's own physics configuration here rather than being configured twice.
+        m_Clock->SetFixedDeltaTime(m_PhysicsSettings.FixedTimeStep);
 
         // Physics runs in the fixed update phase and scripts in the variable update phase, so the
         // order between them comes from the phases rather than from the order of these two lines.
@@ -339,6 +369,7 @@ namespace HachimiEngine
 
     void Scene::OnRuntimeStop()
     {
+        if (!m_RuntimeRunning) return;
         // Detaching in reverse keeps teardown symmetric with startup, and scripts are torn down
         // before physics so OnDestroy callbacks can still query the physics world.
         for (auto it = m_RuntimeSystems.rbegin(); it != m_RuntimeSystems.rend(); ++it)
@@ -347,21 +378,119 @@ namespace HachimiEngine
         }
 
         m_RuntimeSystems.clear();
+        m_ScriptCommands.Clear();
         m_RuntimeRunning = false;
+
+        // Stop owing time and release the borrowed session clock before its owner can go away.
+        ResetFixedStep();
+        m_Clock = &Time::Get();
     }
 
-    void Scene::OnUpdate(Timestep timestep)
+    void Scene::OnUpdate(Timestep unscaledDelta)
     {
-        for (const ScenePhase phase : { ScenePhase::PreUpdate, ScenePhase::FixedUpdate, ScenePhase::Update, ScenePhase::LateUpdate })
+        m_RenderCurrentTransform = false;
+        // Systems only run the fixed update phase while the scene is running: an editor that is not
+        // playing has no simulation to step, and the editor itself reads the same Timestep the
+        // layers were handed.
+        if (!m_RuntimeRunning)
         {
-            for (const Scope<SceneSystem>& system : m_Systems)
+            RunPhase(ScenePhase::PreUpdate, unscaledDelta);
+            RunPhase(ScenePhase::Update, unscaledDelta);
+            m_ScriptCommands.Flush(*this);
+            RunPhase(ScenePhase::LateUpdate, unscaledDelta);
+            return;
+        }
+
+        // A time scale of zero (pause) still advances the clock, so the delta is zeroed here rather
+        // than by the caller. PreUpdate and LateUpdate keep receiving the unscaled delta, which is
+        // what lets UI and editor work continue while the simulation is frozen.
+        //
+        // The clock holds the fixed step, and the editor can edit the scene's setting while the scene
+        // runs, so the two are kept in step here: a physics panel change takes effect on this frame
+        // instead of waiting for the next play session.
+        if (m_Clock->GetFixedDeltaTime() != m_PhysicsSettings.FixedTimeStep)
+        {
+            m_Clock->SetFixedDeltaTime(m_PhysicsSettings.FixedTimeStep);
+        }
+
+        const Timestep scaledDelta(static_cast<float>(unscaledDelta) * m_Clock->GetTimeScale());
+        const Timestep fixedDelta(GetFixedDeltaTime());
+
+        RunPhase(ScenePhase::PreUpdate, unscaledDelta);
+
+        // The frame's whole debt is known before the first step, so the share that no step consumes
+        // is written back once at the end. That leaves Time holding the same remainder a plain
+        // "subtract a step per iteration" loop would, while letting a system observe the value the
+        // frame actually started with. Iterations are bounded by Core/Time.h's catch-up cap, so this
+        // cannot spiral.
+        const float owed = m_Clock->GetStepAccumulator();
+
+        int steps = 0;
+        while (m_Clock->ConsumeStep())
+        {
+            RunPhase(ScenePhase::FixedUpdate, fixedDelta);
+            ++steps;
+        }
+
+        m_Clock->SetStepAccumulator(owed - static_cast<float>(fixedDelta) * static_cast<float>(steps));
+
+        RunPhase(ScenePhase::Update, scaledDelta);
+        m_ScriptCommands.Flush(*this);
+        RunPhase(ScenePhase::LateUpdate, unscaledDelta);
+    }
+
+    void Scene::Step()
+    {
+        if (!m_RuntimeRunning) return;
+        m_Clock->SetFixedDeltaTime(m_PhysicsSettings.FixedTimeStep);
+        const Timestep step(GetFixedDeltaTime());
+        RunPhase(ScenePhase::PreUpdate, step);
+        RunPhase(ScenePhase::FixedUpdate, step);
+        RunPhase(ScenePhase::Update, step);
+        m_ScriptCommands.Flush(*this);
+        RunPhase(ScenePhase::LateUpdate, step);
+        ResetFixedStep();
+        m_RenderCurrentTransform = true;
+    }
+
+    void Scene::RunPhase(ScenePhase phase, Timestep timestep)
+    {
+        for (const Scope<SceneSystem>& system : m_Systems)
+        {
+            if (system != nullptr && system->RunsInPhase(phase))
             {
-                if (system != nullptr && system->GetPhase() == phase)
-                {
+                if (phase == ScenePhase::FixedUpdate)
+                    system->OnFixedUpdate(*this, timestep);
+                else
                     system->OnUpdate(*this, timestep);
-                }
             }
         }
+    }
+
+    float Scene::GetFixedDeltaTime() const
+    {
+        return m_RuntimeRunning ? m_Clock->GetFixedDeltaTime() : 0.0f;
+    }
+
+    float Scene::GetInterpolationAlpha() const
+    {
+        if (!m_RuntimeRunning || m_RenderCurrentTransform)
+        {
+            return 1.0f;
+        }
+
+        const float fixedDelta = m_Clock->GetFixedDeltaTime();
+        if (fixedDelta <= 0.0f)
+        {
+            return 1.0f;
+        }
+
+        return Math::Clamp(m_Clock->GetStepAccumulator() / fixedDelta, 0.0f, 1.0f);
+    }
+
+    void Scene::ResetFixedStep()
+    {
+        m_Clock->ClearSteps();
     }
 
     SceneSystem& Scene::AddSystemImpl(Scope<SceneSystem> system)
@@ -451,7 +580,7 @@ namespace HachimiEngine
 
             RenderItem item;
             item.Mesh = meshComponent.Mesh;
-            item.Transform = GetWorldTransform(entity);
+            item.Transform = GetInterpolatedWorldTransform(entity, transformComponent);
             item.AlbedoColor = meshComponent.AlbedoColor;
             item.Roughness = meshComponent.Roughness;
             item.Metallic = meshComponent.Metallic;
@@ -462,6 +591,36 @@ namespace HachimiEngine
         }
 
         return view;
+    }
+
+    Math::Mat4 Scene::GetInterpolatedWorldTransform(entt::entity entity, const TransformComponent& transform) const
+    {
+        const float alpha = GetInterpolationAlpha();
+
+        // A body that was never stepped - a static one, or any entity outside Play mode - has no
+        // previous state and is drawn exactly where the scene puts it, which is also what keeps the
+        // editor's picture unchanged. Rotation is blended as Euler angles: the wrap-around that
+        // makes that inexact across a full turn does not survive the conversion a rigid body
+        // transform goes through anyway, and a true slerp needs the quaternion path M4 adds.
+        //
+        // Only this entity's own local transform is blended, and it is blended before the parent
+        // chain is composed. A body parented to a moving transform therefore keeps the parent's
+        // motion exactly, which is the part that has to stay in step with the scene.
+        const auto* rigidbody = m_Registry.try_get<RigidbodyComponent>(entity);
+        if (rigidbody == nullptr || !rigidbody->PreviousTransformValid || alpha >= 1.0f)
+        {
+            return GetWorldTransform(entity);
+        }
+
+        TransformComponent interpolated = transform;
+        interpolated.Position = Math::Mix(rigidbody->PreviousPosition, transform.Position, alpha);
+        interpolated.Rotation = Math::Mix(rigidbody->PreviousRotation, transform.Rotation, alpha);
+        return GetWorldTransform(entity, interpolated);
+    }
+
+    Math::Mat4 Scene::GetWorldTransform(entt::entity entity, const TransformComponent& transform) const
+    {
+        return GetWorldTransformRecursive(entity, transform.GetTransform(), 0);
     }
 
     void Scene::CollectLights(LightingEnvironment& outLighting) const

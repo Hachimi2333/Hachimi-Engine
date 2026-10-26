@@ -94,6 +94,21 @@ namespace HachimiEngine
                 owner->ResetLayout();
             }
 
+            ImGui::Separator();
+
+            // The physics view is drawn in the viewport only: the game panel shows what a player
+            // would see, and a collider wireframe is not part of that.
+            ImGui::MenuItem("Show Physics Colliders", nullptr, &context.ShowPhysicsColliders);
+            ImGui::MenuItem("Show Physics Bounds", nullptr, &context.ShowPhysicsBounds);
+            ImGui::MenuItem("Show Contact Points", nullptr, &context.ShowPhysicsContacts);
+
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip(
+                    "Colliders are drawn from the running simulation while playing,\n"
+                    "and from the authored components while editing.");
+            }
+
             ImGui::EndMenu();
         }
 

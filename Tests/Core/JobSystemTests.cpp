@@ -11,6 +11,7 @@
 #include <chrono>
 #include <cstdint>
 #include <thread>
+#include <utility>
 #include <vector>
 
 using namespace HachimiEngine;
@@ -116,6 +117,66 @@ TEST_CASE("jobs run in parallel across workers")
     {
         CHECK(peak.load() == 1);
     }
+}
+
+TEST_CASE("a tracked job reports when it finished")
+{
+    REQUIRE(JobSystem::IsRunning());
+
+    // The job parks on `release`, so "not complete yet" is an observation and not a race: the pool
+    // has no way to finish it before the test lets it.
+    std::atomic<bool> release { false };
+    std::atomic<bool> started { false };
+
+    JobHandle handle = JobSystem::SubmitTracked([&release, &started]()
+    {
+        started.store(true);
+        while (!release.load())
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    });
+
+    CHECK_FALSE(handle.IsComplete());
+
+    release.store(true);
+    handle.Wait();
+
+    CHECK(handle.IsComplete());
+    CHECK(started.load());
+}
+
+TEST_CASE("a tracked handle survives being moved and an empty one is complete")
+{
+    JobHandle original = JobSystem::SubmitTracked([]() {});
+    JobHandle moved = std::move(original);
+
+    moved.Wait();
+    CHECK(moved.IsComplete());
+
+    // The moved-from handle stands for no work at all, which reads as already done so that no caller
+    // needs a validity check before waiting on one.
+    CHECK(original.IsComplete());
+    original.Wait();
+
+    const JobHandle empty;
+    CHECK(empty.IsComplete());
+    empty.Wait();
+}
+
+TEST_CASE("only pool workers report themselves as worker threads")
+{
+    REQUIRE(JobSystem::IsRunning());
+    CHECK_FALSE(JobSystem::IsWorkerThread());
+
+    std::atomic<bool> seenFromJob { false };
+    JobHandle handle = JobSystem::SubmitTracked([&seenFromJob]()
+    {
+        seenFromJob.store(JobSystem::IsWorkerThread());
+    });
+
+    handle.Wait();
+    CHECK(seenFromJob.load());
 }
 
 TEST_SUITE_END();

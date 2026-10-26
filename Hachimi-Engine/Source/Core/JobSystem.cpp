@@ -19,9 +19,15 @@ namespace HachimiEngine
         std::condition_variable s_QueueCondition;
         bool s_Running = false;
         bool s_AcceptingJobs = false;
+        // Read through JobSystem::IsWorkerThread so that code which must not park a pool thread can
+        // tell where it is running. Thread-local rather than a set of ids: a thread either is one of
+        // our workers or it is not, and the flag is set once per worker at startup.
+        thread_local bool s_IsWorkerThread = false;
 
         void WorkerLoop()
         {
+            s_IsWorkerThread = true;
+
             for (;;)
             {
                 std::function<void()> job;
@@ -45,6 +51,26 @@ namespace HachimiEngine
                     job();
                 }
             }
+        }
+    }
+
+    bool JobHandle::IsComplete() const
+    {
+        return m_Completion == nullptr || m_Completion->Finished.load(std::memory_order_acquire);
+    }
+
+    void JobHandle::Wait() const
+    {
+        if (m_Completion == nullptr)
+        {
+            return;
+        }
+
+        // Wait on the atomic instead of a condition variable: completion is a single flag, and the
+        // handle needs no mutex of its own for it. The loop guards against a spurious wake-up.
+        while (!m_Completion->Finished.load(std::memory_order_acquire))
+        {
+            m_Completion->Finished.wait(false, std::memory_order_acquire);
         }
     }
 
@@ -134,6 +160,33 @@ namespace HachimiEngine
         // inline so callers still observe a completed request. Callers that want
         // parallelism check IsRunning() before submitting.
         job();
+    }
+
+    JobHandle JobSystem::SubmitTracked(std::function<void()> job)
+    {
+        Ref<JobHandle::Completion> completion = CreateRef<JobHandle::Completion>();
+        if (!job)
+        {
+            completion->Finished.store(true, std::memory_order_release);
+            return JobHandle(std::move(completion));
+        }
+
+        // The completion travels with the job rather than living next to the queue, so a job that
+        // runs inline (pool not running) and one that runs on a worker finish the same way. The
+        // lambda captures two references, which fits the small-object buffer of std::function.
+        Submit([completion, job = std::move(job)]() mutable
+        {
+            job();
+            completion->Finished.store(true, std::memory_order_release);
+            completion->Finished.notify_all();
+        });
+
+        return JobHandle(std::move(completion));
+    }
+
+    bool JobSystem::IsWorkerThread()
+    {
+        return s_IsWorkerThread;
     }
 
     uint32_t JobSystem::GetWorkerCount()

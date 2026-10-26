@@ -25,6 +25,14 @@ namespace HachimiEngine
         void SetVSync(bool enabled) override;
         bool IsVSync() const override { return m_Data.VSync; }
 
+        void SetCursorMode(CursorMode mode) override;
+        CursorMode GetCursorMode() const override { return m_Data.CurrentCursorMode; }
+
+        void SetFullscreen(bool fullscreen) override;
+        bool IsFullscreen() const override { return m_Data.Fullscreen; }
+
+        void SetTitle(const std::string& title) override;
+
         void* GetNativeWindow() const override { return m_Window; }
 
     private:
@@ -37,6 +45,14 @@ namespace HachimiEngine
             uint32_t Width = 0;
             uint32_t Height = 0;
             bool VSync = true;
+            CursorMode CurrentCursorMode = CursorMode::Normal;
+            bool Fullscreen = false;
+            // Windowed placement, captured when entering full screen so leaving it restores the
+            // size and position the user had rather than a default.
+            int WindowedX = 0;
+            int WindowedY = 0;
+            uint32_t WindowedWidth = 0;
+            uint32_t WindowedHeight = 0;
             EventCallbackFn EventCallback;
         };
 

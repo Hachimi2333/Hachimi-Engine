@@ -170,6 +170,38 @@ namespace HachimiEngine
             return glm::inverse(value);
         }
 
+        // Position of a transform matrix.
+        inline Vec3 DecomposePosition(const Mat4& transform)
+        {
+            return { transform[3].x, transform[3].y, transform[3].z };
+        }
+
+        // Per-axis scale of a transform matrix, which is the length of each basis vector.
+        inline Vec3 DecomposeScale(const Mat4& transform)
+        {
+            return { Length(transform[0]), Length(transform[1]), Length(transform[2]) };
+        }
+
+        // Orientation of a transform matrix with the scale divided out.
+        //
+        // Anything that needs a rotation rather than a matrix - a physics body, a gizmo - needs it
+        // scale free, and dividing the basis vectors out is cheaper than an SVD and exact for the
+        // uniform and per-axis scales a scene can express.
+        inline Quat DecomposeRotation(const Mat4& transform)
+        {
+            Mat3 rotationMatrix(transform);
+            for (int column = 0; column < 3; ++column)
+            {
+                const float scale = Length(rotationMatrix[column]);
+                if (scale > 1e-6f)
+                {
+                    rotationMatrix[column] /= scale;
+                }
+            }
+
+            return QuatCast(rotationMatrix);
+        }
+
         template<typename T>
         inline T Transpose(const T& value)
         {

@@ -87,6 +87,8 @@ namespace
         scene->GetEnvironmentSettings().EnvironmentIntensity = 0.5f;
         scene->GetPhysicsSettings().Gravity = { 0.0f, -12.5f, 0.0f };
         scene->GetPhysicsSettings().SubStepCount = 2;
+        scene->GetPhysicsSettings().WorkerCount = 4;
+        scene->GetPhysicsSettings().EnableContactEvents = false;
 
         Entity parent = scene->CreateEntity("Parent");
         parent.Transform().Position = { 1.0f, 2.0f, 3.0f };
@@ -170,6 +172,8 @@ TEST_SUITE("Serialization")
         CHECK(Near(loaded->GetEnvironmentSettings().EnvironmentIntensity, 0.5f));
         CHECK(Near(loaded->GetPhysicsSettings().Gravity.y, -12.5f));
         CHECK(loaded->GetPhysicsSettings().SubStepCount == 2);
+        CHECK(loaded->GetPhysicsSettings().WorkerCount == 4);
+        CHECK_FALSE(loaded->GetPhysicsSettings().EnableContactEvents);
     }
 
     TEST_CASE("entity components survive the round trip")

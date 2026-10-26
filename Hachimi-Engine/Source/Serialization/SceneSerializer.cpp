@@ -96,6 +96,8 @@ namespace HachimiEngine
         out << YAML::Key << "SubStepCount" << YAML::Value << physics.SubStepCount;
         out << YAML::Key << "EnableSleep" << YAML::Value << physics.EnableSleep;
         out << YAML::Key << "EnableContinuous" << YAML::Value << physics.EnableContinuous;
+        out << YAML::Key << "EnableContactEvents" << YAML::Value << physics.EnableContactEvents;
+        out << YAML::Key << "WorkerCount" << YAML::Value << physics.WorkerCount;
         out << YAML::EndMap;
 
         out << YAML::Key << EntitiesKey << YAML::Value << YAML::BeginSeq;
@@ -190,6 +192,8 @@ namespace HachimiEngine
             physics.SubStepCount = physicsNode["SubStepCount"].as<int>(physics.SubStepCount);
             physics.EnableSleep = physicsNode["EnableSleep"].as<bool>(physics.EnableSleep);
             physics.EnableContinuous = physicsNode["EnableContinuous"].as<bool>(physics.EnableContinuous);
+            physics.EnableContactEvents = physicsNode["EnableContactEvents"].as<bool>(physics.EnableContactEvents);
+            physics.WorkerCount = physicsNode["WorkerCount"].as<uint32_t>(physics.WorkerCount);
         }
 
         const YAML::Node entities = data[EntitiesKey];
