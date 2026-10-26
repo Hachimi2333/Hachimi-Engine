@@ -83,7 +83,7 @@ namespace HachimiEngine
     {
     }
 
-    void ProjectSerializer::Serialize(const std::string& filepath)
+    bool ProjectSerializer::Serialize(const std::string& filepath)
     {
         YAML::Emitter out;
         out << YAML::BeginMap;
@@ -102,8 +102,7 @@ namespace HachimiEngine
 
         out << YAML::EndMap;
 
-        std::ofstream file(filepath);
-        file << out.c_str();
+        return FileSystem::WriteTextFileAtomic(filepath, out.c_str());
     }
 
     void ProjectSerializer::SerializeForBuild(const std::string& filepath)

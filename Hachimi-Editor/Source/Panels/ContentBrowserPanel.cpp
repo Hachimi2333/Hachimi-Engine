@@ -191,49 +191,54 @@ namespace HachimiEngine
         }
 
         ImGui::SameLine();
-        if (ImGui::Button("New Folder"))
+        if (ImGui::Button("New")) ImGui::OpenPopup("CreateAssetMenu");
+        if (ImGui::BeginPopup("CreateAssetMenu"))
         {
-            if (context.Assets != nullptr)
+            if (ImGui::MenuItem("Folder"))
             {
-                std::filesystem::path created;
-                const AssetWriteResult result =
-                    context.Assets->CreateDirectory(m_CurrentDirectory, "New Folder", created);
-                if (result == AssetWriteResult::Success)
+                if (context.Assets != nullptr)
                 {
-                    BeginRename(created);
-                }
-                else
-                {
-                    ReportResult("Create folder", m_CurrentDirectory, result);
+                    std::filesystem::path created;
+                    const AssetWriteResult result =
+                        context.Assets->CreateDirectory(m_CurrentDirectory, "New Folder", created);
+                    if (result == AssetWriteResult::Success)
+                    {
+                        BeginRename(created);
+                    }
+                    else
+                    {
+                        ReportResult("Create folder", m_CurrentDirectory, result);
+                    }
                 }
             }
+
+            if (ImGui::MenuItem("Material"))
+            {
+                if (context.Assets != nullptr)
+                {
+                    AssetHandle created;
+                    const AssetWriteResult result = context.Assets->CreateAsset(
+                        m_CurrentDirectory,
+                        "NewMaterial",
+                        AssetType::Material,
+                        MaterialAsset::Serialize(MaterialAsset::Default()),
+                        created);
+
+                    if (result == AssetWriteResult::Success)
+                    {
+                        m_SelectedPath = context.Assets->GetAssetPath(created);
+                    }
+                    else
+                    {
+                        ReportResult("Create material", m_CurrentDirectory, result);
+                    }
+                }
+            }
+
+            ImGui::EndPopup();
         }
 
         ImGui::SameLine();
-        if (ImGui::Button("New Material"))
-        {
-            if (context.Assets != nullptr)
-            {
-                AssetHandle created;
-                const AssetWriteResult result = context.Assets->CreateAsset(
-                    m_CurrentDirectory,
-                    "NewMaterial",
-                    AssetType::Material,
-                    MaterialAsset::Serialize(MaterialAsset::Default()),
-                    created);
-
-                if (result == AssetWriteResult::Success)
-                {
-                    m_SelectedPath = context.Assets->GetAssetPath(created);
-                }
-                else
-                {
-                    ReportResult("Create material", m_CurrentDirectory, result);
-                }
-            }
-        }
-
-        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - importButtonWidth - style.WindowPadding.x);
         if (ImGui::Button("Import Asset", ImVec2(importButtonWidth, 0.0f)))
         {
             const std::filesystem::path selectedPath = FileDialogs::OpenAssetImportDialog(assetsDirectory);
@@ -537,9 +542,9 @@ namespace HachimiEngine
         PlatformUtils::OpenPathInExplorer(path);
     }
 
-    void ContentBrowserPanel::Draw(EditorLayer* owner, EditorContext& context)
+    void ContentBrowserPanel::Draw(EditorLayer* owner, EditorContext& context, bool* open)
     {
-        if (!ImGui::Begin("Content Browser"))
+        if (!ImGui::Begin("Content Browser", open))
         {
             ImGui::End();
             return;

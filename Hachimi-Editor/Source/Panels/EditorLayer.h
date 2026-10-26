@@ -12,7 +12,7 @@
 #include "Panels/GamePanel.h"
 #include "Panels/InspectorPanel.h"
 #include "Panels/PackageInspectorPanel.h"
-#include "Panels/PhysicsSettingsPanel.h"
+#include "Panels/SceneSettingsPanel.h"
 #include "Panels/SavePromptPopup.h"
 #include "Panels/SceneHierarchyPanel.h"
 #include "Panels/ToolbarPanel.h"
@@ -52,6 +52,7 @@ namespace HachimiEngine
 
         // Opens the Build Settings export configuration popup.
         void OpenBuildSettings();
+        bool HasUnappliedAssetChanges() const { return m_InspectorPanel.HasUnappliedChanges(); }
 
         // Runs an action that would discard unsaved changes. When the scene is dirty the action
         // waits for the save prompt instead of running now; label describes it to the user.
@@ -88,7 +89,7 @@ namespace HachimiEngine
         ContentBrowserPanel m_ContentBrowserPanel;
         ConsolePanel m_ConsolePanel;
         PackageInspectorPanel m_PackageInspectorPanel;
-        PhysicsSettingsPanel m_PhysicsSettingsPanel;
+        SceneSettingsPanel m_SceneSettingsPanel;
         EditorMenuBar m_MenuBar;
         BuildSettingsPanel m_BuildSettingsPanel;
         ToolbarPanel m_ToolbarPanel;

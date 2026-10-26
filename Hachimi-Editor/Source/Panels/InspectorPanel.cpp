@@ -64,13 +64,97 @@ namespace HachimiEngine
         }
     }
 
-    void InspectorPanel::Draw(EditorContext& context)
+    bool InspectorPanel::RequestSelection(EditorContext& context, AssetHandle handle,
+        const std::filesystem::path& path, Entity entity)
     {
-        if (!ImGui::Begin("Inspector"))
+        if (handle == context.SelectedAsset && entity == context.SelectedEntity) return true;
+        return RequestAction([&context, handle, path, entity]
+        {
+            context.SelectedAsset = handle;
+            context.SelectedAssetPath = path;
+            context.SelectedEntity = entity;
+        });
+    }
+
+    bool InspectorPanel::RequestAction(std::function<void()> action)
+    {
+        if (!HasUnappliedChanges()) { m_EditStatus.clear(); return true; }
+        m_PendingAction = std::move(action);
+        m_SelectionPending = true;
+        return false;
+    }
+
+    void InspectorPanel::DiscardAssetEdits()
+    {
+        m_MaterialChanged = false;
+        m_MaterialBufferValid = false;
+        m_TextureDraft = {};
+        m_EditStatus.clear();
+    }
+
+    bool InspectorPanel::ApplyAssetEdits(EditorContext& context)
+    {
+        if (context.Assets == nullptr || context.Assets->IsReadOnly())
+        { m_EditStatus = "This asset is read-only"; return false; }
+        auto& assets = *context.Assets;
+        if (m_MaterialChanged)
+        {
+            const auto path = assets.GetAssetPath(m_MaterialBufferFor);
+            if (path.empty() || !FileSystem::WriteTextFileAtomic(path, MaterialAsset::Serialize(m_MaterialBuffer))
+                || !assets.NotifyAssetChanged(m_MaterialBufferFor))
+            { m_EditStatus = "Could not save material; edits are still pending"; return false; }
+            m_MaterialChanged = false;
+        }
+        if (m_TextureDraft.Changed)
+        {
+            const auto* current = assets.GetMeta(m_TextureDraft.For);
+            if (current == nullptr) { m_EditStatus = "The texture no longer exists"; return false; }
+            AssetMeta edited = *current;
+            edited.Texture = m_TextureDraft.Value;
+            if (assets.WriteMeta(m_TextureDraft.For, edited) != AssetWriteResult::Success)
+            { m_EditStatus = "Could not save texture settings; edits are still pending"; return false; }
+            if (context.Textures != nullptr) context.Textures->Evict(m_TextureDraft.For);
+            m_TextureDraft.Changed = false;
+        }
+        m_EditStatus = "Asset settings saved";
+        return true;
+    }
+
+    void InspectorPanel::DrawPendingSelection(EditorContext& context)
+    {
+        if (!m_SelectionPending) return;
+        ImGui::OpenPopup("Unapplied Asset Settings");
+        if (!ImGui::BeginPopupModal("Unapplied Asset Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+        ImGui::TextUnformatted("Apply the pending asset settings before continuing?");
+        if (!m_EditStatus.empty()) ImGui::TextWrapped("%s", m_EditStatus.c_str());
+        bool proceed = false;
+        if (ImGui::Button("Apply")) proceed = ApplyAssetEdits(context);
+        ImGui::SameLine();
+        if (ImGui::Button("Discard")) { DiscardAssetEdits(); proceed = true; }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) { m_SelectionPending = false; m_PendingAction = {}; ImGui::CloseCurrentPopup(); }
+        if (proceed)
+        {
+            DiscardAssetEdits();
+            m_AssetFields.Picker.Close();
+            m_AssetFields.Pending.Clear();
+            m_SelectionPending = false;
+            ImGui::CloseCurrentPopup();
+            auto action = std::move(m_PendingAction);
+            if (action) action();
+        }
+        ImGui::EndPopup();
+    }
+
+    void InspectorPanel::Draw(EditorContext& context, bool* open)
+    {
+        if (!ImGui::Begin("Inspector", open))
         {
             ImGui::End();
             return;
         }
+
+        if (!m_EditStatus.empty()) ImGui::TextWrapped("%s", m_EditStatus.c_str());
 
         // The picker is drawn first and its answer applied before the rows that consume it, so a
         // choice is reflected in the same frame the modal closes.
@@ -462,29 +546,7 @@ namespace HachimiEngine
         ImGui::BeginDisabled(!m_MaterialChanged);
         if (ImGui::Button("Apply", ImVec2(ImGui::GetContentRegionAvail().x * 0.5f, 0.0f)))
         {
-            const std::filesystem::path assetPath = assets.GetAssetPath(context.SelectedAsset);
-            if (!FileSystem::WriteTextFile(assetPath, MaterialAsset::Serialize(m_MaterialBuffer)))
-            {
-                HE_CLIENT_ERROR("Could not write the material {}", assetPath.string());
-            }
-            else
-            {
-                // Applying is a write the database did not make itself, so it is told about it:
-                // that bump is what makes the renderer rebuild the material it had cached.
-                assets.NotifyAssetChanged(context.SelectedAsset);
-                HE_CLIENT_INFO("Saved material {}", assetPath.generic_string());
-                m_MaterialChanged = false;
-
-                if (context.Textures != nullptr && m_MaterialBuffer.AlbedoTexture.IsValid())
-                {
-                    context.Textures->Evict(m_MaterialBuffer.AlbedoTexture);
-                }
-
-                if (context.DirtyState != nullptr)
-                {
-                    context.DirtyState->MarkDirty();
-                }
-            }
+            ApplyAssetEdits(context);
         }
         ImGui::EndDisabled();
 
@@ -511,58 +573,51 @@ namespace HachimiEngine
             return;
         }
 
-        AssetMeta edited = *meta;
-        bool changed = false;
+        m_TextureDraft.Bind(context.SelectedAsset, *meta);
+        auto& edited = m_TextureDraft.Value;
+        bool& changed = m_TextureDraft.Changed;
 
         if (BeginEntityTable("InspectorTextureRows"))
         {
             static const char* TypeNames[] = { "Color", "Normal", "Data" };
-            int type = static_cast<int>(edited.Texture.Type);
+            int type = static_cast<int>(edited.Type);
             BeginInspectorProperty("Type");
             if (ImGui::Combo("##TextureType", &type, TypeNames, IM_ARRAYSIZE(TypeNames)))
             {
-                edited.Texture.Type = static_cast<TextureType>(type);
+                edited.Type = static_cast<TextureType>(type);
                 changed = true;
             }
 
             static const char* WrapNames[] = { "Repeat", "Clamp", "Mirrored Repeat" };
-            int wrap = static_cast<int>(edited.Texture.Wrap);
+            int wrap = static_cast<int>(edited.Wrap);
             BeginInspectorProperty("Wrap");
             if (ImGui::Combo("##TextureWrap", &wrap, WrapNames, IM_ARRAYSIZE(WrapNames)))
             {
-                edited.Texture.Wrap = static_cast<TextureWrapMode>(wrap);
+                edited.Wrap = static_cast<TextureWrapMode>(wrap);
                 changed = true;
             }
 
             static const char* FilterNames[] = { "Nearest", "Linear" };
-            int filter = static_cast<int>(edited.Texture.Filter);
+            int filter = static_cast<int>(edited.Filter);
             BeginInspectorProperty("Filter");
             if (ImGui::Combo("##TextureFilter", &filter, FilterNames, IM_ARRAYSIZE(FilterNames)))
             {
-                edited.Texture.Filter = static_cast<TextureFilterMode>(filter);
+                edited.Filter = static_cast<TextureFilterMode>(filter);
                 changed = true;
             }
 
             BeginInspectorProperty("Mipmaps");
-            changed |= ImGui::Checkbox("##TextureMipmaps", &edited.Texture.GenerateMipmaps);
+            changed |= ImGui::Checkbox("##TextureMipmaps", &edited.GenerateMipmaps);
 
             ImGui::EndTable();
         }
 
         ImGui::Spacing();
         ImGui::BeginDisabled(!changed);
-        if (ImGui::Button("Apply", GetFullWidthButtonSize()))
-        {
-            if (assets.WriteMeta(context.SelectedAsset, edited) != AssetWriteResult::Success)
-            {
-                HE_CLIENT_ERROR("Could not write the texture settings");
-            }
-            else if (context.Textures != nullptr)
-            {
-                // The new settings only reach the GPU through a fresh upload.
-                context.Textures->Evict(context.SelectedAsset);
-            }
-        }
+        if (ImGui::Button("Apply")) ApplyAssetEdits(context);
         ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Revert")) m_TextureDraft.Revert(context.SelectedAsset, *meta);
+        if (changed) ImGui::TextDisabled("Unapplied texture settings");
     }
 }

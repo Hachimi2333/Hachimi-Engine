@@ -22,7 +22,7 @@ namespace HachimiEngine
     class ContentBrowserPanel
     {
     public:
-        void Draw(EditorLayer* owner, EditorContext& context);
+        void Draw(EditorLayer* owner, EditorContext& context, bool* open = nullptr);
 
     private:
         void NavigateTo(const std::filesystem::path& directory);

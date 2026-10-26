@@ -31,7 +31,7 @@ namespace HachimiEngine
         void Init(RendererContext& rendererContext);
 
         void RenderScene(EditorContext& context);
-        void Draw(EditorContext& context);
+        void Draw(EditorContext& context, bool* open = nullptr);
 
     private:
         void ManipulateSelectedEntity(EditorContext& context, const ImVec2& imageMin, const ImVec2& imageMax);

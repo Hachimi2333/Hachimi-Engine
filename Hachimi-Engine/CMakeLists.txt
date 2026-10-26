@@ -38,6 +38,11 @@ set(ENGINE_SOURCES
     Source/Core/UUID.h
     Source/Core/Window.cpp
     Source/Core/Window.h
+    Source/Editor/SceneEnvironmentCommands.h
+    Source/Editor/SceneEnvironmentCommands.cpp
+    Source/Editor/TextureSettingsDraft.h
+    Source/Editor/ProjectSettingsDraft.h
+    Source/Editor/ProjectSettingsDraft.cpp
     Source/Editor/EditorSettings.h
     Source/Editor/EditorSettings.cpp
     Source/Editor/CommandHistory.cpp

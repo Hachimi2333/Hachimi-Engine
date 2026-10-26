@@ -108,12 +108,12 @@ namespace HachimiEngine
         return FileSystem::WriteBinaryFile(destinationPath, data.data(), data.size());
     }
 
-    void PackageInspectorPanel::Draw(EditorLayer* owner, EditorContext& context)
+    void PackageInspectorPanel::Draw(EditorLayer* owner, EditorContext& context, bool* open)
     {
         (void)owner;
         (void)context;
 
-        if (!ImGui::Begin("Package Inspector"))
+        if (!ImGui::Begin("Package Inspector", open))
         {
             ImGui::End();
             return;

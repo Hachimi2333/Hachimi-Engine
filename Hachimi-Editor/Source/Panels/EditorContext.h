@@ -16,6 +16,7 @@
 
 namespace HachimiEngine
 {
+    struct EditorSettings;
     class AssetDatabase;
     class CommandHistory;
     class SceneDirtyState;
@@ -69,6 +70,8 @@ namespace HachimiEngine
         AssetDatabase* Assets = nullptr;
         TextureCache* Textures = nullptr;
 
+        std::function<bool(AssetHandle, const std::filesystem::path&, Entity)> SelectionGuard;
+        EditorSettings* Preferences = nullptr;
         EditorPendingAction PendingAction;
 
         Math::Vec2 ViewportSize { 1280.0f, 720.0f };
@@ -98,6 +101,7 @@ namespace HachimiEngine
         // editor goes through these two so the two states cannot both be set.
         void SelectEntity(Entity entity)
         {
+            if (SelectionGuard && !SelectionGuard(AssetHandle::Invalid(), {}, entity)) return;
             SelectedEntity = entity;
             SelectedAsset = AssetHandle::Invalid();
             SelectedAssetPath.clear();
@@ -105,6 +109,7 @@ namespace HachimiEngine
 
         void SelectAsset(AssetHandle handle, const std::filesystem::path& path)
         {
+            if (SelectionGuard && !SelectionGuard(handle, path, {})) return;
             SelectedAsset = handle;
             SelectedAssetPath = path;
             SelectedEntity = {};

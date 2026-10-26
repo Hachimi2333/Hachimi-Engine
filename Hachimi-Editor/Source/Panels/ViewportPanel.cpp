@@ -221,12 +221,12 @@ namespace HachimiEngine
         });
     }
 
-    void ViewportPanel::Draw(EditorContext& context)
+    void ViewportPanel::Draw(EditorContext& context, bool* open)
     {
         // Keep the viewport usable even when a stale layout saved a collapsed size.
         ImGui::SetNextWindowSizeConstraints(ImVec2(320.0f, 240.0f), ImVec2(FLT_MAX, FLT_MAX));
         ImGui::SetNextWindowSize(ImVec2(1280.0f, 720.0f), ImGuiCond_FirstUseEver);
-        if (!ImGui::Begin("Viewport"))
+        if (!ImGui::Begin("Viewport", open))
         {
             ImGui::End();
             return;

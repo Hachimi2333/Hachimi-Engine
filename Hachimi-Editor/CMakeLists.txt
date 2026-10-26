@@ -35,8 +35,8 @@ set(EDITOR_SOURCES
     Source/Panels/PackageInspectorPanel.h
     Source/Panels/PhysicsDebugOverlay.cpp
     Source/Panels/PhysicsDebugOverlay.h
-    Source/Panels/PhysicsSettingsPanel.cpp
-    Source/Panels/PhysicsSettingsPanel.h
+    Source/Panels/SceneSettingsPanel.cpp
+    Source/Panels/SceneSettingsPanel.h
     Source/Panels/ProjectHubLayer.cpp
     Source/Panels/ProjectHubLayer.h
     Source/Panels/SavePromptPopup.cpp

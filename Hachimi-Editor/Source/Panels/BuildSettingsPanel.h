@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Base.h"
+#include "Editor/ProjectSettingsDraft.h"
 #include "Packaging/PackageWriter.h"
 
 #include <filesystem>
@@ -12,7 +13,7 @@ namespace HachimiEngine
     struct EditorContext;
     class EditorLayer;
 
-    // Modal window opened from the Build menu. Edits the active project's
+    // Project settings opened from the Settings or Build menu. Edits the active project's
     // per-platform export settings and invokes ProjectPackager on demand.
     class BuildSettingsPanel
     {
@@ -22,6 +23,8 @@ namespace HachimiEngine
 
     private:
         bool m_Open = false;
+        ProjectSettingsDraft m_Draft;
+        std::vector<std::filesystem::path> m_SceneOptions;
         char m_ProductName[128] = {};
         std::string m_StatusMessage;
         bool m_StatusIsError = false;

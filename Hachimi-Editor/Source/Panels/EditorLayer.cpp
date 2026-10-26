@@ -6,6 +6,7 @@
 #include "Core/Application.h"
 #include "Core/Log.h"
 #include "Core/StartupTimer.h"
+#include "ImGui/ImGuiLayer.h"
 #include "Core/Input.h"
 #include "Core/KeyCodes.h"
 #include "Events/EventDispatcher.h"
@@ -43,22 +44,14 @@ namespace HachimiEngine
             ImGuiID dockLeft = 0;
             ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Left, 0.20f, &dockLeft, &dockMain);
 
-            ImGuiID dockConsole = 0;
-            ImGui::DockBuilderSplitNode(dockBottom, ImGuiDir_Right, 0.5f, &dockConsole, &dockBottom);
-
-            // Split the central area vertically so the toolbar stays above the viewport tabs.
-            ImGuiID dockToolbar = 0;
-            ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Up, 0.08f, &dockToolbar, &dockMain);
-
-            ImGui::DockBuilderDockWindow("Toolbar", dockToolbar);
             ImGui::DockBuilderDockWindow("Viewport", dockMain);
             ImGui::DockBuilderDockWindow("Game", dockMain);
             ImGui::DockBuilderDockWindow("Scene Hierarchy", dockLeft);
             ImGui::DockBuilderDockWindow("Inspector", dockRight);
-            ImGui::DockBuilderDockWindow("Physics", dockRight);
+            ImGui::DockBuilderDockWindow("Scene Settings", dockRight);
             ImGui::DockBuilderDockWindow("Content Browser", dockBottom);
-            ImGui::DockBuilderDockWindow("Console", dockConsole);
-            ImGui::DockBuilderDockWindow("Package Inspector", dockConsole);
+            ImGui::DockBuilderDockWindow("Console", dockBottom);
+            ImGui::DockBuilderDockWindow("Package Inspector", dockBottom);
             ImGui::DockBuilderFinish(dockspaceId);
         }
 
@@ -90,6 +83,9 @@ namespace HachimiEngine
         }
 
         Application& application = Application::Get();
+        m_Context.Preferences = &application.GetImGuiLayer()->GetSettings();
+        m_Context.SelectionGuard = [this](AssetHandle handle, const std::filesystem::path& path, Entity entity)
+        { return m_InspectorPanel.RequestSelection(m_Context, handle, path, entity); };
 
         // The asset database scans before the scene loads: a scene resolves the material and script
         // references it carries, which needs the identity sidecars to be readable.
@@ -191,6 +187,7 @@ namespace HachimiEngine
 
     void EditorLayer::OnPlay()
     {
+        if (!m_InspectorPanel.RequestAction([this] { OnPlay(); })) return;
         if (m_Context.ActiveScene == nullptr)
         {
             return;
@@ -286,33 +283,41 @@ namespace HachimiEngine
     void EditorLayer::OnImGuiRender()
     {
         ImGuizmo::BeginFrame();
-        m_ViewportPanel.RenderScene(m_Context);
-        m_GamePanel.RenderScene(m_Context);
+        if (m_Context.Preferences->Panels.Viewport) m_ViewportPanel.RenderScene(m_Context);
+        if (m_Context.Preferences->Panels.Game) m_GamePanel.RenderScene(m_Context);
 
-        DrawDockSpace();
+        auto& settings = *m_Context.Preferences;
+        auto& panels = settings.Panels;
+        const auto previousPanels = panels;
         m_MenuBar.Draw(this, m_Context);
         m_ToolbarPanel.Draw(this, m_Context);
-        m_SceneHierarchyPanel.Draw(m_Context);
-        m_InspectorPanel.Draw(m_Context);
-        m_ContentBrowserPanel.Draw(this, m_Context);
-        m_ConsolePanel.Draw();
-        m_PhysicsSettingsPanel.Draw(m_Context);
-        m_PackageInspectorPanel.Draw(this, m_Context);
+        DrawDockSpace();
+        if (panels.Hierarchy) m_SceneHierarchyPanel.Draw(m_Context, &panels.Hierarchy);
+        if (panels.Inspector) m_InspectorPanel.Draw(m_Context, &panels.Inspector);
+        if (panels.ContentBrowser) m_ContentBrowserPanel.Draw(this, m_Context, &panels.ContentBrowser);
+        if (panels.Console) m_ConsolePanel.Draw(&panels.Console);
+        if (panels.SceneSettings) m_SceneSettingsPanel.Draw(m_Context, &panels.SceneSettings);
+        if (panels.PackageInspector) m_PackageInspectorPanel.Draw(this, m_Context, &panels.PackageInspector);
         m_BuildSettingsPanel.Draw(this, m_Context);
+        m_InspectorPanel.DrawPendingSelection(m_Context);
 
         if (m_Context.FocusGamePanel)
         {
+            panels.Game = true;
             ImGui::SetNextWindowFocus();
             m_Context.FocusGamePanel = false;
         }
-        m_GamePanel.Draw(m_Context);
-
+        if (panels.Game) m_GamePanel.Draw(m_Context, &panels.Game);
+        else { m_Context.GameFocused = false; m_Context.GameInputReleased = true; }
         if (m_Context.FocusViewportPanel)
         {
+            panels.Viewport = true;
             ImGui::SetNextWindowFocus();
             m_Context.FocusViewportPanel = false;
         }
-        m_ViewportPanel.Draw(m_Context);
+        if (panels.Viewport) m_ViewportPanel.Draw(m_Context, &panels.Viewport);
+        else { m_Context.ViewportHovered = false; m_Context.ViewportFocused = false; }
+        settings.Dirty |= previousPanels != panels;
 
         // Shortcuts and the save prompt run last, so they see the selection this frame's panels
         // just produced.
@@ -370,6 +375,8 @@ namespace HachimiEngine
         {
             return;
         }
+
+        if (!m_InspectorPanel.RequestAction([this, label, action] { RequestAction(label, action); })) return;
 
         if (!m_DirtyState.IsDirty())
         {
@@ -560,7 +567,7 @@ namespace HachimiEngine
 
     void EditorLayer::RequestClose()
     {
-        if (m_CloseConfirmed || !m_DirtyState.IsDirty())
+        if (m_CloseConfirmed || (!m_DirtyState.IsDirty() && !m_InspectorPanel.HasUnappliedChanges()))
         {
             m_CloseConfirmed = true;
             Application::Get().Close();
@@ -575,6 +582,7 @@ namespace HachimiEngine
 
     void EditorLayer::ResetLayout()
     {
+        m_Context.Preferences->Reset();
         m_ResetLayoutRequested = true;
     }
 
@@ -590,7 +598,7 @@ namespace HachimiEngine
         EventDispatcher dispatcher(event);
         dispatcher.Dispatch<WindowCloseEvent>([this](WindowCloseEvent& closeEvent)
         {
-            if (m_CloseConfirmed || !m_DirtyState.IsDirty())
+            if (m_CloseConfirmed || (!m_DirtyState.IsDirty() && !m_InspectorPanel.HasUnappliedChanges()))
             {
                 m_CloseConfirmed = true;
                 return false;
@@ -605,13 +613,14 @@ namespace HachimiEngine
     void EditorLayer::DrawDockSpace()
     {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
-        // Versioned dock space ID gives the new Toolbar/Game/Physics panels a clean default layout.
-        const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpaceV3");
+        // The layout version separates the compact workspace from the legacy toolbar dock.
+        const ImGuiID dockspaceId = ImGui::GetID("EditorDockSpaceV4");
 
         // Build the layout once, before the dock space is submitted for this frame. A menu-triggered reset is
         // deferred here because dock builder calls must happen before the dock space is submitted.
         if (m_ResetLayoutRequested || ImGui::DockBuilderGetNode(dockspaceId) == nullptr)
         {
+            ImGui::DockBuilderRemoveNode(dockspaceId);
             SetupDefaultEditorDockLayout(dockspaceId, viewport->WorkSize);
             m_ResetLayoutRequested = false;
         }

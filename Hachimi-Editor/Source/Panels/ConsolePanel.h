@@ -19,7 +19,7 @@ namespace HachimiEngine
 
         void RegisterCallbacks();
         void UnregisterCallbacks();
-        void Draw();
+        void Draw(bool* open = nullptr);
 
     private:
         void PushMessage(const std::string& message);

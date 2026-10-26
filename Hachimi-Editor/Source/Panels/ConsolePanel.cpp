@@ -25,9 +25,9 @@ namespace HachimiEngine
         Log::SetClientMessageCallback(nullptr);
     }
 
-    void ConsolePanel::Draw()
+    void ConsolePanel::Draw(bool* open)
     {
-        if (!ImGui::Begin("Console"))
+        if (!ImGui::Begin("Console", open))
         {
             ImGui::End();
             return;

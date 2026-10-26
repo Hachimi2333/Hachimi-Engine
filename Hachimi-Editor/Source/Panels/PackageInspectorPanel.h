@@ -20,7 +20,7 @@ namespace HachimiEngine
     class PackageInspectorPanel
     {
     public:
-        void Draw(EditorLayer* owner, EditorContext& context);
+        void Draw(EditorLayer* owner, EditorContext& context, bool* open = nullptr);
 
         // Opens a package and refreshes the listing. Logs and keeps the previous
         // state on failure.

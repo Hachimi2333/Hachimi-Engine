@@ -24,6 +24,7 @@ namespace HachimiEngine
         char m_ProjectName[128] = "NewProject";
         char m_ProjectLocation[1024] = {};
         std::filesystem::path m_StartupProjectFile;
+        std::string m_Status;
         bool m_EditorPushed = false;
         Layer* m_EditorLayer = nullptr;
     };

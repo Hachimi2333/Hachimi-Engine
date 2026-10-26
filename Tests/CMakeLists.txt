@@ -25,6 +25,7 @@ set(TEST_SOURCES
     Core/LayerStackTests.cpp
     Core/UUIDTests.cpp
     Editor/EditorSettingsTests.cpp
+    Editor/SettingsEditingTests.cpp
     Renderer/EnvironmentMapDataTests.cpp
     Editor/CommandHistoryTests.cpp
     Math/MathTests.cpp

@@ -3,6 +3,7 @@
 #include "Asset/AssetDatabase.h"
 #include "Core/Application.h"
 #include "Core/Log.h"
+#include "Editor/EditorSettings.h"
 #include "Editor/CommandHistory.h"
 #include "Panels/EditorContext.h"
 #include "Panels/EditorLayer.h"
@@ -95,39 +96,35 @@ namespace HachimiEngine
             }
 
             ImGui::Separator();
-
-            // The physics view is drawn in the viewport only: the game panel shows what a player
-            // would see, and a collider wireframe is not part of that.
-            ImGui::MenuItem("Show Physics Colliders", nullptr, &context.ShowPhysicsColliders);
-            ImGui::MenuItem("Show Physics Bounds", nullptr, &context.ShowPhysicsBounds);
-            ImGui::MenuItem("Show Contact Points", nullptr, &context.ShowPhysicsContacts);
-
-            if (ImGui::IsItemHovered())
+            auto& panels = context.Preferences->Panels;
+            ImGui::MenuItem("Scene Hierarchy", nullptr, &panels.Hierarchy);
+            ImGui::MenuItem("Inspector", nullptr, &panels.Inspector);
+            ImGui::MenuItem("Content Browser", nullptr, &panels.ContentBrowser);
+            ImGui::MenuItem("Viewport", nullptr, &panels.Viewport);
+            ImGui::MenuItem("Game", nullptr, &panels.Game);
+            ImGui::Separator();
+            ImGui::MenuItem("Console", nullptr, &panels.Console);
+            ImGui::MenuItem("Package Inspector", nullptr, &panels.PackageInspector);
+            if (ImGui::BeginMenu("Physics Diagnostics"))
             {
-                ImGui::SetTooltip(
-                    "Colliders are drawn from the running simulation while playing,\n"
-                    "and from the authored components while editing.");
+                ImGui::MenuItem("Colliders", nullptr, &context.ShowPhysicsColliders);
+                ImGui::MenuItem("Bounds", nullptr, &context.ShowPhysicsBounds);
+                ImGui::MenuItem("Contact Points", nullptr, &context.ShowPhysicsContacts);
+                ImGui::EndMenu();
             }
 
             ImGui::EndMenu();
         }
 
+        if (ImGui::BeginMenu("Settings"))
+        {
+            ImGui::MenuItem("Scene Settings", nullptr, &context.Preferences->Panels.SceneSettings);
+            if (ImGui::MenuItem("Project Settings...")) owner->OpenBuildSettings();
+            ImGui::EndMenu();
+        }
         if (ImGui::BeginMenu("Build"))
         {
-            if (ImGui::MenuItem("Build Settings..."))
-            {
-                owner->OpenBuildSettings();
-            }
-
-            ImGui::EndMenu();
-        }
-
-        if (context.ActiveScene != nullptr && ImGui::BeginMenu("Renderer"))
-        {
-            EnvironmentSettings& environment = context.ActiveScene->GetEnvironmentSettings();
-            ImGui::Checkbox("Show Skybox", &environment.ShowSkybox);
-            ImGui::SliderFloat("Exposure", &environment.Exposure, 0.1f, 4.0f);
-            ImGui::SliderFloat("Environment Intensity", &environment.EnvironmentIntensity, 0.0f, 4.0f);
+            if (ImGui::MenuItem("Export Game...")) owner->OpenBuildSettings();
             ImGui::EndMenu();
         }
 
@@ -142,8 +139,12 @@ namespace HachimiEngine
                 + "  -  " + project->GetActiveScenePath().filename().string();
 
             const float textWidth = ImGui::CalcTextSize(title.c_str()).x;
-            ImGui::SameLine(ImGui::GetWindowWidth() - textWidth - ImGui::GetStyle().ItemSpacing.x * 3.0f);
-            ImGui::TextDisabled("%s", title.c_str());
+            const float titleX = ImGui::GetWindowWidth() - textWidth - ImGui::GetStyle().ItemSpacing.x * 3.0f;
+            if (titleX > ImGui::GetCursorPosX())
+            {
+                ImGui::SameLine(titleX);
+                ImGui::TextDisabled("%s", title.c_str());
+            }
         }
 
         ImGui::EndMainMenuBar();

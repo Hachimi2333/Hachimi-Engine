@@ -58,11 +58,11 @@ namespace HachimiEngine
         }
     }
 
-    void GamePanel::Draw(EditorContext& context)
+    void GamePanel::Draw(EditorContext& context, bool* open)
     {
         ImGui::SetNextWindowSizeConstraints(ImVec2(320.0f, 240.0f), ImVec2(FLT_MAX, FLT_MAX));
         ImGui::SetNextWindowSize(ImVec2(1280.0f, 720.0f), ImGuiCond_FirstUseEver);
-        if (!ImGui::Begin("Game"))
+        if (!ImGui::Begin("Game", open))
         {
             context.GameFocused = false;
             ImGui::End();

@@ -26,7 +26,7 @@ namespace HachimiEngine
         void Init(RendererContext& rendererContext);
 
         void RenderScene(EditorContext& context);
-        void Draw(EditorContext& context);
+        void Draw(EditorContext& context, bool* open = nullptr);
 
     private:
         RendererContext* m_Renderer = nullptr;

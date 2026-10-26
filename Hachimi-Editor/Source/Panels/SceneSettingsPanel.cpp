@@ -1,9 +1,10 @@
-#include "Panels/PhysicsSettingsPanel.h"
+#include "Panels/SceneSettingsPanel.h"
 
 #include "Components/InspectorWidgets.h"
 #include "Core/JobSystem.h"
 #include "Editor/CommandHistory.h"
 #include "Editor/ScenePhysicsCommands.h"
+#include "Editor/SceneEnvironmentCommands.h"
 #include "Panels/EditorContext.h"
 #include "Physics/PhysicsTaskScheduler.h"
 #include "Physics/PhysicsWorld.h"
@@ -51,10 +52,10 @@ namespace HachimiEngine
         };
     }
 
-    void PhysicsSettingsPanel::Draw(EditorContext& context)
+    void SceneSettingsPanel::Draw(EditorContext& context, bool* open)
     {
         ImGui::SetNextWindowSizeConstraints(ImVec2(280.0f, 220.0f), ImVec2(FLT_MAX, FLT_MAX));
-        if (!ImGui::Begin("Physics"))
+        if (!ImGui::Begin("Scene Settings", open))
         {
             ImGui::End();
             return;
@@ -75,9 +76,38 @@ namespace HachimiEngine
             ImGui::TextDisabled("Edits apply to this play session only.");
         }
 
+        ImGui::SeparatorText("Rendering");
+        auto& environment = context.ActiveScene->GetEnvironmentSettings();
+        if (BeginInspectorTable("EnvironmentRows"))
+        {
+            BeginInspectorProperty("Skybox");
+            bool skybox = environment.ShowSkybox;
+            if (ImGui::Checkbox("##Skybox", &skybox))
+            {
+                target.Record(SceneEnvironmentCommands::MakeSetSkybox(environment.ShowSkybox, skybox));
+                environment.ShowSkybox = skybox;
+            }
+            BeginInspectorProperty("Exposure");
+            float exposure = environment.Exposure;
+            if (ImGui::SliderFloat("##Exposure", &exposure, 0.1f, 4.0f))
+            {
+                target.Record(SceneEnvironmentCommands::MakeSetExposure(environment.Exposure, exposure));
+                environment.Exposure = exposure;
+            }
+            BeginInspectorProperty("Environment Intensity");
+            float intensity = environment.EnvironmentIntensity;
+            if (ImGui::SliderFloat("##EnvironmentIntensity", &intensity, 0.0f, 4.0f))
+            {
+                target.Record(SceneEnvironmentCommands::MakeSetIntensity(environment.EnvironmentIntensity, intensity));
+                environment.EnvironmentIntensity = intensity;
+            }
+            ImGui::EndTable();
+        }
+        ImGui::SeparatorText("Physics");
+
         if (BeginInspectorTable("PhysicsSettingsRows"))
         {
-            BeginInspectorProperty("Gravity");
+            BeginInspectorProperty("Gravity (m/s2)");
             {
                 Math::Vec3 gravity = settings.Gravity;
                 if (ImGui::DragFloat3("##Gravity", Math::ValuePtr(gravity), 0.1f))
@@ -85,52 +115,6 @@ namespace HachimiEngine
                     const Math::Vec3 before = settings.Gravity;
                     settings.Gravity = gravity;
                     target.Record(ScenePhysicsCommands::MakeSetGravity(before, gravity));
-                }
-            }
-
-            BeginInspectorProperty("Fixed Time Step");
-            {
-                float fixedStep = settings.FixedTimeStep;
-                if (ImGui::DragFloat("##FixedTimeStep", &fixedStep, 0.0005f, 0.001f, 0.1f, "%.4f s"))
-                {
-                    const float before = settings.FixedTimeStep;
-                    settings.FixedTimeStep = fixedStep;
-                    target.Record(ScenePhysicsCommands::MakeSetFixedTimeStep(before, fixedStep));
-                }
-            }
-
-            BeginInspectorProperty("Sub Steps");
-            {
-                int subSteps = settings.SubStepCount;
-                if (ImGui::SliderInt("##SubSteps", &subSteps, 1, 16))
-                {
-                    const int before = settings.SubStepCount;
-                    settings.SubStepCount = subSteps;
-                    target.Record(ScenePhysicsCommands::MakeSetSubStepCount(before, subSteps));
-                }
-            }
-
-            BeginInspectorProperty("Workers");
-            {
-                // 0 is "as many as the pool has", which is the only way to ask for the machine's
-                // whole pool without knowing it here.
-                int workers = static_cast<int>(settings.WorkerCount);
-                if (ImGui::SliderInt("##Workers", &workers, 0, static_cast<int>(PhysicsTaskScheduler::MaxWorkers)))
-                {
-                    const uint32_t before = settings.WorkerCount;
-                    const uint32_t after = static_cast<uint32_t>(std::max(workers, 0));
-                    settings.WorkerCount = after;
-                    target.Record(ScenePhysicsCommands::MakeSetWorkerCount(before, after));
-                }
-
-                ImGui::SameLine();
-                if (settings.WorkerCount == 0)
-                {
-                    ImGui::TextDisabled("(whole pool: %u)", JobSystem::GetWorkerCount());
-                }
-                else
-                {
-                    ImGui::TextDisabled("(pool has %u)", JobSystem::GetWorkerCount());
                 }
             }
 
@@ -144,7 +128,7 @@ namespace HachimiEngine
                 }
             }
 
-            BeginInspectorProperty("Continuous");
+            BeginInspectorProperty("Continuous Collision");
             {
                 bool enableContinuous = settings.EnableContinuous;
                 if (ImGui::Checkbox("##EnableContinuous", &enableContinuous))
@@ -167,8 +151,62 @@ namespace HachimiEngine
             ImGui::EndTable();
         }
 
+        if (ImGui::CollapsingHeader("Advanced Physics"))
+        {
+            ImGui::TextDisabled("Simulation timing and worker pool limits.");
+            if (BeginInspectorTable("AdvancedPhysicsRows"))
+            {
+                BeginInspectorProperty("Fixed Time Step");
+                {
+                    float fixedStep = settings.FixedTimeStep;
+                    if (ImGui::DragFloat("##FixedTimeStep", &fixedStep, 0.0005f, 0.001f, 0.1f, "%.4f s"))
+                    {
+                        const float before = settings.FixedTimeStep;
+                        settings.FixedTimeStep = fixedStep;
+                        target.Record(ScenePhysicsCommands::MakeSetFixedTimeStep(before, fixedStep));
+                    }
+                }
+
+                BeginInspectorProperty("Sub Steps");
+                {
+                    int subSteps = settings.SubStepCount;
+                    if (ImGui::SliderInt("##SubSteps", &subSteps, 1, 16))
+                    {
+                        const int before = settings.SubStepCount;
+                        settings.SubStepCount = subSteps;
+                        target.Record(ScenePhysicsCommands::MakeSetSubStepCount(before, subSteps));
+                    }
+                }
+
+                BeginInspectorProperty("Workers");
+                {
+                    // 0 is "as many as the pool has", which is the only way to ask for the machine's
+                    // whole pool without knowing it here.
+                    int workers = static_cast<int>(settings.WorkerCount);
+                    if (ImGui::SliderInt("##Workers", &workers, 0, static_cast<int>(PhysicsTaskScheduler::MaxWorkers)))
+                    {
+                        const uint32_t before = settings.WorkerCount;
+                        const uint32_t after = static_cast<uint32_t>(std::max(workers, 0));
+                        settings.WorkerCount = after;
+                        target.Record(ScenePhysicsCommands::MakeSetWorkerCount(before, after));
+                    }
+
+                    if (settings.WorkerCount == 0)
+                    {
+                        ImGui::TextDisabled("(whole pool: %u)", JobSystem::GetWorkerCount());
+                    }
+                    else
+                    {
+                        ImGui::TextDisabled("(pool has %u)", JobSystem::GetWorkerCount());
+                    }
+                }
+
+                ImGui::EndTable();
+            }
+        }
+
         PhysicsWorld* world = WorldOf(*context.ActiveScene);
-        if (world == nullptr)
+        if (world == nullptr || !ImGui::CollapsingHeader("Runtime Statistics"))
         {
             ImGui::End();
             return;

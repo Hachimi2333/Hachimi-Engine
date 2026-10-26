@@ -3,8 +3,10 @@
 #include "Asset/AssetHandle.h"
 #include "Asset/MaterialAsset.h"
 #include "Core/Base.h"
+#include "Editor/TextureSettingsDraft.h"
 #include "Scene/Entity.h"
 #include "UI/AssetField.h"
+#include <functional>
 
 namespace HachimiEngine
 {
@@ -19,9 +21,15 @@ namespace HachimiEngine
     class InspectorPanel
     {
     public:
-        void Draw(EditorContext& context);
+        void Draw(EditorContext& context, bool* open = nullptr);
+        bool RequestSelection(EditorContext& context, AssetHandle handle, const std::filesystem::path& path, Entity entity);
+        void DrawPendingSelection(EditorContext& context);
+        bool HasUnappliedChanges() const { return m_MaterialChanged || m_TextureDraft.Changed; }
+        bool RequestAction(std::function<void()> action);
 
     private:
+        bool ApplyAssetEdits(EditorContext& context);
+        void DiscardAssetEdits();
         void DrawEntityInspector(EditorContext& context, Entity entity);
         void DrawAddComponentMenu(EditorContext& context, Entity entity);
 
@@ -43,6 +51,10 @@ namespace HachimiEngine
 
     private:
         AssetFieldState m_AssetFields;
+        TextureSettingsDraft m_TextureDraft;
+        bool m_SelectionPending = false;
+        std::function<void()> m_PendingAction;
+        std::string m_EditStatus;
 
         // The document being edited. A material is a file, so the panel keeps the buffer across
         // frames and only touches the file when the user applies or reverts.

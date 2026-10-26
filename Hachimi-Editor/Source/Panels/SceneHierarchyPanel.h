@@ -12,7 +12,7 @@ namespace HachimiEngine
     class SceneHierarchyPanel
     {
     public:
-        void Draw(EditorContext& context);
+        void Draw(EditorContext& context, bool* open = nullptr);
 
     private:
         void DrawEntityNode(EditorContext& context, Entity entity);

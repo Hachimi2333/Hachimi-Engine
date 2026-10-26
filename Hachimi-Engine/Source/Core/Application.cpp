@@ -153,10 +153,12 @@ namespace HachimiEngine
     void Application::OnEvent(Event& event)
     {
         EventDispatcher dispatcher(event);
-        dispatcher.Dispatch<WindowCloseEvent>([this](WindowCloseEvent& closeEvent) { return OnWindowClose(closeEvent); });
         dispatcher.Dispatch<WindowResizeEvent>([this](WindowResizeEvent& resizeEvent) { return OnWindowResize(resizeEvent); });
 
         m_LayerStack.DispatchEvent(event);
+        // Editors must be able to consume close requests while a save prompt is pending.
+        if (!event.Handled)
+            dispatcher.Dispatch<WindowCloseEvent>([this](WindowCloseEvent& closeEvent) { return OnWindowClose(closeEvent); });
     }
 
     bool Application::OnWindowClose(WindowCloseEvent& event)
