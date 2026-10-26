@@ -164,6 +164,27 @@ Build-system notes:
 - `MeshRendererComponent`'s serialized key is still `"MeshComponent"`: it is a format identifier,
   not a display label, and renaming it would invalidate every scene for no benefit.
 
+## Runtime Contracts
+
+- Gameplay reads named actions and axes through `InputMap`; raw `Input` polling is reserved for
+  platform code and editor controls. Bindings live in `Assets/Input.hinput`, read through VFS.
+- Frame time comes from `Time`. Only `Application` measures wall-clock frame deltas; each
+  `SceneRuntime` owns an independent simulation clock and its fixed-step accumulator.
+- System events travel through the scene's `entt::dispatcher`. Physics publishes after each fixed
+  step; `ScriptWorld` queues callbacks in simulation order and delivers them before script Update.
+- Structural scene changes from scripts use `ScriptCommandQueue`, flushed once after Update and
+  before LateUpdate. Pending handles cannot read or mutate components until creation is flushed.
+  Other gameplay scene edits belong to Update; never mutate a registry during system traversal.
+- `b3World_Step` must never run inside a `JobSystem` job. `PhysicsSystem` steps on the frame thread;
+  only Box3D sub-tasks enter the pool, and worker counts cannot exceed the actual available pool.
+- Script backends implement the language-independent lifecycle contract in `ScriptRuntime`:
+  `OnCreate`, `FixedUpdate(dt)`, `OnCollisionEnter(other, contact)`, `OnCollisionExit(other)`,
+  `OnTriggerEnter(other)`, `OnTriggerExit(other)`, `OnUpdate(dt)`, `OnDestroy`, and optional
+  `OnReload`. Lua-specific VM, field injection and module loading stay in `Scripting/Lua`.
+- Editor Play and Player use `SceneRuntime`. Attach, Update, Pause, Step and Detach remain headless;
+  runtime presentation is initialized lazily by the renderer layer. Detach sessions before
+  shutting down scripting, asset services or the graphics context.
+
 ## Project Scope
 
 - Audio is not implemented in the current phase.

@@ -38,7 +38,11 @@
 ### 物理
 
 - Box3D 物理系统：Static / Kinematic / Dynamic 刚体、Box / Sphere / Capsule / Plane 碰撞体
-- 固定步长模拟与 Play 模式 Transform 同步
+- 固定步长模拟、渲染插值与暂停单步
+- RayCast / RayCastAll、球/盒 Overlap、球形 ShapeCast、力/冲量和 Teleport
+- 碰撞与触发器事件通过场景 dispatcher 在脚本 Update 前派发
+- Box3D 子任务接入 JobSystem，默认 1 个 worker，0 自动选择可用线程池数量
+- 编辑器碰撞体调试叠加与可撤销的场景物理设置
 
 ### 编辑器
 
@@ -64,7 +68,10 @@
 local MyScript = {}
 
 function MyScript:OnCreate() end
+function MyScript:FixedUpdate(fixedDeltaTime) end
 function MyScript:OnUpdate(deltaTime) end
+function MyScript:OnTriggerEnter(other) end
+function MyScript:OnReload() end
 function MyScript:OnDestroy() end
 
 return MyScript
@@ -73,14 +80,57 @@ return MyScript
 回调中 `self.entity` 为挂载该脚本的实体，全局 `HE` 表提供沙箱化引擎 API：
 
 - `HE.Log.Info / Warn / Error`
-- `HE.Time.DeltaTime / ElapsedTime`
-- `HE.Input.IsKeyDown / IsMouseButtonDown / GetMousePosition`
+- `HE.Time.DeltaTime / UnscaledDeltaTime / FixedDeltaTime / ElapsedTime / TimeScale / FrameCount`
+- `HE.Input.GetActionPressed / GetActionHeld / GetActionReleased / GetAxis`，保留原始轮询接口以兼容已有脚本
 - `HE.Key.*`、`HE.Mouse.*`
 - `HE.Math.Vec3`，以及 `Length / Normalize / Dot / Cross / Clamp / Lerp / Radians / Degrees`
-- `HE.Scene.FindEntityByName`
+- `HE.Scene.FindEntityByName / CreateEntity / DestroyEntity`
+- `HE.Physics.Raycast / OverlapSphere`
+- 刚体接口：`GetLinearVelocity / SetLinearVelocity / GetAngularVelocity / SetAngularVelocity`、
+  `ApplyForce / ApplyImpulse / ApplyTorque / ApplyAngularImpulse / Teleport`、`IsTriggered / SetTriggered`
+- 延迟实体操作：`AddComponent / RemoveComponent / SetParent / ClearParent / Destroy`
 - 实体方法：`GetName / SetName / GetPosition / SetPosition / GetRotation / SetRotation / GetScale / SetScale / Translate / Rotate / GetWorldPosition`
 
-脚本只在 Play 模式运行。每次 Play 会话使用独立 Lua VM，脚本报错只会输出到 Console，不会导致编辑器崩溃。
+脚本在编辑器 Play 与导出的 Player 中运行，每个场景拥有独立 VM。在 Inspector 声明
+Bool / Int / Float / String / Vec3 字段，通过 `self.fields.Name` 访问；序列化只保存默认值，
+运行时值留在会话内。`self.scene` / `self.time` 与 `HE.Scene` / `HE.Time` 指向同一服务。
+
+`require("Helper")` 通过 VFS 加载 `Assets/Scripts/Helper.lua`，缓存模块并拒绝越界路径。
+磁盘脚本及 require 的模块每 0.5 秒检查一次；成功热重载保留当前字段并调用
+OnDestroy → OnCreate → OnReload，加载失败保留旧模块。仅存在于资源包中的脚本不轮询磁盘。
+回调错误输出文件与行号，后续调用继续重试。
+
+## 统一运行时
+
+编辑器 Play 与 Player 都通过 `SceneRuntime` 驱动独立时钟、输入、模拟和延迟初始化的渲染资源。
+帧时间夹到 0.1 秒，每帧最多补 4 个固定步；物理事件先于脚本 Update，结构性场景命令在
+Update 结束、LateUpdate 开始前统一执行。新实体此前为 Pending，组件读写返回空值并告警一次。
+
+输入绑定从 `Assets/Input.hinput` 加载，支持键盘、鼠标与 GLFW 手柄，也能直接读取 `Data.hpak`。
+缺失文件时使用内置映射，新项目自动生成默认文件。玩法代码使用命名动作/轴；
+`TimeScale = 0` 停止固定步推进，编辑器 Pause 暂停整个会话。
+Play 继续、Pause 暂停、Step 在暂停时精确推进一个固定步、Stop 丢弃运行时副本。
+Game 面板聚焦时捕获光标，Escape 释放，点击面板可重新捕获；Play 时禁用编辑器相机控制。
+Play 态拾取使用物理碰撞体，编辑态仍使用网格三角形。
+
+在动态刚体脚本上声明 Float 字段 `Speed`，可使用以下脚本验证 WASD 与手柄移动：
+
+```lua
+local Player = {}
+function Player:FixedUpdate(dt)
+    local x = HE.Input.GetAxis("MoveX") + HE.Input.GetAxis("GamepadMoveX")
+    local z = HE.Input.GetAxis("MoveY") - HE.Input.GetAxis("GamepadMoveY")
+    local velocity = self.entity:GetLinearVelocity()
+    self.entity:SetLinearVelocity(HE.Math.Vec3(x * self.fields.Speed, velocity.y, -z * self.fields.Speed))
+end
+function Player:OnTriggerEnter(other)
+    HE.Log.Info("Entered trigger: " .. other:GetName())
+end
+return Player
+```
+
+场景格式升级到版本 4，旧版本明确拒绝加载、不自动迁移。
+画面、手柄和导出后行为由用户手动验证；模拟、脚本、序列化及编辑器/Player 状态一致性由无窗口测试覆盖。
 
 ## 环境要求
 
@@ -178,6 +228,7 @@ Build/x64-debug/bin/Hachimi-Player.exe Build/x64-debug/bin/SmokeTest.hpak --veri
 <ProjectName>/
 ├── <ProjectName>.hproj
 └── Assets/
+    ├── Input.hinput
     ├── Meshes/
     ├── Textures/
     ├── Materials/
@@ -310,7 +361,7 @@ Utils/                   # 临时调试工具（FramebufferTest 帧缓冲测试�
 - 除 OpenGL 4.6 Core 外的渲染后端
 - 外部 3D 模型导入（当前使用内置网格）
 - 日志文件输出（当前仅控制台）
-- 物理 Joints / Character Mover / Mesh / HeightField 碰撞体 / 物理 Debug Draw / Box3D 多线程（当前使用基础刚体与凸碰撞体）
+- 物理关节 / 角色控制器 / Mesh、HeightField、Compound 碰撞体 / 每实体多碰撞体 / 物理材质资产
 - 除 albedo 外的材质贴图通道（法线 / 自发光 / AO / 粗糙度 / 金属度）与 Alpha 模式；材质资产目前只有 albedo 通道
 - 编辑器之外的资产改名追踪：手工删除 `.meta` 侧车后会以新身份重建，指向它的引用随之失效
 

@@ -47,7 +47,11 @@ A C++20 3D game engine and editor for Windows, built on OpenGL 4.6 Core and insp
 ### Physics
 
 - Box3D integration: Static / Kinematic / Dynamic rigid bodies, Box / Sphere / Capsule / Plane colliders
-- Fixed-timestep simulation with Transform sync in Play mode
+- Fixed-step simulation with interpolated rendering and exact single-step control
+- RayCast / RayCastAll, sphere and box overlap, sphere shape casts, forces, impulses and teleport
+- Collision and trigger events delivered through the scene dispatcher before script Update
+- JobSystem schedules Box3D sub-tasks (1 worker by default; 0 selects the available pool)
+- Physics debug overlays and undoable scene settings in the editor
 
 ### Editor
 
@@ -77,7 +81,10 @@ A script returns a module table with optional lifecycle callbacks:
 local MyScript = {}
 
 function MyScript:OnCreate() end
+function MyScript:FixedUpdate(fixedDeltaTime) end
 function MyScript:OnUpdate(deltaTime) end
+function MyScript:OnTriggerEnter(other) end
+function MyScript:OnReload() end
 function MyScript:OnDestroy() end
 
 return MyScript
@@ -86,14 +93,63 @@ return MyScript
 Inside a callback, `self.entity` is the owning entity and the global `HE` table exposes the sandboxed engine API:
 
 - `HE.Log.Info / Warn / Error`
-- `HE.Time.DeltaTime / ElapsedTime`
-- `HE.Input.IsKeyDown / IsMouseButtonDown / GetMousePosition`
+- `HE.Time.DeltaTime / UnscaledDeltaTime / FixedDeltaTime / ElapsedTime / TimeScale / FrameCount`
+- `HE.Input.GetActionPressed / GetActionHeld / GetActionReleased / GetAxis` (raw polling remains available)
 - `HE.Key.*`, `HE.Mouse.*`
 - `HE.Math.Vec3` plus `Length / Normalize / Dot / Cross / Clamp / Lerp / Radians / Degrees`
-- `HE.Scene.FindEntityByName`
+- `HE.Scene.FindEntityByName / CreateEntity / DestroyEntity`
+- `HE.Physics.Raycast / OverlapSphere`
+- Entity motion: `GetLinearVelocity / SetLinearVelocity / GetAngularVelocity / SetAngularVelocity`,
+  `ApplyForce / ApplyImpulse / ApplyTorque / ApplyAngularImpulse / Teleport`, `IsTriggered / SetTriggered`
+- Deferred entity edits: `AddComponent / RemoveComponent / SetParent / ClearParent / Destroy`
 - Entity methods: `GetName / SetName / GetPosition / SetPosition / GetRotation / SetRotation / GetScale / SetScale / Translate / Rotate / GetWorldPosition`
 
-Scripts run only in Play mode. Each Play session creates an isolated Lua VM, and script errors are reported to the Console without crashing the editor.
+Scripts run in Editor Play and the exported Player, with an isolated VM per scene. Declare
+Bool / Int / Float / String / Vec3 fields in the Inspector and use `self.fields.Name`.
+Authored defaults are serialized; runtime values belong to the session. `self.scene` and
+`self.time` expose the same services as `HE.Scene` and `HE.Time`.
+
+`require("Helper")` loads `Assets/Scripts/Helper.lua` through VFS, caches the result, and rejects
+paths outside the script root. Disk scripts and required modules are checked every 0.5 seconds.
+Reload preserves current fields and calls OnDestroy → OnCreate → OnReload. Failed loading keeps
+the previous module; callback errors include file and line and retry on subsequent invocations.
+Packaged-only scripts skip disk polling.
+
+## Runtime
+
+`SceneRuntime` owns the independent session clock, input map, simulation and lazy presentation
+for both Editor Play and Player. Frame time is clamped to 0.1 seconds with at most four fixed
+steps per frame. Physics events precede script Update. Structural script commands flush after
+Update and before LateUpdate; a created entity remains pending until then, and component access
+returns an empty value with one warning.
+
+Bindings load from `Assets/Input.hinput`, including from `Data.hpak`, with keyboard, mouse and
+GLFW gamepad support. Missing files use built-in bindings; new projects include the default map.
+Gameplay reads named actions/axes. `TimeScale = 0` freezes fixed steps; the editor's Pause freezes
+the session. Play resumes, Pause pauses, Step advances one fixed step while paused, and Stop
+discards the runtime clone. The focused Game panel captures the cursor; Escape releases it and
+clicking the panel captures it again. Editor camera controls stop during Play. Picking uses
+physical colliders during Play and mesh triangles while editing.
+
+Declare a Float field `Speed` on a dynamic rigidbody's script to try WASD and gamepad movement:
+
+```lua
+local Player = {}
+function Player:FixedUpdate(dt)
+    local x = HE.Input.GetAxis("MoveX") + HE.Input.GetAxis("GamepadMoveX")
+    local z = HE.Input.GetAxis("MoveY") - HE.Input.GetAxis("GamepadMoveY")
+    local velocity = self.entity:GetLinearVelocity()
+    self.entity:SetLinearVelocity(HE.Math.Vec3(x * self.fields.Speed, velocity.y, -z * self.fields.Speed))
+end
+function Player:OnTriggerEnter(other)
+    HE.Log.Info("Entered trigger: " .. other:GetName())
+end
+return Player
+```
+
+Scene format is version 4; older layouts are explicitly rejected without migration.
+Interactive rendering, controller input and exported behavior need manual verification; simulation,
+Lua lifecycle/reload/fields, input/time and Editor/Player state parity have headless coverage.
 
 ## Requirements
 
@@ -196,6 +252,7 @@ A new project is generated with:
 <ProjectName>/
 ├── <ProjectName>.hproj
 └── Assets/
+    ├── Input.hinput
     ├── Meshes/
     ├── Textures/
     ├── Materials/
@@ -353,7 +410,7 @@ The following have reserved architecture slots but are not yet implemented:
 - Rendering backends other than OpenGL 4.6 Core
 - External 3D model import (built-in meshes are used)
 - Log file output (console only)
-- Physics joints / character mover / mesh / heightfield colliders / physics debug draw / Box3D multithreading (basic rigid bodies and convex colliders are used)
+- Physics joints / character controller / mesh, heightfield and compound colliders / multiple colliders per entity / physical material assets
 - Material texture channels beyond albedo (normal, emissive, AO, roughness, metallic) and alpha modes; the material asset holds the albedo channel today
 - Asset rename tracking from outside the editor: a `.meta` sidecar deleted by hand is regenerated with a new identity, which loses the references to it
 
