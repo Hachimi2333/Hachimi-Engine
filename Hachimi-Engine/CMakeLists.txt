@@ -38,6 +38,8 @@ set(ENGINE_SOURCES
     Source/Core/UUID.h
     Source/Core/Window.cpp
     Source/Core/Window.h
+    Source/Editor/EditorSettings.h
+    Source/Editor/EditorSettings.cpp
     Source/Editor/CommandHistory.cpp
     Source/Editor/CommandHistory.h
     Source/Editor/EditorCommand.h

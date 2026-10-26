@@ -36,6 +36,8 @@ namespace HachimiEngine
         bool HasLayer(Layer* layer) const { return m_LayerStack.ContainsLayer(layer); }
         bool HasOverlay(Layer* overlay) const { return m_LayerStack.ContainsOverlay(overlay); }
 
+        ImGuiLayer* GetImGuiLayer() { return m_ImGuiLayer.get(); }
+
         Window& GetWindow() { return *m_Window; }
         // The application frame clock. Gameplay reads its scene's independent session clock;
         // this clock measures and clamps the delta handed to layers.

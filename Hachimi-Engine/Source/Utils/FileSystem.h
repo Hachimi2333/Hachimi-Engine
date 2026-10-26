@@ -31,6 +31,7 @@ namespace HachimiEngine
         // Renames a file or a directory, falling back to copy-then-delete when the source and
         // the destination are on different volumes.
         static bool MoveFile(const std::filesystem::path& source, const std::filesystem::path& destination);
+        static bool WriteTextFileAtomic(const std::filesystem::path& path, const std::string& content);
         static bool WriteTextFile(const std::filesystem::path& path, std::string_view content);
         static bool WriteBinaryFile(const std::filesystem::path& path, const void* data, size_t size);
         static bool RemoveAll(const std::filesystem::path& path);

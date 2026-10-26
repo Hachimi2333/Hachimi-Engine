@@ -2,6 +2,8 @@
 
 #include "Core/Layer.h"
 #include "Core/Memory.h"
+#include "Editor/EditorSettings.h"
+#include <chrono>
 
 namespace HachimiEngine
 {
@@ -18,5 +20,12 @@ namespace HachimiEngine
 
         void Begin();
         void End();
+        EditorSettings& GetSettings() { return m_Settings; }
+
+    private:
+        void SaveSettings();
+        EditorSettings m_Settings;
+        std::chrono::steady_clock::time_point m_SaveRequestedAt {};
+        bool m_SavePending = false;
     };
 }

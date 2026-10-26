@@ -4,6 +4,7 @@
 #include "Core/Application.h"
 #include "Core/Log.h"
 #include "Utils/VirtualFileSystem.h"
+#include "Utils/FileSystem.h"
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -146,9 +147,14 @@ namespace HachimiEngine
         ImGui::CreateContext();
 
         ImGuiIO& io = ImGui::GetIO();
+        io.IniFilename = nullptr;
+        const auto settingsPath = EditorSettings::GetPath();
+        if (FileSystem::Exists(settingsPath) && !m_Settings.Load(settingsPath))
+            HE_CORE_WARN("Invalid editor settings; using the default layout: {}", settingsPath.string());
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+        if (!m_Settings.Layout.empty()) ImGui::LoadIniSettingsFromMemory(m_Settings.Layout.data(), m_Settings.Layout.size());
 
         // Apply the centralized square, blue-accented dark editor theme.
         ThemeConfig::Apply(ImGui::GetStyle());
@@ -161,9 +167,21 @@ namespace HachimiEngine
 
     void ImGuiLayer::OnDetach()
     {
+        SaveSettings();
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
+    }
+
+    void ImGuiLayer::SaveSettings()
+    {
+        size_t size = 0;
+        const char* layout = ImGui::SaveIniSettingsToMemory(&size);
+        m_Settings.Layout.assign(layout, size);
+        if (!m_Settings.Save(EditorSettings::GetPath()))
+            HE_CORE_WARN("Could not save editor settings; changes remain in memory");
+        m_Settings.Dirty = false;
+        m_SavePending = false;
     }
 
     void ImGuiLayer::OnEvent(Event& event)
@@ -189,6 +207,16 @@ namespace HachimiEngine
 
     void ImGuiLayer::End()
     {
+        auto& io = ImGui::GetIO();
+        if (io.WantSaveIniSettings || m_Settings.Dirty)
+        {
+            io.WantSaveIniSettings = false;
+            m_Settings.Dirty = false;
+            if (!m_SavePending) m_SaveRequestedAt = std::chrono::steady_clock::now();
+            m_SavePending = true;
+        }
+        if (m_SavePending && std::chrono::steady_clock::now() - m_SaveRequestedAt >= std::chrono::seconds(1))
+            SaveSettings();
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 

@@ -2,6 +2,9 @@
 
 #include <algorithm>
 #include <fstream>
+#include <windows.h>
+#undef CopyFile
+#undef MoveFile
 
 namespace HachimiEngine
 {
@@ -139,6 +142,16 @@ namespace HachimiEngine
         return !errorCode;
     }
 
+    bool FileSystem::WriteTextFileAtomic(const std::filesystem::path& path, const std::string& content)
+    {
+        if (path.empty()) return false;
+        const auto temporary = std::filesystem::path(path.wstring() + L".tmp");
+        if (!WriteTextFile(temporary, content)) return false;
+        const bool saved = MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+        if (!saved) { std::error_code error; std::filesystem::remove(temporary, error); }
+        return saved;
+    }
+
     bool FileSystem::WriteTextFile(const std::filesystem::path& path, std::string_view content)
     {
         CreateDirectories(path.parent_path());
@@ -150,7 +163,8 @@ namespace HachimiEngine
         }
 
         file.write(content.data(), static_cast<std::streamsize>(content.size()));
-        return file.good();
+        file.close();
+        return !file.fail();
     }
 
     bool FileSystem::WriteBinaryFile(const std::filesystem::path& path, const void* data, size_t size)
