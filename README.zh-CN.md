@@ -50,7 +50,7 @@
 - 撤销 / 重做命令栈（Ctrl+Z / Ctrl+Y），gizmo 拖拽与文本输入等连续编辑合并为一条记录
 - 关闭编辑器、切换场景、返回 Project Hub 前提示保存未保存的改动
 - Content Browser 文件管理：新建文件夹、新建材质、重命名、复制、删除（删除前列出引用者）与拖拽移动，`.meta` 随资产移动
-- 游戏导出管线：Build Settings 弹窗、Windows_x64 导出、`Data.hpak` 资源打包，以及独立的 `Hachimi-Player` 运行时
+- 游戏导出管线：Project Settings 弹窗、Windows_x64 导出、`Data.hpak` 资源打包，以及独立的 `Hachimi-Player` 运行时
 - 大图标 Content Browser 网格，支持纹理缩略图，可将文件拖拽到 Inspector 资产字段
 - Native File Dialog Extended 系统原生文件对话框
 - Inter 字体与显示器 DPI 自适应 UI 缩放
@@ -244,15 +244,29 @@ Build/x64-debug/bin/Hachimi-Player.exe Build/x64-debug/bin/SmokeTest.hpak --veri
 同时 `Scripted Spinner` 实体会由内置的 `Rotator.lua` 脚本持续旋转。
 Game 面板使用主相机视角。
 
+### 设置与启动
+
+`Settings → Scene Settings` 集中管理渲染和物理设置，高级模拟参数与运行统计默认折叠。
+场景设置支持撤销、重做；播放期间的修改只影响运行副本。可通过 `View` 开启辅助面板或重置布局。
+
+个人布局与面板可见性保存在 `%APPDATA%/HachimiEngine/EditorSettings.yaml`，最近项目继续使用同目录下的
+`HubSettings.yaml`。程序不再读取或生成 `imgui.ini`。资产属性草稿在 Apply 或 Revert 前持续保留，离开时会提示处理。
+
+CMake 在构建阶段将固定天空与环境光烘焙为 `Environment/Default.henv`，保持原有画质。
+统一资源复制目标将它放到可执行文件旁，导出时纳入 `Data.hpak`；Player 不再初始化 ImGui。
+
+编辑器和 Player 均接受 `--startup-profile`：输出启动分阶段计时，提交一个实际画面帧后退出。
+该诊断会创建图形窗口；自动化 `Tests.exe` 始终无窗口。详见[启动分析与实测](Docs/StartupAndEditorUX.md)。
+
 ### 导出游戏
 
-在编辑器菜单栏打开 `Build → Build Settings...`。弹窗按目标平台保存配置，当前阶段仅实现 Windows。Windows 配置包括：
+在编辑器菜单栏打开 `Settings → Project Settings...`，也可以通过 `Build → Export Game...` 进入。修改先保留在草稿中，保存后才写入项目；当前仅支持 Windows x86_64。配置包括：
 
 - Product Name（导出的可执行文件名与窗口标题）
 - Start Scene（`Assets/Scenes` 下的 `.hscene` 文件）
 - 窗口宽高与 VSync
 
-点击 `Export` 生成构建：
+点击 `Save and Export` 保存项目与场景后生成构建：
 
 ```
 <ProjectName>/
@@ -357,7 +371,7 @@ Utils/                   # 临时调试工具（FramebufferTest 帧缓冲测试�
 
 - 音频系统
 - 除 Lua 外的更多脚本语言（后端抽象已预留）
-- Windows 以外的导出平台（Build Settings 的平台布局已预留，当前实现 Windows_x64）
+- Windows 以外的导出平台（数据模型预留了其他平台，当前实现 Windows_x64）
 - 除 OpenGL 4.6 Core 外的渲染后端
 - 外部 3D 模型导入（当前使用内置网格）
 - 日志文件输出（当前仅控制台）

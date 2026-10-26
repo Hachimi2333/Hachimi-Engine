@@ -63,7 +63,7 @@ A C++20 3D game engine and editor for Windows, built on OpenGL 4.6 Core and insp
 - Unsaved-changes prompt before closing the editor, switching scene or returning to the Project Hub
 - Content Browser file management: new folder, new material, rename, duplicate, delete (with the
   referencing documents listed first) and drag-and-drop moving; sidecars travel with their asset
-- Game export pipeline: Build Settings popup, Windows_x64 builds, packaged `Data.hpak` assets, and a standalone `Hachimi-Player` runtime
+- Game export pipeline: Project Settings popup, Windows_x64 builds, packaged `Data.hpak` assets, and a standalone `Hachimi-Player` runtime
 - Large-icon Content Browser grid with texture thumbnails and drag-and-drop to Inspector asset fields
 - Native File Dialog Extended system file dialogs
 - Inter font and DPI-aware UI scaling
@@ -264,15 +264,33 @@ A new project is generated with:
 
 The default `Default.hscene` showcases rendering and physics features: PBR metal/roughness material balls and cubes, ground plane, directional light shadows (including inter-object shadows on the platform), two point lights, a parented object hierarchy, skybox and IBL. In Play mode, the scene's spheres, cubes and clustered child objects fall, collide and settle under Box3D physics simulation, while the `Scripted Spinner` entity rotates from the bundled `Rotator.lua` script. The Game panel uses the main camera view.
 
+### Settings and startup
+
+`Settings → Scene Settings` groups rendering and physics controls; advanced simulation options
+and runtime statistics are collapsed. Scene edits support undo/redo; edits during Play affect
+only the runtime copy. `View` opens optional panels and resets the workspace layout.
+
+Personal layout and panel visibility are saved in `%APPDATA%/HachimiEngine/EditorSettings.yaml`.
+Recent projects remain in `HubSettings.yaml` in the same directory. No `imgui.ini` is loaded or
+created. Asset inspectors retain pending edits until Apply or Revert and prompt before leaving them.
+
+CMake bakes the fixed sky and environment lighting into `Environment/Default.henv` during the
+build, retaining the original quality. The shared resource-copy target publishes it beside the
+executables and the exporter includes it in `Data.hpak`. The Player does not initialize ImGui.
+
+Both executables accept `--startup-profile`: log startup stages, submit one real frame, then
+exit. This diagnostic opens a graphics window; automated `Tests.exe` remains entirely headless.
+See [startup analysis and measurements](Docs/StartupAndEditorUX.md).
+
 ### Exporting a Game
 
-Open `Build → Build Settings...` in the editor menu bar. The popup stores settings per target platform; only Windows is implemented in the current phase. Windows settings include:
+Open `Settings → Project Settings...` (also available through `Build → Export Game...`). Changes remain in a draft until saved; only Windows x86_64 is supported. Settings include:
 
 - Product Name (used for the exported executable name and window title)
 - Start Scene (`.hscene` files under `Assets/Scenes`)
 - Window width / height and VSync
 
-Click `Export` to create the build:
+Click `Save and Export` to save the project and scene, then create the build:
 
 ```
 <ProjectName>/
@@ -406,7 +424,7 @@ The following have reserved architecture slots but are not yet implemented:
 
 - Audio system
 - Additional scripting languages beyond Lua (the backend abstraction is in place)
-- Export targets beyond Windows (the Build Settings platform layout is reserved; Windows_x64 is implemented)
+- Export targets beyond Windows (platform slots are reserved in the data model; Windows_x64 is implemented)
 - Rendering backends other than OpenGL 4.6 Core
 - External 3D model import (built-in meshes are used)
 - Log file output (console only)
